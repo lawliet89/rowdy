@@ -2,9 +2,12 @@
 name = "rowdy"
 version = "0.1.0"
 dependencies = [
+ "hyper 0.10.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "jwt 0.1.0 (git+https://github.com/lawliet89/rust-jwt?rev=0816f212eb85df143fcb04f6db4e05d1ae020bbd)",
  "rocket 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rocket_codegen 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rocket_contrib 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -234,6 +237,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rocket_contrib"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rocket 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.9.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 0.9.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "rustc-serialize"
 version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -393,6 +408,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "uuid"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "version_check"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -436,6 +456,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum ring 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "595afba2db7545b940ec900dc59b5281f719d327fc0674eeadc9953617e55357"
 "checksum rocket 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4492fd7b3300f156b699f8033e2aa902b80b8be4a44e9a389f34a54b07981126"
 "checksum rocket_codegen 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "011ec66b6cfccff11e1c1e56fdaac876efe0bff9b477d4d05be4cbe7a0193f14"
+"checksum rocket_contrib 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e1e24cdf302cdd0a09afa987cae6ed92ca18bb34dc8c7883a54dd1a617804e8b"
 "checksum rustc-serialize 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)" = "237546c689f20bb44980270c73c3b9edd0891c1be49cc1274406134a66d3957b"
 "checksum rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"
 "checksum semver 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)" = "d4f410fedcf71af0345d7607d246e7ad15faaadd49d240ee3b24e5dc21a820ac"
@@ -458,6 +479,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum unicode-xid 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f860d7d29cf02cb2f3f359fd35991af3d30bac52c57d265a3c461074cb4dc"
 "checksum untrusted 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "193df64312e3515fd983ded55ad5bcaa7647a035804828ed757e832ce6029ef3"
 "checksum url 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5ba8a749fb4479b043733416c244fa9d1d3af3d7c23804944651c8a448cb87e"
+"checksum uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7cfec50b0842181ba6e713151b72f4ec84a6a7e2c9c8a8a3ffc37bb1cd16b231"
 "checksum version_check 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f2edadb5308f31d97771a678c33df28f18d04f61de3fe21b9452f37854eb6c08"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"

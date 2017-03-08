@@ -17,6 +17,16 @@ doctest = true
 doc = true
 
 [dependencies]
+hyper = "0.10"
 jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "0816f212eb85df143fcb04f6db4e05d1ae020bbd" }
 rocket = "0.2.2"
 rocket_codegen = "0.2.2"
+uuid = "0.4"
+
+[dependencies.rocket_contrib]
+version = "*"
+default-features = false
+features = ["json", "uuid"]
+
+[dev-dependencies]
+rocket = { version = "*", features = ["testing"] }
