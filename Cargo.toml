@@ -1,0 +1,22 @@
+[package]
+name = "rowdy"
+version = "0.1.0"
+authors = ["Yong Wen Chua <me@yongwen.xyz>"]
+
+[[bin]]
+name = "rowdy"
+path = "src/main.rs"
+test = true
+doc = false
+
+[lib]
+name = "rowdy"
+path = "src/lib.rs"
+test = true
+doctest = true
+doc = true
+
+[dependencies]
+jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "0816f212eb85df143fcb04f6db4e05d1ae020bbd" }
+rocket = "0.2.2"
+rocket_codegen = "0.2.2"
