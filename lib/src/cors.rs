@@ -104,7 +104,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Origin {
                     Err(e) => Outcome::Failure((Status::BadRequest, Error::BadOrigin(e))),
                 }
             }
-            None => Outcome::Failure((Status::BadRequest, Error::MissingOrigin)),
+            None => Outcome::Failure((Status::Forbidden, Error::MissingOrigin)),
         }
     }
 }
@@ -192,6 +192,9 @@ pub struct Options {
     pub allowed_methods: HashSet<rocket::http::Method>,
     /// Only used in pre-flight
     pub allowed_headers: HashSet<String>,
+    pub allow_credentials: bool,
+    pub expose_headers: HashSet<String>,
+    pub max_age: Option<usize>,
 }
 
 impl Options {
@@ -208,11 +211,11 @@ impl Options {
 
         match headers {
             Some(headers) => {
-                response.allowed_headers(headers,
-                                         self.allowed_headers
-                                             .iter()
-                                             .map(|s| &**s)
-                                             .collect())
+                self.append(response.allowed_headers(headers,
+                                                     self.allowed_headers
+                                                         .iter()
+                                                         .map(|s| &**s)
+                                                         .collect()))
             }
             None => Ok(response),
         }
@@ -220,17 +223,28 @@ impl Options {
 
     /// Use options to respond
     pub fn respond<'r, R: Responder<'r>>(&self, responder: R, origin: &Origin) -> Result<Response<R>, Error> {
-        Response::<R>::allowed_origin(responder, origin, &self.allowed_origins)
+        self.append(Response::<R>::allowed_origin(responder, origin, &self.allowed_origins))
+    }
+
+    pub fn append<'r, R: Responder<'r>>(&self, response: Result<Response<R>, Error>) -> Result<Response<R>, Error> {
+        Ok(response?
+               .credentials(self.allow_credentials)
+               .exposed_headers(self.expose_headers
+                                    .iter()
+                                    .map(|s| &**s)
+                                    .collect::<Vec<&str>>()
+                                    .as_slice())
+               .max_age(self.max_age))
     }
 }
 
 /// The CORS type, which implements `Responder`. This type allows
 /// you to request resources from another domain.
 pub struct Response<R> {
+    responder: R,
     allow_origin: String,
     allow_methods: HashSet<Method>,
     allow_headers: HashSet<String>,
-    responder: R,
     allow_credentials: bool,
     expose_headers: HashSet<String>,
     max_age: Option<usize>,

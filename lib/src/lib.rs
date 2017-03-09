@@ -18,7 +18,6 @@ extern crate uuid;
 mod test;
 pub mod cors;
 
-use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 use std::ops::Deref;
@@ -28,16 +27,23 @@ use rocket::http::Method::*;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
 
+/// Implement a simple Deref from `From` to `To` where `From` is a newtype struct containing `To`
+macro_rules! impl_deref {
+    ($f:ty, $t:ty) => {
+        impl Deref for $f {
+            type Target = $t;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+    }
+}
+
 /// Wrapper around `hyper::Url` with `Serialize` and `Deserialize` implemented
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Url(hyper::Url);
-
-impl Deref for Url {
-    type Target = hyper::Url;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref!(Url, hyper::Url);
 
 impl FromStr for Url {
     type Err = hyper::error::ParseError;
@@ -95,38 +101,10 @@ pub struct Configuration {
     pub allowed_origins: cors::AllowedOrigins,
 }
 
-impl Configuration {
-    /// Panics if any URL is invalid.
-    pub fn to_cors_options(&self,
-                           allowed_methods: &HashSet<rocket::http::Method>,
-                           allowed_headers: &HashSet<String>)
-                           -> cors::Options {
-
-        cors::Options {
-            allowed_origins: self.allowed_origins.clone(),
-            allowed_methods: allowed_methods.clone(),
-            allowed_headers: allowed_headers.clone(),
-        }
-    }
-}
-
-/// Implement a simple Deref from `From` to `To` where `From` is a newtype struct containing `To`
-macro_rules! impl_deref {
-    ($f:ty, $t:ty) => {
-        impl Deref for $f {
-            type Target = $t;
-
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
-    }
-}
-
 struct HelloCorsOptions(cors::Options);
 impl_deref!(HelloCorsOptions, cors::Options);
 
-const HELLO_METHODS: &[rocket::http::Method] = &[Get];
+const HELLO_METHODS: &[rocket::http::Method] = &[Post];
 const HELLO_HEADERS: &'static [&'static str] = &[];
 
 #[options("/")]
@@ -137,14 +115,18 @@ fn hello_options(origin: cors::Origin,
     options.preflight(&origin, &method, None)
 }
 
-#[get("/")]
+#[post("/")]
 fn hello(origin: cors::Origin, options: State<HelloCorsOptions>) -> Result<cors::Response<&'static str>, cors::Error> {
     options.respond("Hello world", &origin)
 }
 
 pub fn launch(config: Configuration) {
-    let hello_options =
-        HelloCorsOptions(config.to_cors_options(&HELLO_METHODS.iter().cloned().collect(),
-                                                &HELLO_HEADERS.iter().map(|s| s.to_string()).collect()));
+    let hello_options = HelloCorsOptions(cors::Options {
+                                             allowed_origins: config.allowed_origins.clone(),
+                                             allowed_methods: HELLO_METHODS.iter().cloned().collect(),
+                                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string()).collect(),
+                                             allow_credentials: true,
+                                             ..Default::default()
+                                         });
     rocket::ignite().mount("/", routes![hello, hello_options]).manage(hello_options).launch();
 }
