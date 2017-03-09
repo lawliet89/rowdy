@@ -17,7 +17,7 @@ use rocket::response::{self, Responder};
 use rocket::http::{Method, Status};
 use rocket::Outcome;
 
-use ::Url;
+use Url;
 
 // TODO: impl Responder?
 #[derive(Debug)]

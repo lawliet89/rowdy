@@ -35,23 +35,18 @@ struct Args {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.decode())
-                            .unwrap_or_else(|e| e.exit());
+    let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
 
     let config = read_config(&args.arg_configuration_json)
         .map_err(|err| {
-            panic!("Failed to read configuration file {}: {}",
-                    &args.arg_configuration_json,
-                    err)
-        })
+                     panic!("Failed to read configuration file {}: {}",
+                            &args.arg_configuration_json,
+                            err)
+                 })
         .unwrap();
     debug!("Configuration parsed {:?}", config);
 
-    rocket::ignite()
-        .mount("/", routes![rowdy::hello, rowdy::hello_options])
-        .manage(config)
-        .launch();
+    rowdy::launch(config);
 }
 
 fn read_config(path: &str) -> Result<rowdy::Configuration, String> {

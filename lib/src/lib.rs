@@ -23,6 +23,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::ops::Deref;
 
+use rocket::State;
 use rocket::http::Method::*;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
@@ -109,15 +110,26 @@ impl Configuration {
     }
 }
 
+pub fn launch(config: Configuration) {
+    rocket::ignite().mount("/", routes![hello, hello_options]).manage(config).launch();
+}
+
 const HELLO_METHODS: &[rocket::http::Method] = &[Get];
 const HELLO_HEADERS: &'static [&'static str] = &[];
 
 #[options("/")]
-fn hello_options() -> &'static str {
-    "OK"
+fn hello_options(origin: cors::Origin,
+                 method: cors::AccessControlRequestMethod,
+                 config: State<Configuration>)
+                 -> Result<cors::Response<()>, cors::Error> {
+    let options = config.to_cors_options(&HELLO_METHODS.iter().cloned().collect(),
+                                         &HELLO_HEADERS.iter().map(|s| s.to_string()).collect());
+    options.preflight(&origin, &method, None)
 }
 
 #[get("/")]
-fn hello(origin: cors::Origin) -> cors::Response<&'static str> {
-    cors::Response::any("Hello, world!")
+fn hello(origin: cors::Origin, config: State<Configuration>) -> Result<cors::Response<&'static str>, cors::Error> {
+    let options = config.to_cors_options(&HELLO_METHODS.iter().cloned().collect(),
+                                         &HELLO_HEADERS.iter().map(|s| s.to_string()).collect());
+    options.respond("Hello world", &origin)
 }
