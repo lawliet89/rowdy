@@ -219,7 +219,7 @@ impl Options {
     }
 
     /// Use options to respond
-    pub fn respond<'r, R: Responder<'r>>(self, responder: R, origin: &Origin) -> Result<Response<R>, Error> {
+    pub fn respond<'r, R: Responder<'r>>(&self, responder: R, origin: &Origin) -> Result<Response<R>, Error> {
         Response::<R>::allowed_origin(responder, origin, &self.allowed_origins)
     }
 }

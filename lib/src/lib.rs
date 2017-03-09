@@ -110,9 +110,21 @@ impl Configuration {
     }
 }
 
-pub fn launch(config: Configuration) {
-    rocket::ignite().mount("/", routes![hello, hello_options]).manage(config).launch();
+/// Implement a simple Deref from `From` to `To` where `From` is a newtype struct containing `To`
+macro_rules! impl_deref {
+    ($f:ty, $t:ty) => {
+        impl Deref for $f {
+            type Target = $t;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+    }
 }
+
+struct HelloCorsOptions(cors::Options);
+impl_deref!(HelloCorsOptions, cors::Options);
 
 const HELLO_METHODS: &[rocket::http::Method] = &[Get];
 const HELLO_HEADERS: &'static [&'static str] = &[];
@@ -120,16 +132,19 @@ const HELLO_HEADERS: &'static [&'static str] = &[];
 #[options("/")]
 fn hello_options(origin: cors::Origin,
                  method: cors::AccessControlRequestMethod,
-                 config: State<Configuration>)
+                 options: State<HelloCorsOptions>)
                  -> Result<cors::Response<()>, cors::Error> {
-    let options = config.to_cors_options(&HELLO_METHODS.iter().cloned().collect(),
-                                         &HELLO_HEADERS.iter().map(|s| s.to_string()).collect());
     options.preflight(&origin, &method, None)
 }
 
 #[get("/")]
-fn hello(origin: cors::Origin, config: State<Configuration>) -> Result<cors::Response<&'static str>, cors::Error> {
-    let options = config.to_cors_options(&HELLO_METHODS.iter().cloned().collect(),
-                                         &HELLO_HEADERS.iter().map(|s| s.to_string()).collect());
+fn hello(origin: cors::Origin, options: State<HelloCorsOptions>) -> Result<cors::Response<&'static str>, cors::Error> {
     options.respond("Hello world", &origin)
+}
+
+pub fn launch(config: Configuration) {
+    let hello_options =
+        HelloCorsOptions(config.to_cors_options(&HELLO_METHODS.iter().cloned().collect(),
+                                                &HELLO_HEADERS.iter().map(|s| s.to_string()).collect()));
+    rocket::ignite().mount("/", routes![hello, hello_options]).manage(hello_options).launch();
 }

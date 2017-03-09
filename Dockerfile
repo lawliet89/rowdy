@@ -27,7 +27,8 @@ RUN cargo fetch
 COPY . ./
 RUN cargo build --release
 
-COPY ./Config.json ./
+# FIXME: Better way to deal with this
+COPY target/Config.json ./
 
 ENTRYPOINT ["cargo"]
 CMD ["run", "--release", "Config.json"]
