@@ -4,3 +4,4 @@ Dockerfile
 docker-compose.yml
 docker-compose.override.yml
 .gitignore
+.dockerignore
