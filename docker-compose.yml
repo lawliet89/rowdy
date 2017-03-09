@@ -1,6 +1,8 @@
-version: "2.0"
+version: "2.1"
 services:
   rowdy:
     build: .
     expose:
       - 8000
+    volumes:
+      - ./config:/app/src/config

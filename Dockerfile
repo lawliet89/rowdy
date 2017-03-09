@@ -28,7 +28,7 @@ COPY . ./
 RUN cargo build --release
 
 # FIXME: Better way to deal with this
-COPY target/Config.json ./
+VOLUME ["/app/src/config"]
 
 ENTRYPOINT ["cargo"]
-CMD ["run", "--release", "Config.json"]
+CMD ["run", "--release", "config/Config.json"]
