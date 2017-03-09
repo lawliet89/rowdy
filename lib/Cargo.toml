@@ -1,0 +1,30 @@
+[package]
+name = "rowdy-lib"
+version = "0.1.0"
+authors = ["Yong Wen Chua <me@yongwen.xyz>"]
+
+[lib]
+name = "rowdy"
+path = "src/lib.rs"
+test = true
+doctest = true
+doc = true
+
+[dependencies]
+hyper = "0.10"
+jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "0816f212eb85df143fcb04f6db4e05d1ae020bbd" }
+log = "0.3"
+rocket = "0.2.2"
+rocket_codegen = "0.2.2"
+serde = "0.9"
+serde_derive = "0.9"
+serde_json = "0.9"
+uuid = "0.4"
+
+[dependencies.rocket_contrib]
+version = "*"
+default-features = false
+features = ["json", "uuid"]
+
+[dev-dependencies]
+rocket = { version = "*", features = ["testing"] }

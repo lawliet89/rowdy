@@ -5,17 +5,19 @@
 //! [example implementation](https://github.com/SergioBenitez/Rocket/pull/141) to nest `Responders` to acheive
 //! the same effect in the short run.
 use std::collections::HashSet;
+use std::default::Default;
 use std::error;
 use std::fmt;
 use std::str::FromStr;
 
-use hyper::Url;
 use hyper::error::ParseError;
 use rocket;
 use rocket::request::{self, Request, FromRequest};
-use rocket::response::{self, Response, Responder};
+use rocket::response::{self, Responder};
 use rocket::http::{Method, Status};
 use rocket::Outcome;
+
+use ::Url;
 
 // TODO: impl Responder?
 #[derive(Debug)]
@@ -25,6 +27,9 @@ pub enum Error {
     MissingRequestMethod,
     BadRequestMethod(rocket::Error),
     MissingRequestHeaders,
+    OriginNotAllowed,
+    MethodNotAllowed,
+    HeadersNotAllowed,
 }
 
 impl error::Error for Error {
@@ -41,6 +46,9 @@ impl error::Error for Error {
                 "The request header `Access-Control-Request-Headers` \
                 is required but is missing"
             }
+            Error::OriginNotAllowed => "Origin is not allowed to request",
+            Error::MethodNotAllowed => "Method is not allowed",
+            Error::HeadersNotAllowed => "Headers are not allowed",
         }
     }
 
@@ -62,6 +70,16 @@ impl fmt::Display for Error {
     }
 }
 
+impl<'r> Responder<'r> for Error {
+    fn respond(self) -> Result<response::Response<'r>, Status> {
+        error_!("CORS Error: {:?}", self);
+        Err(match self {
+                Error::OriginNotAllowed | Error::MethodNotAllowed | Error::HeadersNotAllowed => Status::Forbidden,
+                _ => Status::BadRequest,
+            })
+    }
+}
+
 /// The `Origin` request header used in CORS
 #[derive(Debug)]
 pub struct Origin(Url);
@@ -70,7 +88,7 @@ impl FromStr for Origin {
     type Err = ParseError;
 
     fn from_str(url: &str) -> Result<Self, Self::Err> {
-        let url = Url::parse(url)?;
+        let url = Url::from_str(url)?;
         Ok(Origin(url))
     }
 }
@@ -128,6 +146,10 @@ impl FromStr for AccessControlRequestHeaders {
     type Err = ();
 
     fn from_str(headers: &str) -> Result<Self, Self::Err> {
+        if headers.trim().is_empty() {
+            return Ok(AccessControlRequestHeaders(HashSet::new()));
+        }
+
         let set: HashSet<String> = headers.split(',').map(|header| header.trim().to_string()).collect();
         Ok(AccessControlRequestHeaders(set))
     }
@@ -149,87 +171,173 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestHeaders {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AllowedOrigins {
+    All,
+    Some(HashSet<Url>),
+}
+
+impl Default for AllowedOrigins {
+    fn default() -> Self {
+        AllowedOrigins::All
+    }
+}
+
+/// Options to aid in the building of a CORS response during pre-flight or after
+#[derive(Clone, Debug, Default)]
+pub struct Options {
+    pub allowed_origins: AllowedOrigins,
+    /// Only used in preflight
+    pub allowed_methods: HashSet<rocket::http::Method>,
+    /// Only used in pre-flight
+    pub allowed_headers: HashSet<String>,
+}
+
+impl Options {
+    /// Construct a pre-flight response based on the options
+    pub fn preflight(&self,
+                     origin: &Origin,
+                     method: &AccessControlRequestMethod,
+                     headers: Option<&AccessControlRequestHeaders>)
+                     -> Result<Response<()>, Error> {
+
+
+        let response = Response::<()>::allowed_origin((), origin, &self.allowed_origins)?
+            .allowed_methods(method, self.allowed_methods.clone())?;
+
+        match headers {
+            Some(headers) => {
+                response.allowed_headers(headers,
+                                         self.allowed_headers
+                                             .iter()
+                                             .map(|s| &**s)
+                                             .collect())
+            }
+            None => Ok(response),
+        }
+    }
+
+    /// Use options to respond
+    pub fn respond<'r, R: Responder<'r>>(self, responder: R, origin: &Origin) -> Result<Response<R>, Error> {
+        Response::<R>::allowed_origin(responder, origin, &self.allowed_origins)
+    }
+}
 
 /// The CORS type, which implements `Responder`. This type allows
 /// you to request resources from another domain.
-pub struct CORS<R> {
-    responder: R,
+pub struct Response<R> {
     allow_origin: String,
+    allow_methods: HashSet<Method>,
+    allow_headers: HashSet<String>,
+    responder: R,
     allow_credentials: bool,
     expose_headers: HashSet<String>,
     max_age: Option<usize>,
-    allow_methods: HashSet<Method>,
-    allow_headers: HashSet<String>,
 }
 
-// pub type PreflightCORS = CORS<()>;
-
-// impl PreflightCORS {
-//     /// Consumes origin for which it will allow to use `CORS`
-//     /// and return a basic origin `CORS`
-//     pub fn preflight(origin: &'static str) -> PreflightCORS {
-//         CORS::origin((), origin)
-//     }
-// }
-
-impl<'r, R: Responder<'r>> CORS<R> {
-    /// Consumes responder and returns CORS with any origin
-    pub fn any(responder: R) -> CORS<R> {
-        CORS::origin(responder, "*")
-    }
-
+impl<'r, R: Responder<'r>> Response<R> {
     /// Consumes the responder and origin and returns basic CORS
-    pub fn origin(responder: R, origin: &str) -> CORS<R> {
-        CORS {
-            responder: responder,
+    fn origin(responder: R, origin: &str) -> Self {
+        Self {
             allow_origin: origin.to_string(),
+            allow_headers: HashSet::new(),
+            allow_methods: HashSet::new(),
+            responder: responder,
             allow_credentials: false,
             expose_headers: HashSet::new(),
             max_age: None,
-            allow_methods: HashSet::new(),
-            allow_headers: HashSet::new(),
         }
+    }
+    /// Consumes the responder and based on the provided list of allowed origins,
+    /// check if the requested origin is allowed.
+    /// Useful for pre-flight and during requests
+    pub fn allowed_origin(responder: R, origin: &Origin, allowed_origins: &AllowedOrigins) -> Result<Self, Error> {
+        match allowed_origins {
+            &AllowedOrigins::All => Ok(Self::any(responder)),
+            &AllowedOrigins::Some(ref allowed_origins) => {
+                let &Origin(ref origin) = origin;
+                let origin = origin.origin().unicode_serialization();
+
+                let allowed_origins: HashSet<_> =
+                    allowed_origins.iter().map(|o| o.origin().unicode_serialization()).collect();
+                allowed_origins.get(&origin).ok_or_else(|| Error::OriginNotAllowed)?;
+                Ok(Self::origin(responder, &origin))
+            }
+        }
+    }
+
+    /// Consumes responder and returns CORS with any origin
+    pub fn any(responder: R) -> Self {
+        Self::origin(responder, "*")
     }
 
     /// Consumes the CORS, set allow_credentials to
     /// new value and returns changed CORS
-    pub fn credentials(mut self, value: bool) -> CORS<R> {
+    pub fn credentials(mut self, value: bool) -> Self {
         self.allow_credentials = value;
         self
     }
 
     /// Consumes the CORS, set expose_headers to
     /// passed headers and returns changed CORS
-    pub fn exposed_headers(mut self, headers: &[&str]) -> CORS<R> {
+    pub fn exposed_headers(mut self, headers: &[&str]) -> Self {
         self.expose_headers = headers.into_iter().map(|s| s.to_string()).collect();
         self
     }
 
     /// Consumes the CORS, set max_age to
     /// passed value and returns changed CORS
-    pub fn max_age(mut self, value: Option<usize>) -> CORS<R> {
+    pub fn max_age(mut self, value: Option<usize>) -> Self {
         self.max_age = value;
         self
     }
 
     /// Consumes the CORS, set allow_methods to
     /// passed methods and returns changed CORS
-    pub fn methods(mut self, methods: &[Method]) -> CORS<R> {
-        self.allow_methods = methods.into_iter().cloned().collect();
+    fn methods(mut self, methods: HashSet<Method>) -> Self {
+        self.allow_methods = methods;
         self
+    }
+
+    /// Consumes the CORS, check if requested method is allowed.
+    /// Useful for pre-flight checks
+    pub fn allowed_methods(self,
+                           method: &AccessControlRequestMethod,
+                           allowed_methods: HashSet<Method>)
+                           -> Result<Self, Error> {
+        let &AccessControlRequestMethod(ref request_method) = method;
+        if !allowed_methods.iter().any(|m| m == request_method) {
+            Err(Error::MethodNotAllowed)?
+        }
+        Ok(self.methods(allowed_methods))
     }
 
     /// Consumes the CORS, set allow_headers to
     /// passed headers and returns changed CORS
-    pub fn headers(mut self, headers: &[&str]) -> CORS<R> {
+    fn headers(mut self, headers: HashSet<&str>) -> Self {
         self.allow_headers = headers.into_iter().map(|s| s.to_string()).collect();
         self
     }
+
+    /// Consumes the CORS, check if requested headersa are allowed.
+    /// Useful for pre-flight checks
+    pub fn allowed_headers(self,
+                           headers: &AccessControlRequestHeaders,
+                           allowed_headers: HashSet<&str>)
+                           -> Result<Self, Error> {
+        let &AccessControlRequestHeaders(ref headers) = headers;
+        let headers: HashSet<&str> = headers.iter().map(|s| &**s).collect();
+        if !headers.is_empty() && !headers.is_subset(&allowed_headers) {
+            Err(Error::HeadersNotAllowed)?
+        }
+        Ok(self.headers(allowed_headers))
+    }
 }
 
-impl<'r, R: Responder<'r>> Responder<'r> for CORS<R> {
+impl<'r, R: Responder<'r>> Responder<'r> for Response<R> {
     fn respond(self) -> response::Result<'r> {
-        let mut response = Response::build_from(self.responder.respond()?)
+        let mut response = response::Response::build_from(self.responder.respond()?)
             .raw_header("Access-Control-Allow-Origin", self.allow_origin)
             .finalize();
 
@@ -280,8 +388,8 @@ mod tests {
     use cors::*;
 
     #[get("/hello")]
-    fn hello() -> CORS<&'static str> {
-        CORS::any("Hello, world!")
+    fn hello() -> Response<&'static str> {
+        Response::any("Hello, world!")
     }
 
     #[get("/request_headers")]
@@ -292,7 +400,9 @@ mod tests {
         let Origin(origin) = origin;
         let AccessControlRequestMethod(method) = method;
         let AccessControlRequestHeaders(headers) = headers;
-        format!("{}\n{}\n{}", origin, method, headers.iter().cloned().collect::<Vec<String>>().join(", "))
+        let mut headers = headers.iter().cloned().collect::<Vec<String>>();
+        headers.sort();
+        format!("{}\n{}\n{}", origin, method, headers.join(", "))
     }
 
     #[test]
@@ -362,7 +472,7 @@ mod tests {
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
         let expected_body = r#"https://foo.bar.xyz/
 GET
-accept-language, X-Ping"#;
+X-Ping, accept-language"#;
         assert_eq!(expected_body, body_str);
     }
 }
