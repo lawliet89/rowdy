@@ -1,5 +1,5 @@
 use std::time::Duration;
-use serde::{self, Deserialize, Serializer, Deserializer};
+use serde::{Deserialize, Serializer, Deserializer};
 
 pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
     where S: Serializer
