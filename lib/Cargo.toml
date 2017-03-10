@@ -20,6 +20,7 @@ serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
 uuid = "0.4"
+unicase="1.4"
 
 [dependencies.rocket_contrib]
 version = "*"

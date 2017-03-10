@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use std::default::Default;
 use std::error;
 use std::fmt;
+use std::ops::Deref;
 use std::str::FromStr;
 
 use hyper::error::ParseError;
@@ -16,6 +17,7 @@ use rocket::request::{self, Request, FromRequest};
 use rocket::response::{self, Responder};
 use rocket::http::{Method, Status};
 use rocket::Outcome;
+use unicase::UniCase;
 
 use Url;
 
@@ -137,9 +139,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestMethod {
     }
 }
 
+type HeaderFieldNamesSet = HashSet<UniCase<String>>;
+
 /// The `Access-Control-Request-Headers` request header
 #[derive(Debug)]
-pub struct AccessControlRequestHeaders(HashSet<String>);
+pub struct AccessControlRequestHeaders(HeaderFieldNamesSet);
 
 /// Will never fail
 impl FromStr for AccessControlRequestHeaders {
@@ -150,7 +154,7 @@ impl FromStr for AccessControlRequestHeaders {
             return Ok(AccessControlRequestHeaders(HashSet::new()));
         }
 
-        let set: HashSet<String> = headers.split(',').map(|header| header.trim().to_string()).collect();
+        let set: HeaderFieldNamesSet = headers.split(',').map(|header| UniCase(header.trim().to_string())).collect();
         Ok(AccessControlRequestHeaders(set))
     }
 }
@@ -191,7 +195,7 @@ pub struct Options {
     /// Only used in preflight
     pub allowed_methods: HashSet<rocket::http::Method>,
     /// Only used in pre-flight
-    pub allowed_headers: HashSet<String>,
+    pub allowed_headers: HeaderFieldNamesSet,
     pub allow_credentials: bool,
     pub expose_headers: HashSet<String>,
     pub max_age: Option<usize>,
@@ -210,13 +214,7 @@ impl Options {
             .allowed_methods(method, self.allowed_methods.clone())?;
 
         match headers {
-            Some(headers) => {
-                self.append(response.allowed_headers(headers,
-                                                     self.allowed_headers
-                                                         .iter()
-                                                         .map(|s| &**s)
-                                                         .collect()))
-            }
+            Some(headers) => self.append(response.allowed_headers(headers, &self.allowed_headers)),
             None => Ok(response),
         }
     }
@@ -244,9 +242,9 @@ pub struct Response<R> {
     responder: R,
     allow_origin: String,
     allow_methods: HashSet<Method>,
-    allow_headers: HashSet<String>,
+    allow_headers: HeaderFieldNamesSet,
     allow_credentials: bool,
-    expose_headers: HashSet<String>,
+    expose_headers: HeaderFieldNamesSet,
     max_age: Option<usize>,
 }
 
@@ -296,7 +294,7 @@ impl<'r, R: Responder<'r>> Response<R> {
     /// Consumes the CORS, set expose_headers to
     /// passed headers and returns changed CORS
     pub fn exposed_headers(mut self, headers: &[&str]) -> Self {
-        self.expose_headers = headers.into_iter().map(|s| s.to_string()).collect();
+        self.expose_headers = headers.into_iter().map(|s| s.to_string().into()).collect();
         self
     }
 
@@ -329,8 +327,8 @@ impl<'r, R: Responder<'r>> Response<R> {
 
     /// Consumes the CORS, set allow_headers to
     /// passed headers and returns changed CORS
-    fn headers(mut self, headers: HashSet<&str>) -> Self {
-        self.allow_headers = headers.into_iter().map(|s| s.to_string()).collect();
+    fn headers(mut self, headers: &[&str]) -> Self {
+        self.allow_headers = headers.into_iter().map(|s| s.to_string().into()).collect();
         self
     }
 
@@ -338,14 +336,13 @@ impl<'r, R: Responder<'r>> Response<R> {
     /// Useful for pre-flight checks
     pub fn allowed_headers(self,
                            headers: &AccessControlRequestHeaders,
-                           allowed_headers: HashSet<&str>)
+                           allowed_headers: &HeaderFieldNamesSet)
                            -> Result<Self, Error> {
         let &AccessControlRequestHeaders(ref headers) = headers;
-        let headers: HashSet<&str> = headers.iter().map(|s| &**s).collect();
-        if !headers.is_empty() && !headers.is_subset(&allowed_headers) {
+        if !headers.is_empty() && !headers.is_subset(allowed_headers) {
             Err(Error::HeadersNotAllowed)?
         }
-        Ok(self.headers(allowed_headers))
+        Ok(self.headers(allowed_headers.iter().map(|s| &**s.deref()).collect::<Vec<&str>>().as_slice()))
     }
 }
 
@@ -362,11 +359,19 @@ impl<'r, R: Responder<'r>> Responder<'r> for Response<R> {
         }
 
         if !self.expose_headers.is_empty() {
-            let headers: Vec<_> = self.expose_headers.into_iter().collect();
+            let headers: Vec<String> = self.expose_headers.into_iter().map(|s| s.deref().to_string()).collect();
             let headers = headers.join(", ");
 
             response.set_raw_header("Access-Control-Expose-Headers", headers);
         }
+
+        if !self.allow_headers.is_empty() {
+            let headers: Vec<String> = self.allow_headers.into_iter().map(|s| s.deref().to_string()).collect();
+            let headers = headers.join(", ");
+
+            response.set_raw_header("Access-Control-Allow-Headers", headers);
+        }
+
 
         if !self.allow_methods.is_empty() {
             let methods: Vec<_> = self.allow_methods
@@ -414,7 +419,7 @@ mod tests {
         let Origin(origin) = origin;
         let AccessControlRequestMethod(method) = method;
         let AccessControlRequestHeaders(headers) = headers;
-        let mut headers = headers.iter().cloned().collect::<Vec<String>>();
+        let mut headers = headers.iter().map(|s| s.deref().to_string()).collect::<Vec<String>>();
         headers.sort();
         format!("{}\n{}\n{}", origin, method, headers.join(", "))
     }
@@ -449,7 +454,7 @@ mod tests {
     fn request_headers_parsing() {
         let headers = ["foo", "bar", "baz"];
         let parsed_headers = not_err!(AccessControlRequestHeaders::from_str(&headers.join(", ")));
-        let expected_headers: HashSet<String> = headers.iter().map(|s| s.to_string()).collect();
+        let expected_headers: HeaderFieldNamesSet = headers.iter().map(|s| s.to_string().into()).collect();
         let AccessControlRequestHeaders(actual_headers) = parsed_headers;
         assert_eq!(actual_headers, expected_headers);
     }

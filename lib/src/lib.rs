@@ -1,3 +1,4 @@
+#![feature(custom_derive)]
 #![feature(plugin)]
 #![plugin(rocket_codegen)]
 
@@ -12,6 +13,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate uuid;
+extern crate unicase;
 
 #[cfg(test)]
 #[macro_use]
@@ -104,19 +106,30 @@ pub struct Configuration {
 struct HelloCorsOptions(cors::Options);
 impl_deref!(HelloCorsOptions, cors::Options);
 
-const HELLO_METHODS: &[rocket::http::Method] = &[Post];
-const HELLO_HEADERS: &'static [&'static str] = &[];
+const HELLO_METHODS: &[rocket::http::Method] = &[Get];
+const HELLO_HEADERS: &'static [&'static str] = &["Authorization"];
 
-#[options("/")]
-fn hello_options(origin: cors::Origin,
-                 method: cors::AccessControlRequestMethod,
-                 options: State<HelloCorsOptions>)
-                 -> Result<cors::Response<()>, cors::Error> {
-    options.preflight(&origin, &method, None)
+#[derive(FromForm)]
+struct AuthParam {
+    service: String,
+    scope: String,
+    offline_token: Option<bool>,
 }
 
-#[post("/")]
-fn hello(origin: cors::Origin, options: State<HelloCorsOptions>) -> Result<cors::Response<&'static str>, cors::Error> {
+#[options("/?<_auth_param>")]
+fn hello_options(origin: cors::Origin,
+                 method: cors::AccessControlRequestMethod,
+                 headers: cors::AccessControlRequestHeaders,
+                 options: State<HelloCorsOptions>,
+                 _auth_param: AuthParam)
+                 -> Result<cors::Response<()>, cors::Error> {
+    options.preflight(&origin, &method, Some(&headers))
+}
+
+#[get("/?<auth_param>")]
+fn hello(origin: cors::Origin,
+        auth_param: AuthParam,
+        options: State<HelloCorsOptions>) -> Result<cors::Response<&'static str>, cors::Error> {
     options.respond("Hello world", &origin)
 }
 
@@ -124,7 +137,7 @@ pub fn launch(config: Configuration) {
     let hello_options = HelloCorsOptions(cors::Options {
                                              allowed_origins: config.allowed_origins.clone(),
                                              allowed_methods: HELLO_METHODS.iter().cloned().collect(),
-                                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string()).collect(),
+                                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string().into()).collect(),
                                              allow_credentials: true,
                                              ..Default::default()
                                          });
