@@ -562,10 +562,8 @@ X-Ping, accept-language"#;
         let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
                                                                                   .unwrap()]);
         let request_headers = Header::from(request_headers);
-        let mut req = MockRequest::new(Options, "/")
-            .header(origin_header)
-            .header(method_header)
-            .header(request_headers);
+        let mut req =
+            MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
         let mut response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Ok);
@@ -577,9 +575,7 @@ X-Ping, accept-language"#;
 
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.acme.com")));
         let authorization = Header::new("Authorization", "let me in");
-        let mut req = MockRequest::new(Get, "/")
-            .header(origin_header)
-            .header(authorization);
+        let mut req = MockRequest::new(Get, "/").header(origin_header).header(authorization);
 
         let mut response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Ok);
@@ -596,10 +592,8 @@ X-Ping, accept-language"#;
         let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
                                                                                   .unwrap()]);
         let request_headers = Header::from(request_headers);
-        let mut req = MockRequest::new(Options, "/")
-            .header(origin_header)
-            .header(method_header)
-            .header(request_headers);
+        let mut req =
+            MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
         let mut response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
@@ -614,10 +608,8 @@ X-Ping, accept-language"#;
         let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
                                                                                   .unwrap()]);
         let request_headers = Header::from(request_headers);
-        let mut req = MockRequest::new(Options, "/")
-            .header(origin_header)
-            .header(method_header)
-            .header(request_headers);
+        let mut req =
+            MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
         let mut response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
@@ -629,13 +621,10 @@ X-Ping, accept-language"#;
 
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.acme.com")));
         let method_header = Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Get));
-        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Foobar")
-                                                                                  .unwrap()]);
+        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Foobar").unwrap()]);
         let request_headers = Header::from(request_headers);
-        let mut req = MockRequest::new(Options, "/")
-            .header(origin_header)
-            .header(method_header)
-            .header(request_headers);
+        let mut req =
+            MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
         let mut response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
@@ -647,9 +636,7 @@ X-Ping, accept-language"#;
 
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.bad-origin.com")));
         let authorization = Header::new("Authorization", "let me in");
-        let mut req = MockRequest::new(Get, "/")
-            .header(origin_header)
-            .header(authorization);
+        let mut req = MockRequest::new(Get, "/").header(origin_header).header(authorization);
 
         let mut response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
