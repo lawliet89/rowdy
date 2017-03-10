@@ -342,7 +342,10 @@ impl<'r, R: Responder<'r>> Response<R> {
         if !headers.is_empty() && !headers.is_subset(allowed_headers) {
             Err(Error::HeadersNotAllowed)?
         }
-        Ok(self.headers(allowed_headers.iter().map(|s| &**s.deref()).collect::<Vec<&str>>().as_slice()))
+        Ok(self.headers(allowed_headers.iter()
+                            .map(|s| &**s.deref())
+                            .collect::<Vec<&str>>()
+                            .as_slice()))
     }
 }
 
@@ -359,14 +362,20 @@ impl<'r, R: Responder<'r>> Responder<'r> for Response<R> {
         }
 
         if !self.expose_headers.is_empty() {
-            let headers: Vec<String> = self.expose_headers.into_iter().map(|s| s.deref().to_string()).collect();
+            let headers: Vec<String> = self.expose_headers
+                .into_iter()
+                .map(|s| s.deref().to_string())
+                .collect();
             let headers = headers.join(", ");
 
             response.set_raw_header("Access-Control-Expose-Headers", headers);
         }
 
         if !self.allow_headers.is_empty() {
-            let headers: Vec<String> = self.allow_headers.into_iter().map(|s| s.deref().to_string()).collect();
+            let headers: Vec<String> = self.allow_headers
+                .into_iter()
+                .map(|s| s.deref().to_string())
+                .collect();
             let headers = headers.join(", ");
 
             response.set_raw_header("Access-Control-Allow-Headers", headers);

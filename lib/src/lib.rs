@@ -128,18 +128,20 @@ fn hello_options(origin: cors::Origin,
 
 #[get("/?<auth_param>")]
 fn hello(origin: cors::Origin,
-        auth_param: AuthParam,
-        options: State<HelloCorsOptions>) -> Result<cors::Response<&'static str>, cors::Error> {
+         auth_param: AuthParam,
+         options: State<HelloCorsOptions>)
+         -> Result<cors::Response<&'static str>, cors::Error> {
     options.respond("Hello world", &origin)
 }
 
 pub fn launch(config: Configuration) {
-    let hello_options = HelloCorsOptions(cors::Options {
-                                             allowed_origins: config.allowed_origins.clone(),
-                                             allowed_methods: HELLO_METHODS.iter().cloned().collect(),
-                                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string().into()).collect(),
-                                             allow_credentials: true,
-                                             ..Default::default()
-                                         });
+    let hello_options =
+        HelloCorsOptions(cors::Options {
+                             allowed_origins: config.allowed_origins.clone(),
+                             allowed_methods: HELLO_METHODS.iter().cloned().collect(),
+                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string().into()).collect(),
+                             allow_credentials: true,
+                             ..Default::default()
+                         });
     rocket::ignite().mount("/", routes![hello, hello_options]).manage(hello_options).launch();
 }
