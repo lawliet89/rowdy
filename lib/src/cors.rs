@@ -4,7 +4,7 @@
 //! on the way. In the mean time, we adopt an
 //! [example implementation](https://github.com/SergioBenitez/Rocket/pull/141) to nest `Responders` to acheive
 //! the same effect in the short run.
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::default::Default;
 use std::error;
 use std::fmt;
@@ -21,7 +21,6 @@ use unicase::UniCase;
 
 use Url;
 
-// TODO: impl Responder?
 #[derive(Debug)]
 pub enum Error {
     MissingOrigin,
@@ -175,6 +174,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestHeaders {
     }
 }
 
+// TODO: impl std::iter::FromIterator
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AllowedOrigins {
@@ -185,6 +185,25 @@ pub enum AllowedOrigins {
 impl Default for AllowedOrigins {
     fn default() -> Self {
         AllowedOrigins::All
+    }
+}
+
+impl AllowedOrigins {
+    pub fn new_from_str_list(urls: &[&str]) -> (Self, HashMap<String, ParseError>) {
+        let urls: HashMap<String, Result<Url, ParseError>> =
+            urls.iter().map(|s| (s.to_string(), Url::from_str(s))).collect();
+
+        let error_map = urls.iter()
+            .filter(|&(_, r)| r.is_err())
+            .map(|(s, r)| (s.to_string(), r.clone().unwrap_err()))
+            .collect();
+
+        let ok_set = urls.iter()
+            .filter(|&(_, r)| r.is_ok())
+            .map(|(_, r)| r.clone().unwrap())
+            .collect();
+
+        (AllowedOrigins::Some(ok_set), error_map)
     }
 }
 
@@ -412,26 +431,10 @@ mod tests {
     use rocket::testing::MockRequest;
     use rocket::http::Method::*;
     use rocket::http::{Header, Status};
+    use rocket::State;
 
+    use cors;
     use cors::*;
-
-    #[get("/hello")]
-    fn hello() -> Response<&'static str> {
-        Response::any("Hello, world!")
-    }
-
-    #[get("/request_headers")]
-    fn request_headers(origin: Origin,
-                       method: AccessControlRequestMethod,
-                       headers: AccessControlRequestHeaders)
-                       -> String {
-        let Origin(origin) = origin;
-        let AccessControlRequestMethod(method) = method;
-        let AccessControlRequestHeaders(headers) = headers;
-        let mut headers = headers.iter().map(|s| s.deref().to_string()).collect::<Vec<String>>();
-        headers.sort();
-        format!("{}\n{}\n{}", origin, method, headers.join(", "))
-    }
 
     #[test]
     fn origin_header_parsing() {
@@ -468,19 +471,20 @@ mod tests {
         assert_eq!(actual_headers, expected_headers);
     }
 
-    #[test]
-    fn smoke_test() {
-        let rocket = rocket::ignite().mount("/", routes![hello]);
-        let mut req = MockRequest::new(Get, "/hello");
-        let mut response = req.dispatch_with(&rocket);
-
-        assert_eq!(Status::Ok, response.status());
-        let body_str = response.body().and_then(|body| body.into_string());
-        let values: Vec<_> = response.header_values("Access-Control-Allow-Origin").collect();
-        assert_eq!(values, vec!["*"]);
-        assert_eq!(body_str, Some("Hello, world!".to_string()));
+    #[get("/request_headers")]
+    fn request_headers(origin: Origin,
+                       method: AccessControlRequestMethod,
+                       headers: AccessControlRequestHeaders)
+                       -> String {
+        let Origin(origin) = origin;
+        let AccessControlRequestMethod(method) = method;
+        let AccessControlRequestHeaders(headers) = headers;
+        let mut headers = headers.iter().map(|s| s.deref().to_string()).collect::<Vec<String>>();
+        headers.sort();
+        format!("{}\n{}\n{}", origin, method, headers.join(", "))
     }
 
+    /// Tests that all the headers are parsed correcly in a HTTP request
     #[test]
     fn request_headers_round_trip_smoke_test() {
         let rocket = rocket::ignite().mount("/", routes![request_headers]);
@@ -502,5 +506,152 @@ mod tests {
 GET
 X-Ping, accept-language"#;
         assert_eq!(expected_body, body_str);
+    }
+
+    #[get("/any")]
+    fn any() -> Response<&'static str> {
+        Response::any("Hello, world!")
+    }
+
+    #[test]
+    fn response_any_origin_smoke_test() {
+        let rocket = rocket::ignite().mount("/", routes![any]);
+        let mut req = MockRequest::new(Get, "/any");
+        let mut response = req.dispatch_with(&rocket);
+
+        assert_eq!(Status::Ok, response.status());
+        let body_str = response.body().and_then(|body| body.into_string());
+        let values: Vec<_> = response.header_values("Access-Control-Allow-Origin").collect();
+        assert_eq!(values, vec!["*"]);
+        assert_eq!(body_str, Some("Hello, world!".to_string()));
+    }
+
+    #[options("/")]
+    fn cors_options(origin: Origin,
+                    method: AccessControlRequestMethod,
+                    headers: AccessControlRequestHeaders,
+                    options: State<cors::Options>)
+                    -> Result<Response<()>, Error> {
+        options.preflight(&origin, &method, Some(&headers))
+    }
+
+    #[get("/")]
+    fn cors(origin: Origin, options: State<cors::Options>) -> Result<Response<&'static str>, Error> {
+        options.respond("Hello CORS", &origin)
+    }
+
+    fn make_cors_options() -> cors::Options {
+        let (allowed_origins, failed_origins) = AllowedOrigins::new_from_str_list(&["https://www.acme.com"]);
+        assert!(failed_origins.is_empty());
+
+        cors::Options {
+            allowed_origins: allowed_origins,
+            allowed_methods: [Get].iter().cloned().collect(),
+            allowed_headers: ["Authorization"].iter().map(|s| s.to_string().into()).collect(),
+            allow_credentials: true,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn cors_options_check() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.acme.com")));
+        let method_header = Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Get));
+        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
+                                                                                  .unwrap()]);
+        let request_headers = Header::from(request_headers);
+        let mut req = MockRequest::new(Options, "/")
+            .header(origin_header)
+            .header(method_header)
+            .header(request_headers);
+
+        let mut response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[test]
+    fn cors_get_check() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.acme.com")));
+        let authorization = Header::new("Authorization", "let me in");
+        let mut req = MockRequest::new(Get, "/")
+            .header(origin_header)
+            .header(authorization);
+
+        let mut response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Ok);
+        let body_str = response.body().and_then(|body| body.into_string());
+        assert_eq!(body_str, Some("Hello CORS".to_string()));
+    }
+
+    #[test]
+    fn cors_options_bad_origin() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.bad-origin.com")));
+        let method_header = Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Get));
+        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
+                                                                                  .unwrap()]);
+        let request_headers = Header::from(request_headers);
+        let mut req = MockRequest::new(Options, "/")
+            .header(origin_header)
+            .header(method_header)
+            .header(request_headers);
+
+        let mut response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+
+    #[test]
+    fn cors_options_bad_request_method() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.acme.com")));
+        let method_header = Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Post));
+        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
+                                                                                  .unwrap()]);
+        let request_headers = Header::from(request_headers);
+        let mut req = MockRequest::new(Options, "/")
+            .header(origin_header)
+            .header(method_header)
+            .header(request_headers);
+
+        let mut response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+
+    #[test]
+    fn cors_options_bad_request_header() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.acme.com")));
+        let method_header = Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Get));
+        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Foobar")
+                                                                                  .unwrap()]);
+        let request_headers = Header::from(request_headers);
+        let mut req = MockRequest::new(Options, "/")
+            .header(origin_header)
+            .header(method_header)
+            .header(request_headers);
+
+        let mut response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+
+    #[test]
+    fn cors_get_bad_origin() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.bad-origin.com")));
+        let authorization = Header::new("Authorization", "let me in");
+        let mut req = MockRequest::new(Get, "/")
+            .header(origin_header)
+            .header(authorization);
+
+        let mut response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Forbidden);
     }
 }

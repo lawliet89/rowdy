@@ -112,6 +112,18 @@ impl_deref!(HelloCorsOptions, cors::Options);
 const HELLO_METHODS: &[rocket::http::Method] = &[Get];
 const HELLO_HEADERS: &'static [&'static str] = &["Authorization"];
 
+impl HelloCorsOptions {
+    fn new(config: &Configuration) -> Self {
+        HelloCorsOptions(cors::Options {
+                             allowed_origins: config.allowed_origins.clone(),
+                             allowed_methods: HELLO_METHODS.iter().cloned().collect(),
+                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string().into()).collect(),
+                             allow_credentials: true,
+                             ..Default::default()
+                         })
+    }
+}
+
 #[derive(FromForm)]
 struct AuthParam {
     service: String,
@@ -137,24 +149,17 @@ fn hello(origin: cors::Origin,
     let token = token::Token::<token::PrivateClaim> {
         token: jwt::ClaimsSet::<token::PrivateClaim> {
             private: Default::default(),
-            registered: Default::default()
+            registered: Default::default(),
         },
         expires_in: std::time::Duration::from_secs(86400),
         issued_at: chrono::UTC::now(),
-        refresh_token: None
+        refresh_token: None,
     };
 
     options.respond(token, &origin)
 }
 
 pub fn launch(config: Configuration) {
-    let hello_options =
-        HelloCorsOptions(cors::Options {
-                             allowed_origins: config.allowed_origins.clone(),
-                             allowed_methods: HELLO_METHODS.iter().cloned().collect(),
-                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string().into()).collect(),
-                             allow_credentials: true,
-                             ..Default::default()
-                         });
+    let hello_options = HelloCorsOptions::new(&config);
     rocket::ignite().mount("/", routes![hello, hello_options]).manage(hello_options).launch();
 }
