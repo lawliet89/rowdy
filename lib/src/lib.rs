@@ -1,7 +1,7 @@
-#![feature(custom_derive)]
-#![feature(plugin)]
+#![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
 
+extern crate chrono;
 extern crate hyper;
 extern crate jwt;
 #[macro_use]
@@ -12,14 +12,17 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate uuid;
 extern crate unicase;
+extern crate uuid;
 
 #[cfg(test)]
 #[macro_use]
 mod test;
 pub mod cors;
+pub mod serde_custom;
+pub mod token;
 
+use std::default::Default;
 use std::fmt;
 use std::str::FromStr;
 use std::ops::Deref;
@@ -130,8 +133,18 @@ fn hello_options(origin: cors::Origin,
 fn hello(origin: cors::Origin,
          auth_param: AuthParam,
          options: State<HelloCorsOptions>)
-         -> Result<cors::Response<&'static str>, cors::Error> {
-    options.respond("Hello world", &origin)
+         -> Result<cors::Response<token::Token<token::PrivateClaim>>, cors::Error> {
+    let token = token::Token::<token::PrivateClaim> {
+        token: jwt::ClaimsSet::<token::PrivateClaim> {
+            private: Default::default(),
+            registered: Default::default()
+        },
+        expires_in: std::time::Duration::from_secs(86400),
+        issued_at: chrono::UTC::now(),
+        refresh_token: None
+    };
+
+    options.respond(token, &origin)
 }
 
 pub fn launch(config: Configuration) {

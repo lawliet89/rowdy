@@ -11,6 +11,7 @@ doctest = true
 doc = true
 
 [dependencies]
+chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
 jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "0816f212eb85df143fcb04f6db4e05d1ae020bbd" }
 log = "0.3"
@@ -19,8 +20,8 @@ rocket_codegen = "0.2.2"
 serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
-uuid = "0.4"
 unicase="1.4"
+uuid = "0.4"
 
 [dependencies.rocket_contrib]
 version = "*"
