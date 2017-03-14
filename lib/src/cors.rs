@@ -562,6 +562,7 @@ mod tests {
     }
 
     #[get("/request_headers")]
+    #[allow(needless_pass_by_value)]
     fn request_headers(origin: Origin,
                        method: AccessControlRequestMethod,
                        headers: AccessControlRequestHeaders)
@@ -599,6 +600,7 @@ X-Ping, accept-language"#;
     }
 
     #[get("/any")]
+    #[allow(needless_pass_by_value)]
     fn any() -> Response<&'static str> {
         Response::any("Hello, world!")
     }
@@ -617,6 +619,7 @@ X-Ping, accept-language"#;
     }
 
     #[options("/")]
+    #[allow(needless_pass_by_value)]
     fn cors_options(origin: Origin,
                     method: AccessControlRequestMethod,
                     headers: AccessControlRequestHeaders,
@@ -626,6 +629,7 @@ X-Ping, accept-language"#;
     }
 
     #[get("/")]
+    #[allow(needless_pass_by_value)]
     fn cors(origin: Origin, options: State<cors::Options>) -> Result<Response<&'static str>, Error> {
         options.respond("Hello CORS", &origin)
     }

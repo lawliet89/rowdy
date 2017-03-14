@@ -1,5 +1,15 @@
+//! # rowdy
+//!
+//! `rowdy` is a JSON Web token based authentication server based off Docker Registry's
+//! [authtentication protocol](https://docs.docker.com/registry/spec/auth/).
+//!
+//! ## Features
+//!
+//! - `clippy`: Enable clippy lints during builds
+
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
+#![cfg_attr(feature="clippy", plugin(clippy))]
 
 extern crate chrono;
 extern crate hyper;
@@ -294,4 +304,9 @@ pub fn launch(config: Configuration) {
         .manage(config)
         .manage(token_getter_options)
         .launch();
+}
+
+
+#[cfg(test)]
+mod tests {
 }

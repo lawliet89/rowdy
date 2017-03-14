@@ -23,6 +23,8 @@ serde_json = "0.9"
 unicase="1.4"
 uuid = { version = "0.4", features = ["use_std", "v5", "serde"] }
 
+clippy = {version = "*", optional = true}
+
 [dependencies.rocket_contrib]
 version = "*"
 default-features = false
