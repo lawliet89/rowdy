@@ -92,8 +92,8 @@ impl<T> Clone for Token<T>
     fn clone(&self) -> Self {
         Token {
             token: self.token.clone(),
-            expires_in: self.expires_in.clone(),
-            issued_at: self.issued_at.clone(),
+            expires_in: self.expires_in,
+            issued_at: self.issued_at,
             refresh_token: self.refresh_token.clone(),
         }
     }
@@ -103,7 +103,7 @@ impl<T: Serialize + Deserialize> Token<T> {
     pub fn new(header: jws::Header, claims_set: jwt::ClaimsSet<T>, expires_in: &Duration) -> Self {
         Token {
             token: jwt::JWT::new_decoded(header, claims_set),
-            expires_in: expires_in.clone(),
+            expires_in: *expires_in,
             issued_at: UTC::now(),
             refresh_token: None,
         }
@@ -300,6 +300,7 @@ struct AuthParam {
 #[allow(unmounted_route)]
 // mounted via `::launch()`
 #[options("/?<_auth_param>")]
+#[allow(needless_pass_by_value)]
 fn token_getter_options(origin: cors::Origin,
                         method: cors::AccessControlRequestMethod,
                         headers: cors::AccessControlRequestHeaders,
@@ -312,6 +313,7 @@ fn token_getter_options(origin: cors::Origin,
 #[allow(unmounted_route)]
 // mounted via `::launch()`
 #[get("/?<_auth_param>")]
+#[allow(needless_pass_by_value)]
 fn token_getter(origin: cors::Origin,
                 authentication: header::Authorization<hyper::header::Basic>,
                 _auth_param: AuthParam,

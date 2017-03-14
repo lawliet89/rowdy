@@ -90,7 +90,7 @@ impl<'r> Responder<'r> for Error {
         match self {
             Error::CORS(e) => e.respond(),
             Error::Token(e) => e.respond(),
-            e @ _ => {
+            e => {
                 error_!("{}", e);
                 Err(Status::InternalServerError)
             }
@@ -255,8 +255,8 @@ impl Configuration {
                issuer: Some(self.issuer.to_string()),
                subject: Some(subject.to_string()),
                audience: self.audience.clone(),
-               issued_at: Some(now.clone().into()),
-               not_before: Some(now.clone().into()),
+               issued_at: Some(now.into()),
+               not_before: Some(now.into()),
                expiry: Some((now + expiry_duration).into()),
                id: Some(self.make_uuid().urn().to_string()),
            })
@@ -269,7 +269,7 @@ impl Configuration {
                                                   -> Result<token::Token<T>, Error> {
         let header = self.make_header();
         let registered_claims = self.make_registered_claims(subject)?;
-        let issued_at = registered_claims.issued_at.unwrap().clone(); // we always set it, don't we?
+        let issued_at = registered_claims.issued_at.unwrap(); // we always set it, don't we?
 
         let token = token::Token::<T> {
             token: jwt::JWT::new_decoded(header,
@@ -277,7 +277,7 @@ impl Configuration {
                                              private: private_claims,
                                              registered: registered_claims,
                                          }),
-            expires_in: self.expiry_duration.clone(),
+            expires_in: self.expiry_duration,
             issued_at: *issued_at.deref(),
             refresh_token: None,
         };

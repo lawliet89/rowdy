@@ -334,9 +334,9 @@ impl<'r, R: Responder<'r>> Response<R> {
     /// check if the requested origin is allowed.
     /// Useful for pre-flight and during requests
     pub fn allowed_origin(responder: R, origin: &Origin, allowed_origins: &AllowedOrigins) -> Result<Self, Error> {
-        match allowed_origins {
-            &AllowedOrigins::All => Ok(Self::any(responder)),
-            &AllowedOrigins::Some(ref allowed_origins) => {
+        match *allowed_origins {
+            AllowedOrigins::All => Ok(Self::any(responder)),
+            AllowedOrigins::Some(ref allowed_origins) => {
                 let &Origin(ref origin) = origin;
                 let origin = origin.origin().unicode_serialization();
 

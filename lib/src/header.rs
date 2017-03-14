@@ -63,10 +63,7 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
 
         match request.headers().get_one("Authorization") {
             Some(authorization) => {
-                let bytes: Vec<u8> = authorization.as_bytes()
-                    .iter()
-                    .cloned()
-                    .collect();
+                let bytes: Vec<u8> = authorization.as_bytes().to_vec();
                 match header::Authorization::parse_header(&[bytes]) {
                     Err(e) => Outcome::Failure((Status::BadRequest, From::from(e))),
                     Ok(parsed) => Outcome::Success(Authorization(parsed)),
