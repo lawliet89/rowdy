@@ -66,3 +66,13 @@ pub fn deserialize_json<T>(json: &str) -> Result<T, String>
 {
     serde_json::from_str(json).map_err(|e| format!("{:?}", e))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_config_smoke_test() {
+       read_config("test/fixtures/config.json").unwrap();
+    }
+}
