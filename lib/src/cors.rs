@@ -83,7 +83,7 @@ impl<'r> Responder<'r> for Error {
 
 /// The `Origin` request header used in CORS
 #[derive(Debug)]
-pub struct Origin(Url);
+pub struct Origin(pub Url);
 
 impl FromStr for Origin {
     type Err = ParseError;
@@ -112,7 +112,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Origin {
 
 /// The `Access-Control-Request-Method` request header
 #[derive(Debug)]
-pub struct AccessControlRequestMethod(Method);
+pub struct AccessControlRequestMethod(pub Method);
 
 impl FromStr for AccessControlRequestMethod {
     type Err = rocket::Error;
@@ -142,7 +142,7 @@ type HeaderFieldNamesSet = HashSet<UniCase<String>>;
 
 /// The `Access-Control-Request-Headers` request header
 #[derive(Debug)]
-pub struct AccessControlRequestHeaders(HeaderFieldNamesSet);
+pub struct AccessControlRequestHeaders(pub HeaderFieldNamesSet);
 
 /// Will never fail
 impl FromStr for AccessControlRequestHeaders {

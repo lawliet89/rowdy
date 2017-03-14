@@ -112,7 +112,7 @@ impl<T: Serialize + Deserialize> Token<T> {
         }
     }
 
-    fn encode_and_respond(self) -> Result<String, Error> {
+    fn serialize_and_respond(self) -> Result<String, Error> {
         if let jwt::JWT::Decoded { .. } = self.token {
             Err(Error::TokenNotEncoded)?
         }
@@ -123,7 +123,7 @@ impl<T: Serialize + Deserialize> Token<T> {
 
 impl<'r, T: Serialize + Deserialize> Responder<'r> for Token<T> {
     fn respond(self) -> Result<Response<'r>, Status> {
-        match self.encode_and_respond() {
+        match self.serialize_and_respond() {
             Ok(serialized) => Response::build().header(ContentType::JSON).sized_body(Cursor::new(serialized)).ok(),
             Err(e) => Err::<String, Error>(e).respond(),
         }

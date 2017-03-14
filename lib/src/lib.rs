@@ -26,7 +26,7 @@ macro_rules! impl_from_error {
 #[cfg(test)]
 #[macro_use]
 mod test;
-pub mod headers;
+pub mod header;
 pub mod cors;
 pub mod serde_custom;
 pub mod token;
@@ -297,26 +297,25 @@ fn hello_options(origin: cors::Origin,
     options.preflight(&origin, &method, Some(&headers))
 }
 
-#[get("/?<auth_param>")]
+#[get("/?<_auth_param>")]
 fn hello(origin: cors::Origin,
-         auth_param: AuthParam,
-         options: State<HelloCorsOptions>)
+         authentication: header::Authorization<hyper::header::Basic>,
+         _auth_param: AuthParam,
+         configuration: State<Configuration>,
+         cors_options: State<HelloCorsOptions>)
          -> Result<cors::Response<token::Token<token::PrivateClaim>>, Error> {
-    let token = token::Token::<token::PrivateClaim> {
-        token: jwt::JWT::new_decoded(jws::Header::default(),
-                                     jwt::ClaimsSet::<token::PrivateClaim> {
-                                         private: Default::default(),
-                                         registered: Default::default(),
-                                     }),
-        expires_in: Duration::from_secs(86400),
-        issued_at: chrono::UTC::now(),
-        refresh_token: None,
-    };
+
+    let header::Authorization(hyper::header::Authorization(hyper::header::Basic { username, .. })) = authentication;
+    let token = configuration.make_token::<token::PrivateClaim>(&username, Default::default())?;
     let token = token.encode(jws::Secret::Bytes("secret".to_string().into_bytes()))?;
-    Ok(options.respond(token, &origin)?)
+    Ok(cors_options.respond(token, &origin)?)
 }
 
 pub fn launch(config: Configuration) {
     let hello_options = HelloCorsOptions::new(&config);
-    rocket::ignite().mount("/", routes![hello, hello_options]).manage(hello_options).launch();
+    rocket::ignite()
+        .mount("/", routes![hello, hello_options])
+        .manage(config)
+        .manage(hello_options)
+        .launch();
 }
