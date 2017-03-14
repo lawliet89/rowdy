@@ -182,7 +182,6 @@ pub struct Configuration {
     /// Defaults to `None`.
     ///
     /// See [`token::Secret`] for serialization examples
-    /// ```
     #[serde(default)]
     pub secret: token::Secret,
     /// Expiry duration of tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled

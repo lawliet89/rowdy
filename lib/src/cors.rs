@@ -556,7 +556,8 @@ mod tests {
         let AccessControlRequestHeaders(parsed_headers) = parsed_header;
         let mut parsed_headers: Vec<String> = parsed_headers.iter().map(|s| s.to_string()).collect();
         parsed_headers.sort();
-        assert_eq!(vec!["accept-language".to_string(), "date".to_string()], parsed_headers);
+        assert_eq!(vec!["accept-language".to_string(), "date".to_string()],
+                   parsed_headers);
     }
 
     #[get("/request_headers")]

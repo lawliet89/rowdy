@@ -73,7 +73,7 @@ impl<'r> Responder<'r> for Error {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Default, Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PrivateClaim {}
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -84,6 +84,19 @@ pub struct Token<T: Serialize + Deserialize> {
     pub issued_at: DateTime<UTC>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<String>, // TODO
+}
+
+impl<T> Clone for Token<T>
+    where T: Serialize + Deserialize + Clone
+{
+    fn clone(&self) -> Self {
+        Token {
+            token: self.token.clone(),
+            expires_in: self.expires_in.clone(),
+            issued_at: self.issued_at.clone(),
+            refresh_token: self.refresh_token.clone(),
+        }
+    }
 }
 
 impl<T: Serialize + Deserialize> Token<T> {
@@ -309,5 +322,96 @@ fn token_getter(origin: cors::Origin,
 
 #[cfg(test)]
 mod tests {
+    use std::default::Default;
+    use std::time::Duration;
+    use jwt;
+    use serde_json;
+    use super::*;
 
+    #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+    struct TestClaims {
+        company: String,
+        department: String,
+    }
+
+    impl Default for TestClaims {
+        fn default() -> Self {
+            TestClaims {
+                company: "ACME".to_string(),
+                department: "Toilet Cleaning".to_string(),
+            }
+        }
+    }
+
+
+    fn make_token() -> Token<TestClaims> {
+        Token::new(jwt::jws::Header::default(),
+                   jwt::ClaimsSet {
+                       private: Default::default(),
+                       registered: Default::default(),
+                   },
+                   &Duration::from_secs(120))
+    }
+
+    #[test]
+    fn encoding_and_decoding_round_trip() {
+        let token = make_token();
+        let token = not_err!(token.encode(jwt::jws::Secret::bytes_from_str("secret")));
+        assert_matches!(token, Token { token: jwt::JWT::Encoded(_), .. });
+
+        let token = not_err!(token.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+        let private = assert_matches!(token,
+                                      Token {
+                                          token: jwt::JWT::Decoded { claims_set: jwt::ClaimsSet {private, .. },
+                                                                     .. },
+                                          .. },
+                                      private);
+
+        assert_eq!(private, Default::default());
+    }
+
+    #[test]
+    #[should_panic(expected = "TokenAlreadyEncoded")]
+    fn panics_when_encoding_encoded() {
+        let token = make_token();
+        let token = not_err!(token.encode(jwt::jws::Secret::bytes_from_str("secret")));
+        token.encode(jwt::jws::Secret::bytes_from_str("secret")).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "TokenAlreadyDecoded")]
+    fn panics_when_decoding_decoded() {
+        let token = make_token();
+        token.decode(jwt::jws::Secret::bytes_from_str("secret"),
+                     Default::default())
+            .unwrap();
+    }
+
+    #[test]
+    fn token_serialization_smoke_test() {
+        let expected_token = make_token();
+        let token = not_err!(expected_token.clone().encode(jwt::jws::Secret::bytes_from_str("secret")));
+        let serialized = not_err!(token.serialize_and_respond());
+
+        let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&serialized));
+        let actual_token =
+            not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+        assert_eq!(expected_token, actual_token);
+    }
+
+    #[test]
+    fn token_response_smoke_test() {
+        use rocket::response::{Response, Responder};
+
+        let expected_token = make_token();
+        let token = not_err!(expected_token.clone().encode(jwt::jws::Secret::bytes_from_str("secret")));
+        let mut response = not_err!(token.respond());
+
+        assert_eq!(response.status(), Status::Ok);
+        let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+        let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&body_str));
+        let actual_token =
+            not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+        assert_eq!(expected_token, actual_token);
+    }
 }
