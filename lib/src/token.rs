@@ -329,8 +329,15 @@ fn token_getter(origin: cors::Origin,
 mod tests {
     use std::default::Default;
     use std::time::Duration;
+    use std::str::FromStr;
+
+    use hyper;
     use jwt;
+    use rocket::http::Header;
+    use rocket::http::Method::*;
+    use rocket::testing::MockRequest;
     use serde_json;
+
     use super::*;
 
     #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -448,5 +455,100 @@ mod tests {
             rsa_public: "test/fixtures/rsa_public_key.der".to_string(),
         };
         assert_matches_non_debug!(not_err!(rsa.for_verification()), jwt::jws::Secret::PublicKey(_));
+    }
+
+    #[test]
+    fn token_getter_options_test() {
+        // Ignite rocket
+        let allowed_origins = ["https://www.example.com"];
+        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
+        let configuration = ::Configuration {
+            issuer: "https://www.acme.com".to_string(),
+            allowed_origins: allowed_origins,
+            audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
+            signature_algorithm: Some(jwt::jws::Algorithm::HS512),
+            secret: Secret::String("secret".to_string()),
+            expiry_duration: Duration::from_secs(120),
+        };
+        let token_getter_cors_options = TokenGetterCorsOptions::new(&configuration);
+
+        let rocket = rocket::ignite()
+            .mount("/",
+                   routes![::token::token_getter_options, ::token::token_getter])
+            .manage(configuration)
+            .manage(token_getter_cors_options);
+
+        // Make headers
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
+        let method_header = Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Get));
+        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
+                                                                                  .unwrap()]);
+        let request_headers = Header::from(request_headers);
+
+        // Make and dispatch request
+        let mut req = MockRequest::new(Options, "/?service=foobar&scope=all")
+            .header(origin_header)
+            .header(method_header)
+            .header(request_headers);
+        let response = req.dispatch_with(&rocket);
+
+        // Assert
+        assert_eq!(response.status(), Status::Ok);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn token_getter_get_test() {
+        // Ignite rocket
+        let allowed_origins = ["https://www.example.com"];
+        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
+        let configuration = ::Configuration {
+            issuer: "https://www.acme.com".to_string(),
+            allowed_origins: allowed_origins,
+            audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
+            signature_algorithm: Some(jwt::jws::Algorithm::HS512),
+            secret: Secret::String("secret".to_string()),
+            expiry_duration: Duration::from_secs(120),
+        };
+        let token_getter_cors_options = TokenGetterCorsOptions::new(&configuration);
+
+        let rocket = rocket::ignite()
+            .mount("/",
+                   routes![::token::token_getter_options, ::token::token_getter])
+            .manage(configuration)
+            .manage(token_getter_cors_options);
+
+        // Make headers
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
+        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+                                                           username: "Aladdin".to_owned(),
+                                                           password: Some("open sesame".to_string()),
+                                                       });
+        let auth_header = Header::new("Authorization",
+                                      format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+        // Make and dispatch request
+        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all").header(origin_header).header(auth_header);
+        let mut response = req.dispatch_with(&rocket);
+
+        // Assert
+        assert_eq!(response.status(), Status::Ok);
+        let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+
+        let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
+        let actual_token =
+            not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"), jwt::jws::Algorithm::HS512));
+
+        let registered = assert_matches!(actual_token,
+                                         Token {
+                                             token: jwt::JWT::Decoded {
+                                                 claims_set: jwt::ClaimsSet { registered, .. },
+                                                 ..
+                                             },
+                                             ..
+                                         },
+                                         registered);
+
+        assert_eq!(Some("https://www.acme.com".to_string()), registered.issuer);
+        assert_eq!(Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())), registered.audience);
     }
 }
