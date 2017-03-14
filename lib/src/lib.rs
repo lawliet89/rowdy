@@ -34,6 +34,7 @@ pub mod token;
 use std::default::Default;
 use std::error;
 use std::fmt;
+use std::io;
 use std::str::FromStr;
 use std::time::Duration;
 use std::ops::Deref;
@@ -66,17 +67,20 @@ pub enum Error {
     GenericError(String),
     CORS(cors::Error),
     Token(token::Error),
+    IOError(io::Error),
 }
 
 impl_from_error!(cors::Error, Error::CORS);
 impl_from_error!(token::Error, Error::Token);
 impl_from_error!(String, Error::GenericError);
+impl_from_error!(io::Error, Error::IOError);
 
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::CORS(_) => "CORS Error",
-            Error::Token(_) => "Token error",
+            Error::CORS(ref e) => e.description(),
+            Error::Token(ref e) => e.description(),
+            Error::IOError(ref e) => e.description(),
             Error::GenericError(ref e) => e,
         }
     }
@@ -85,6 +89,7 @@ impl error::Error for Error {
         match *self {
             Error::CORS(ref e) => Some(e as &error::Error),
             Error::Token(ref e) => Some(e as &error::Error),
+            Error::IOError(ref e) => Some(e as &error::Error),
             Error::GenericError(_) => Some(self as &error::Error),
         }
     }
@@ -95,6 +100,7 @@ impl fmt::Display for Error {
         match *self {
             Error::CORS(ref e) => fmt::Display::fmt(e, f),
             Error::Token(ref e) => fmt::Display::fmt(e, f),
+            Error::IOError(ref e) => fmt::Display::fmt(e, f),
             Error::GenericError(ref e) => fmt::Display::fmt(e, f),
         }
     }
@@ -105,7 +111,7 @@ impl<'r> Responder<'r> for Error {
         match self {
             Error::CORS(e) => e.respond(),
             Error::Token(e) => e.respond(),
-            Error::GenericError(e) => {
+            e @ _ => {
                 error_!("{}", e);
                 Err(Status::InternalServerError)
             }
@@ -180,9 +186,9 @@ pub struct Configuration {
     /// Origins that are allowed to issue CORS request. This is needed for browser
     /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
     ///
-    /// This field is (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
     ///
-    /// # Examples
+    /// # Serialization Examples
     /// ## Allow all origins
     /// ```json
     /// {
@@ -202,8 +208,31 @@ pub struct Configuration {
     /// Defaults to `none`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_algorithm: Option<jws::Algorithm>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub secret: Option<token::Secret>,
+    /// Secrets for use in signing and encrypting a JWT.
+    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+    /// Defaults to `None`.
+    ///
+    /// # Serialization Examples
+    /// ## No secret
+    /// ```json
+    /// {
+    ///     "secret": null
+    /// }
+    /// ```
+    /// ## HMAC secret string
+    /// ```json
+    /// {
+    ///     "secret": "some_secret_string"
+    /// }
+    /// ```
+    /// ## RSA Key pair
+    /// ```json
+    /// {
+    ///     "secret": { "rsa_private": "private.der", "rsa_public": "public.der" }
+    /// }
+    /// ```
+    #[serde(default)]
+    pub secret: token::Secret,
     /// Expiry duration of tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
     #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
     pub expiry_duration: Duration,
@@ -307,7 +336,7 @@ fn hello(origin: cors::Origin,
 
     let header::Authorization(hyper::header::Authorization(hyper::header::Basic { username, .. })) = authentication;
     let token = configuration.make_token::<token::PrivateClaim>(&username, Default::default())?;
-    let token = token.encode(jws::Secret::Bytes("secret".to_string().into_bytes()))?;
+    let token = token.encode(configuration.secret.for_signing()?)?;
     Ok(cors_options.respond(token, &origin)?)
 }
 

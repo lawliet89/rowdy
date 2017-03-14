@@ -20,12 +20,12 @@ pub enum Error {
     TokenNotEncoded,
 
     /// Errors during token encoding/decoding
-    TokenEncodingError(jwt::errors::Error),
+    JWTError(jwt::errors::Error),
     /// Errors during token serialization
     TokenSerializationError(serde_json::Error),
 }
 
-impl_from_error!(jwt::errors::Error, Error::TokenEncodingError);
+impl_from_error!(jwt::errors::Error, Error::JWTError);
 impl_from_error!(serde_json::Error, Error::TokenSerializationError);
 
 impl error::Error for Error {
@@ -34,14 +34,14 @@ impl error::Error for Error {
             Error::TokenAlreadyEncoded => "Token is already encoded",
             Error::TokenAlreadyDecoded => "Token is already decoded",
             Error::TokenNotEncoded => "Token is not encoded and cannot be used in a response",
-            Error::TokenEncodingError(_) => "Error during token encoding",
-            Error::TokenSerializationError(_) => "Error during token serialization",
+            Error::JWTError(ref e) => e.description(),
+            Error::TokenSerializationError(ref e) => e.description(),
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            Error::TokenEncodingError(ref e) => Some(e as &error::Error),
+            Error::JWTError(ref e) => Some(e as &error::Error),
             Error::TokenSerializationError(ref e) => Some(e as &error::Error),
             _ => Some(self as &error::Error),
         }
@@ -51,7 +51,7 @@ impl error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::TokenEncodingError(ref e) => fmt::Display::fmt(e, f),
+            Error::JWTError(ref e) => fmt::Display::fmt(e, f),
             Error::TokenSerializationError(ref e) => fmt::Display::fmt(e, f),
             _ => write!(f, "{}", error::Error::description(self)),
         }
@@ -130,18 +130,68 @@ impl<'r, T: Serialize + Deserialize> Responder<'r> for Token<T> {
     }
 }
 
+/// Secrets for use in signing and encrypting a JWT.
+/// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+/// Defaults to `None`.
+///
+/// # Serialization Examples
+/// ## No secret
+/// ```json
+/// {
+///     "secret": null
+/// }
+/// ```
+/// ## HMAC secret string
+/// ```json
+/// {
+///     "secret": "some_secret_string"
+/// }
+/// ```
+/// ## RSA Key pair
+/// ```json
+/// {
+///     "secret": { "rsa_private": "private.der", "rsa_public": "public.der" }
+/// }
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Secret {
+    /// No secret -- used when no signature or encryption is required.
+    None,
     /// Secret for HMAC signing
     String(String),
-    /// RSA Key pair.
+    /// DER RSA Key pair.
+    /// See [`jwt::jws::Secret`] for more details.
     RSAKeyPair {
         /// Path to DER encoded private key
-        private: String,
+        rsa_private: String,
         /// Path to DER encoded public key
-        public: String,
+        rsa_public: String,
     },
 }
 
-// impl from Secret to jwt::jws::Secret
+impl Default for Secret {
+    fn default() -> Self {
+        Secret::None
+    }
+}
+
+impl Secret {
+    /// Create a [`jws::Secret`] for the purpose of signing
+    pub fn for_signing(&self) -> Result<jws::Secret, Error> {
+        match *self {
+            Secret::None => Ok(jws::Secret::None),
+            Secret::String(ref secret) => Ok(jws::Secret::bytes_from_str(secret)),
+            Secret::RSAKeyPair { ref rsa_private, .. } => Ok(jws::Secret::rsa_keypair_from_file(rsa_private)?),
+        }
+    }
+
+    /// Create a [`jws::Secret`] for the purpose of verifying signatures
+    pub fn for_verification(&self) -> Result<jws::Secret, Error> {
+        match *self {
+            Secret::None => Ok(jws::Secret::None),
+            Secret::String(ref secret) => Ok(jws::Secret::bytes_from_str(secret)),
+            Secret::RSAKeyPair { ref rsa_public, .. } => Ok(jws::Secret::public_key_from_file(rsa_public)?),
+        }
+    }
+}

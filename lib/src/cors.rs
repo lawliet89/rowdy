@@ -174,7 +174,22 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestHeaders {
     }
 }
 
-// TODO: impl std::iter::FromIterator
+/// Allowed Origins for a CORS request.
+/// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+///
+/// # Serialization Examples
+/// ## Allow all origins
+/// ```json
+/// {
+///     "allowed_origins": null
+/// }
+/// ```
+/// ## Allow specific origins
+/// ```json
+/// {
+///     "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"]
+/// }
+/// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AllowedOrigins {
