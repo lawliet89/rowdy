@@ -26,6 +26,7 @@ macro_rules! impl_from_error {
 #[cfg(test)]
 #[macro_use]
 mod test;
+pub mod headers;
 pub mod cors;
 pub mod serde_custom;
 pub mod token;
@@ -37,12 +38,15 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::ops::Deref;
 
+use chrono::UTC;
+use jwt::jws;
 use rocket::http::Status;
 use rocket::http::Method::*;
 use rocket::State;
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
+use uuid::Uuid;
 
 /// Implement a simple Deref from `From` to `To` where `From` is a newtype struct containing `To`
 macro_rules! impl_deref {
@@ -59,18 +63,21 @@ macro_rules! impl_deref {
 
 #[derive(Debug)]
 pub enum Error {
+    GenericError(String),
     CORS(cors::Error),
     Token(token::Error),
 }
 
 impl_from_error!(cors::Error, Error::CORS);
 impl_from_error!(token::Error, Error::Token);
+impl_from_error!(String, Error::GenericError);
 
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::CORS(_) => "CORS Error",
             Error::Token(_) => "Token error",
+            Error::GenericError(ref e) => e,
         }
     }
 
@@ -78,6 +85,7 @@ impl error::Error for Error {
         match *self {
             Error::CORS(ref e) => Some(e as &error::Error),
             Error::Token(ref e) => Some(e as &error::Error),
+            Error::GenericError(_) => Some(self as &error::Error),
         }
     }
 }
@@ -87,6 +95,7 @@ impl fmt::Display for Error {
         match *self {
             Error::CORS(ref e) => fmt::Display::fmt(e, f),
             Error::Token(ref e) => fmt::Display::fmt(e, f),
+            Error::GenericError(ref e) => fmt::Display::fmt(e, f),
         }
     }
 }
@@ -96,6 +105,10 @@ impl<'r> Responder<'r> for Error {
         match self {
             Error::CORS(e) => e.respond(),
             Error::Token(e) => e.respond(),
+            Error::GenericError(e) => {
+                error_!("{}", e);
+                Err(Status::InternalServerError)
+            }
         }
     }
 }
@@ -158,14 +171,40 @@ impl Deserialize for Url {
 
 const DEFAULT_EXPIRY_DURATION: u64 = 86400;
 
+/// Application configuration. Usually deserialized from JSON for use.
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Configuration {
+    /// The issuer of the token. Usually the URI of the authentication server.
+    /// The issuer URI will also be used in the UUID generation of the tokens.
+    pub issuer: String,
+    /// Origins that are allowed to issue CORS request. This is needed for browser
+    /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
+    ///
+    /// This field is (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+    ///
+    /// # Examples
+    /// ## Allow all origins
+    /// ```json
+    /// {
+    ///     "allowed_origins": null
+    /// }
+    /// ```
+    /// ## Allow specific origins
+    /// ```json
+    /// {
+    ///     "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"]
+    /// }
+    /// ```
     pub allowed_origins: cors::AllowedOrigins,
+    /// The audience intended for your tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature_algorithm: Option<jwt::jws::Algorithm>,
+    pub audience: Option<jwt::SingleOrMultipleStrings>,
+    /// Defaults to `none`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature_algorithm: Option<jws::Algorithm>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secret: Option<token::Secret>,
-    /// Expiry duration of tokens, in seconds
+    /// Expiry duration of tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
     #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
     pub expiry_duration: Duration,
 }
@@ -173,6 +212,53 @@ pub struct Configuration {
 impl Configuration {
     fn default_expiry_duration() -> Duration {
         Duration::from_secs(86400)
+    }
+
+    fn make_uuid(&self) -> Uuid {
+        Uuid::new_v5(&uuid::NAMESPACE_URL, &self.issuer)
+    }
+
+    fn make_header(&self) -> jws::Header {
+        jws::Header {
+            algorithm: self.signature_algorithm.unwrap_or_else(|| jws::Algorithm::None),
+            ..Default::default()
+        }
+    }
+
+    fn make_registered_claims(&self, subject: &str) -> Result<jwt::RegisteredClaims, Error> {
+        let now = UTC::now();
+        let expiry_duration = chrono::Duration::from_std(self.expiry_duration).map_err(|e| format!("{}", e))?;
+
+        Ok(jwt::RegisteredClaims {
+               issuer: Some(self.issuer.to_string()),
+               subject: Some(subject.to_string()),
+               audience: self.audience.clone(),
+               issued_at: Some(now.clone().into()),
+               not_before: Some(now.clone().into()),
+               expiry: Some((now + expiry_duration).into()),
+               id: Some(self.make_uuid().urn().to_string()),
+           })
+    }
+
+    pub fn make_token<T: Serialize + Deserialize>(&self,
+                                                  subject: &str,
+                                                  private_claims: T)
+                                                  -> Result<token::Token<T>, Error> {
+        let header = self.make_header();
+        let registered_claims = self.make_registered_claims(subject)?;
+        let issued_at = registered_claims.issued_at.unwrap().clone(); // we always set it, don't we?
+
+        let token = token::Token::<T> {
+            token: jwt::JWT::new_decoded(header,
+                                         jwt::ClaimsSet::<T> {
+                                             private: private_claims,
+                                             registered: registered_claims,
+                                         }),
+            expires_in: self.expiry_duration.clone(),
+            issued_at: *issued_at.deref(),
+            refresh_token: None,
+        };
+        Ok(token)
     }
 }
 
@@ -217,15 +303,16 @@ fn hello(origin: cors::Origin,
          options: State<HelloCorsOptions>)
          -> Result<cors::Response<token::Token<token::PrivateClaim>>, Error> {
     let token = token::Token::<token::PrivateClaim> {
-        token: jwt::JWT::new_decoded(jwt::jws::Header::default(), jwt::ClaimsSet::<token::PrivateClaim> {
-            private: Default::default(),
-            registered: Default::default(),
-        }),
+        token: jwt::JWT::new_decoded(jws::Header::default(),
+                                     jwt::ClaimsSet::<token::PrivateClaim> {
+                                         private: Default::default(),
+                                         registered: Default::default(),
+                                     }),
         expires_in: Duration::from_secs(86400),
         issued_at: chrono::UTC::now(),
         refresh_token: None,
     };
-    let token = token.encode(jwt::jws::Secret::Bytes("secret".to_string().into_bytes()))?;
+    let token = token.encode(jws::Secret::Bytes("secret".to_string().into_bytes()))?;
     Ok(options.respond(token, &origin)?)
 }
 

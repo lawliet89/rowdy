@@ -107,7 +107,7 @@ impl<T: Serialize + Deserialize> Token<T> {
             jwt @ jwt::JWT::Encoded(_) => {
                 self.token = jwt.into_decoded(secret, algorithm)?;
                 Ok(self)
-            },
+            }
             jwt::JWT::Decoded { .. } => Err(Error::TokenAlreadyDecoded),
         }
     }
@@ -125,7 +125,7 @@ impl<'r, T: Serialize + Deserialize> Responder<'r> for Token<T> {
     fn respond(self) -> Result<Response<'r>, Status> {
         match self.encode_and_respond() {
             Ok(serialized) => Response::build().header(ContentType::JSON).sized_body(Cursor::new(serialized)).ok(),
-            Err(e) => Err::<String, Error>(e).respond()
+            Err(e) => Err::<String, Error>(e).respond(),
         }
     }
 }
