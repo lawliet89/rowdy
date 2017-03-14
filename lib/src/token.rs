@@ -149,17 +149,71 @@ impl<'r, T: Serialize + Deserialize> Responder<'r> for Token<T> {
 ///     "secret": null
 /// }
 /// ```
+/// ```
+/// extern crate rowdy;
+/// #[macro_use]
+/// extern crate serde_derive;
+/// extern crate serde_json;
+///
+/// use rowdy::token;
+///
+/// # fn main() {
+/// #[derive(Serialize, Deserialize)]
+/// struct Test {
+///     secret: token::Secret
+/// }
+///
+/// let json = r#"{ "secret": null }"#;
+/// let deserialized: Test = serde_json::from_str(json).unwrap();
+/// # }
+/// ```
 /// ## HMAC secret string
 /// ```json
 /// {
 ///     "secret": "some_secret_string"
 /// }
 /// ```
+/// ```
+/// extern crate rowdy;
+/// #[macro_use]
+/// extern crate serde_derive;
+/// extern crate serde_json;
+///
+/// use rowdy::token;
+///
+/// # fn main() {
+/// #[derive(Serialize, Deserialize)]
+/// struct Test {
+///     secret: token::Secret
+/// }
+///
+/// let json = r#"{ "secret": "some_secret_string" }"#;
+/// let deserialized: Test = serde_json::from_str(json).unwrap();
+/// # }
+/// ```
 /// ## RSA Key pair
 /// ```json
 /// {
 ///     "secret": { "rsa_private": "private.der", "rsa_public": "public.der" }
 /// }
+/// ```
+/// ```
+/// extern crate rowdy;
+/// #[macro_use]
+/// extern crate serde_derive;
+/// extern crate serde_json;
+///
+/// use rowdy::token;
+///
+/// # fn main() {
+/// #[derive(Serialize, Deserialize)]
+/// struct Test {
+///     secret: token::Secret
+/// }
+///
+/// let json = r#"{ "secret": { "rsa_private": "private.der", "rsa_public": "public.der" } }"#;
+/// let deserialized: Test = serde_json::from_str(json).unwrap();
+/// # }
 /// ```
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -251,4 +305,9 @@ fn token_getter(origin: cors::Origin,
     let token = configuration.make_token::<PrivateClaim>(&username, Default::default())?;
     let token = token.encode(configuration.secret.for_signing()?)?;
     Ok(cors_options.respond(token, &origin)?)
+}
+
+#[cfg(test)]
+mod tests {
+
 }

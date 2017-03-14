@@ -174,22 +174,55 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestHeaders {
     }
 }
 
-/// Allowed Origins for a CORS request.
+/// Origins that are allowed to issue CORS request. This is needed for browser
+/// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
+///
 /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
 ///
-/// # Serialization Examples
+/// # Examples
 /// ## Allow all origins
 /// ```json
-/// {
-///     "allowed_origins": null
+/// { "allowed_origins": null }
+/// ```
+/// ```
+/// extern crate rowdy;
+/// #[macro_use]
+/// extern crate serde_derive;
+/// extern crate serde_json;
+///
+/// use rowdy::cors;
+///
+/// # fn main() {
+/// #[derive(Serialize, Deserialize)]
+/// struct Test {
+///     allowed_origins: cors::AllowedOrigins
 /// }
+///
+/// let json = r#"{ "allowed_origins": null }"#;
+/// let deserialized: Test = serde_json::from_str(json).unwrap();
+/// # }
 /// ```
 /// ## Allow specific origins
 /// ```json
-/// {
-///     "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"]
-/// }
+/// { "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"] }
 /// ```
+/// ```
+/// extern crate rowdy;
+/// #[macro_use]
+/// extern crate serde_derive;
+/// extern crate serde_json;
+///
+/// use rowdy::cors;
+///
+/// # fn main() {
+/// #[derive(Serialize, Deserialize)]
+/// struct Test {
+///     allowed_origins: cors::AllowedOrigins
+/// }
+///
+/// let json = r#"{ "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"] }"#;
+/// let deserialized: Test = serde_json::from_str(json).unwrap();
+/// # }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AllowedOrigins {

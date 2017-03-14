@@ -169,19 +169,7 @@ pub struct Configuration {
     ///
     /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
     ///
-    /// # Serialization Examples
-    /// ## Allow all origins
-    /// ```json
-    /// {
-    ///     "allowed_origins": null
-    /// }
-    /// ```
-    /// ## Allow specific origins
-    /// ```json
-    /// {
-    ///     "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"]
-    /// }
-    /// ```
+    /// See [`cors::AllowedOrigins`] for serialization examples.
     pub allowed_origins: cors::AllowedOrigins,
     /// The audience intended for your tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -193,24 +181,7 @@ pub struct Configuration {
     /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
     /// Defaults to `None`.
     ///
-    /// # Serialization Examples
-    /// ## No secret
-    /// ```json
-    /// {
-    ///     "secret": null
-    /// }
-    /// ```
-    /// ## HMAC secret string
-    /// ```json
-    /// {
-    ///     "secret": "some_secret_string"
-    /// }
-    /// ```
-    /// ## RSA Key pair
-    /// ```json
-    /// {
-    ///     "secret": { "rsa_private": "private.der", "rsa_public": "public.der" }
-    /// }
+    /// See [`token::Secret`] for serialization examples
     /// ```
     #[serde(default)]
     pub secret: token::Secret,
