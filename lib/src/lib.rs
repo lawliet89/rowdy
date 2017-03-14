@@ -36,8 +36,6 @@ use std::ops::Deref;
 use chrono::UTC;
 use jwt::jws;
 use rocket::http::Status;
-use rocket::http::Method::*;
-use rocket::State;
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
@@ -191,7 +189,7 @@ pub struct Configuration {
 
 impl Configuration {
     fn default_expiry_duration() -> Duration {
-        Duration::from_secs(86400)
+        Duration::from_secs(DEFAULT_EXPIRY_DURATION)
     }
 
     fn make_uuid(&self) -> Uuid {
@@ -242,6 +240,7 @@ impl Configuration {
     }
 }
 
+/// Launches the Rocket server with the configuration. This function blocks and never returns.
 pub fn launch(config: Configuration) {
     let token_getter_options = token::TokenGetterCorsOptions::new(&config);
     rocket::ignite()

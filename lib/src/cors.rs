@@ -471,7 +471,6 @@ impl<'r, R: Responder<'r>> Responder<'r> for Response<R> {
 #[cfg(test)]
 #[allow(unmounted_route)]
 mod tests {
-    use std::collections::HashSet;
     use std::str::FromStr;
 
     use hyper;
@@ -654,7 +653,7 @@ X-Ping, accept-language"#;
         let mut req =
             MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
-        let mut response = req.dispatch_with(&rocket);
+        let response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Ok);
     }
 
@@ -684,7 +683,7 @@ X-Ping, accept-language"#;
         let mut req =
             MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
-        let mut response = req.dispatch_with(&rocket);
+        let response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
     }
 
@@ -700,7 +699,7 @@ X-Ping, accept-language"#;
         let mut req =
             MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
-        let mut response = req.dispatch_with(&rocket);
+        let response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
     }
 
@@ -715,7 +714,7 @@ X-Ping, accept-language"#;
         let mut req =
             MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
 
-        let mut response = req.dispatch_with(&rocket);
+        let response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
     }
 
@@ -727,7 +726,7 @@ X-Ping, accept-language"#;
         let authorization = Header::new("Authorization", "let me in");
         let mut req = MockRequest::new(Get, "/").header(origin_header).header(authorization);
 
-        let mut response = req.dispatch_with(&rocket);
+        let response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
     }
 }

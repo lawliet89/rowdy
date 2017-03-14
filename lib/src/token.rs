@@ -296,6 +296,7 @@ struct AuthParam {
     offline_token: Option<bool>,
 }
 
+#[allow(unmounted_route)] // mounted via `::launch()`
 #[options("/?<_auth_param>")]
 fn token_getter_options(origin: cors::Origin,
                         method: cors::AccessControlRequestMethod,
@@ -306,6 +307,7 @@ fn token_getter_options(origin: cors::Origin,
     options.preflight(&origin, &method, Some(&headers))
 }
 
+#[allow(unmounted_route)] // mounted via `::launch()`
 #[get("/?<_auth_param>")]
 fn token_getter(origin: cors::Origin,
                 authentication: header::Authorization<hyper::header::Basic>,
@@ -401,7 +403,7 @@ mod tests {
 
     #[test]
     fn token_response_smoke_test() {
-        use rocket::response::{Response, Responder};
+        use rocket::response::Responder;
 
         let expected_token = make_token();
         let token = not_err!(expected_token.clone().encode(jwt::jws::Secret::bytes_from_str("secret")));

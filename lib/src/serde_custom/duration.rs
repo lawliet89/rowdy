@@ -19,7 +19,6 @@ pub fn deserialize<D>(deserializer: D) -> Result<Duration, D::Error>
 mod tests {
     use std::time::Duration;
     use serde_json;
-    use super::*;
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     struct TestStruct {
