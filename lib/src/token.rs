@@ -228,6 +228,7 @@ impl<'r, T: Serialize + Deserialize> Responder<'r> for Token<T> {
 /// let deserialized: Test = serde_json::from_str(json).unwrap();
 /// # }
 /// ```
+// Note: A "smoke test"-ish of (de)serialization is tested in the documentation code above.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Secret {
@@ -289,14 +290,15 @@ impl TokenGetterCorsOptions {
     }
 }
 
-#[derive(FromForm)]
+#[derive(FromForm, Default, Clone, Debug)]
 struct AuthParam {
     service: String,
     scope: String,
     offline_token: Option<bool>,
 }
 
-#[allow(unmounted_route)] // mounted via `::launch()`
+#[allow(unmounted_route)]
+// mounted via `::launch()`
 #[options("/?<_auth_param>")]
 fn token_getter_options(origin: cors::Origin,
                         method: cors::AccessControlRequestMethod,
@@ -307,7 +309,8 @@ fn token_getter_options(origin: cors::Origin,
     options.preflight(&origin, &method, Some(&headers))
 }
 
-#[allow(unmounted_route)] // mounted via `::launch()`
+#[allow(unmounted_route)]
+// mounted via `::launch()`
 #[get("/?<_auth_param>")]
 fn token_getter(origin: cors::Origin,
                 authentication: header::Authorization<hyper::header::Basic>,
@@ -415,5 +418,35 @@ mod tests {
         let actual_token =
             not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
         assert_eq!(expected_token, actual_token);
+    }
+
+    #[test]
+    fn secrets_are_transformed_for_signing_correctly() {
+        let none = Secret::None;
+        assert_matches_non_debug!(not_err!(none.for_signing()), jwt::jws::Secret::None);
+
+        let string = Secret::String("secret".to_string());
+        assert_matches_non_debug!(not_err!(string.for_signing()), jwt::jws::Secret::Bytes(_));
+
+        let rsa = Secret::RSAKeyPair {
+            rsa_private: "test/fixtures/rsa_private_key.der".to_string(),
+            rsa_public: "test/fixtures/rsa_public_key.der".to_string(),
+        };
+        assert_matches_non_debug!(not_err!(rsa.for_signing()), jwt::jws::Secret::RSAKeyPair(_));
+    }
+
+    #[test]
+    fn secrets_are_transformed_for_verification_correctly() {
+        let none = Secret::None;
+        assert_matches_non_debug!(not_err!(none.for_verification()), jwt::jws::Secret::None);
+
+        let string = Secret::String("secret".to_string());
+        assert_matches_non_debug!(not_err!(string.for_verification()), jwt::jws::Secret::Bytes(_));
+
+        let rsa = Secret::RSAKeyPair {
+            rsa_private: "test/fixtures/rsa_private_key.der".to_string(),
+            rsa_public: "test/fixtures/rsa_public_key.der".to_string(),
+        };
+        assert_matches_non_debug!(not_err!(rsa.for_verification()), jwt::jws::Secret::PublicKey(_));
     }
 }

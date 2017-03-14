@@ -33,3 +33,11 @@ macro_rules! assert_matches {
         e @ _ => panic!("{}: Expected pattern {} \ndoes not match {:?}", stringify!($e), stringify!($p), e)
     })
 }
+
+macro_rules! assert_matches_non_debug {
+    ($e: expr, $p: pat) => (assert_matches_non_debug!($e, $p, ()));
+    ($e: expr, $p: pat, $f: expr) => (match $e {
+        $p => $f,
+        _ => panic!("{}: Expected pattern {} \ndoes not match {}", stringify!($e), stringify!($p), stringify!($e))
+    })
+}
