@@ -551,6 +551,7 @@ mod tests {
                                          registered);
 
         assert_eq!(Some("https://www.acme.com".to_string()), registered.issuer);
-        assert_eq!(Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())), registered.audience);
+        assert_eq!(Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
+                   registered.audience);
     }
 }

@@ -308,5 +308,4 @@ pub fn launch(config: Configuration) {
 
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}
