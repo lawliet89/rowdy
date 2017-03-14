@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::error;
 use std::fmt;
 use std::io::Cursor;
@@ -5,10 +6,17 @@ use std::time::Duration;
 
 use chrono::{DateTime, UTC};
 use jwt::{self, jws};
+use hyper;
+use rocket;
 use rocket::http::{ContentType, Status};
+use rocket::http::Method::*;
 use rocket::response::{Response, Responder};
+use rocket::State;
 use serde::{Serialize, Deserialize};
 use serde_json;
+
+use cors;
+use header;
 
 #[derive(Debug)]
 pub enum Error {
@@ -194,4 +202,53 @@ impl Secret {
             Secret::RSAKeyPair { ref rsa_public, .. } => Ok(jws::Secret::public_key_from_file(rsa_public)?),
         }
     }
+}
+
+pub struct TokenGetterCorsOptions(cors::Options);
+impl_deref!(TokenGetterCorsOptions, cors::Options);
+
+const TOKEN_GETTER_METHODS: &[rocket::http::Method] = &[Get];
+const TOKEN_GETTER_HEADERS: &'static [&'static str] = &["Authorization"];
+
+impl TokenGetterCorsOptions {
+    pub fn new(config: &::Configuration) -> Self {
+        TokenGetterCorsOptions(cors::Options {
+                                   allowed_origins: config.allowed_origins.clone(),
+                                   allowed_methods: TOKEN_GETTER_METHODS.iter().cloned().collect(),
+                                   allowed_headers: TOKEN_GETTER_HEADERS.iter().map(|s| s.to_string().into()).collect(),
+                                   allow_credentials: true,
+                                   ..Default::default()
+                               })
+    }
+}
+
+#[derive(FromForm)]
+struct AuthParam {
+    service: String,
+    scope: String,
+    offline_token: Option<bool>,
+}
+
+#[options("/?<_auth_param>")]
+fn token_getter_options(origin: cors::Origin,
+                        method: cors::AccessControlRequestMethod,
+                        headers: cors::AccessControlRequestHeaders,
+                        options: State<TokenGetterCorsOptions>,
+                        _auth_param: AuthParam)
+                        -> Result<cors::Response<()>, cors::Error> {
+    options.preflight(&origin, &method, Some(&headers))
+}
+
+#[get("/?<_auth_param>")]
+fn token_getter(origin: cors::Origin,
+                authentication: header::Authorization<hyper::header::Basic>,
+                _auth_param: AuthParam,
+                configuration: State<::Configuration>,
+                cors_options: State<TokenGetterCorsOptions>)
+                -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
+
+    let ::header::Authorization(hyper::header::Authorization(hyper::header::Basic { username, .. })) = authentication;
+    let token = configuration.make_token::<PrivateClaim>(&username, Default::default())?;
+    let token = token.encode(configuration.secret.for_signing()?)?;
+    Ok(cors_options.respond(token, &origin)?)
 }

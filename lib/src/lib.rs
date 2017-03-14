@@ -15,14 +15,8 @@ extern crate serde_json;
 extern crate unicase;
 extern crate uuid;
 
-macro_rules! impl_from_error {
-    ($f: ty, $e: expr) => {
-        impl From<$f> for Error {
-            fn from(f: $f) -> Error { $e(f) }
-        }
-    }
-}
-
+#[macro_use]
+mod macros;
 #[cfg(test)]
 #[macro_use]
 mod test;
@@ -48,19 +42,6 @@ use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
 use uuid::Uuid;
-
-/// Implement a simple Deref from `From` to `To` where `From` is a newtype struct containing `To`
-macro_rules! impl_deref {
-    ($f:ty, $t:ty) => {
-        impl Deref for $f {
-            type Target = $t;
-
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
-    }
-}
 
 #[derive(Debug)]
 pub enum Error {
@@ -291,60 +272,12 @@ impl Configuration {
     }
 }
 
-struct HelloCorsOptions(cors::Options);
-impl_deref!(HelloCorsOptions, cors::Options);
-
-const HELLO_METHODS: &[rocket::http::Method] = &[Get];
-const HELLO_HEADERS: &'static [&'static str] = &["Authorization"];
-
-impl HelloCorsOptions {
-    fn new(config: &Configuration) -> Self {
-        HelloCorsOptions(cors::Options {
-                             allowed_origins: config.allowed_origins.clone(),
-                             allowed_methods: HELLO_METHODS.iter().cloned().collect(),
-                             allowed_headers: HELLO_HEADERS.iter().map(|s| s.to_string().into()).collect(),
-                             allow_credentials: true,
-                             ..Default::default()
-                         })
-    }
-}
-
-#[derive(FromForm)]
-struct AuthParam {
-    service: String,
-    scope: String,
-    offline_token: Option<bool>,
-}
-
-#[options("/?<_auth_param>")]
-fn hello_options(origin: cors::Origin,
-                 method: cors::AccessControlRequestMethod,
-                 headers: cors::AccessControlRequestHeaders,
-                 options: State<HelloCorsOptions>,
-                 _auth_param: AuthParam)
-                 -> Result<cors::Response<()>, cors::Error> {
-    options.preflight(&origin, &method, Some(&headers))
-}
-
-#[get("/?<_auth_param>")]
-fn hello(origin: cors::Origin,
-         authentication: header::Authorization<hyper::header::Basic>,
-         _auth_param: AuthParam,
-         configuration: State<Configuration>,
-         cors_options: State<HelloCorsOptions>)
-         -> Result<cors::Response<token::Token<token::PrivateClaim>>, Error> {
-
-    let header::Authorization(hyper::header::Authorization(hyper::header::Basic { username, .. })) = authentication;
-    let token = configuration.make_token::<token::PrivateClaim>(&username, Default::default())?;
-    let token = token.encode(configuration.secret.for_signing()?)?;
-    Ok(cors_options.respond(token, &origin)?)
-}
-
 pub fn launch(config: Configuration) {
-    let hello_options = HelloCorsOptions::new(&config);
+    let token_getter_options = token::TokenGetterCorsOptions::new(&config);
     rocket::ignite()
-        .mount("/", routes![hello, hello_options])
+        .mount("/",
+               routes![token::token_getter, token::token_getter_options])
         .manage(config)
-        .manage(hello_options)
+        .manage(token_getter_options)
         .launch();
 }
