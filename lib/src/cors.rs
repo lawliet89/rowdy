@@ -442,17 +442,18 @@ mod tests {
     use std::str::FromStr;
 
     use hyper;
-    use rocket;
+    use rocket::{self, Outcome};
     use rocket::testing::MockRequest;
     use rocket::http::Method::*;
     use rocket::http::{Header, Status};
+    use rocket::request::{self, Request, FromRequest};
     use rocket::State;
 
     use cors;
     use cors::*;
 
     #[test]
-    fn origin_header_parsing() {
+    fn origin_header_conversion() {
         let url = "https://foo.bar.xyz";
         not_err!(Origin::from_str(url));
 
@@ -464,7 +465,19 @@ mod tests {
     }
 
     #[test]
-    fn request_method_parsing() {
+    fn origin_header_parsing() {
+        let origin = hyper::header::Origin::new("https", "www.example.com", None);
+        let mut request = Request::new(rocket::http::Method::Get, "/");
+        request.add_header(origin);
+        let outcome: request::Outcome<Origin, Error> = FromRequest::from_request(&request);
+
+        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let Origin(actual_url) = parsed_header;
+        assert_eq!("https://www.example.com/", actual_url.as_str());
+    }
+
+    #[test]
+    fn request_method_conversion() {
         let method = "POST";
         let parsed_method = not_err!(AccessControlRequestMethod::from_str(method));
         assert_matches!(parsed_method, AccessControlRequestMethod(Method::Post));
@@ -478,12 +491,39 @@ mod tests {
     }
 
     #[test]
-    fn request_headers_parsing() {
+    fn request_method_parsing() {
+        let method = hyper::header::AccessControlRequestMethod(hyper::method::Method::Get);
+        let mut request = Request::new(rocket::http::Method::Get, "/");
+        request.add_header(method);
+        let outcome: request::Outcome<AccessControlRequestMethod, Error> = FromRequest::from_request(&request);
+
+        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let AccessControlRequestMethod(parsed_method) = parsed_header;
+        assert_eq!("GET", parsed_method.as_str());
+    }
+
+    #[test]
+    fn request_headers_conversion() {
         let headers = ["foo", "bar", "baz"];
         let parsed_headers = not_err!(AccessControlRequestHeaders::from_str(&headers.join(", ")));
         let expected_headers: HeaderFieldNamesSet = headers.iter().map(|s| s.to_string().into()).collect();
         let AccessControlRequestHeaders(actual_headers) = parsed_headers;
         assert_eq!(actual_headers, expected_headers);
+    }
+
+    #[test]
+    fn request_headers_parsing() {
+        let headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("accept-language").unwrap(),
+                                                                      FromStr::from_str("date").unwrap()]);
+        let mut request = Request::new(rocket::http::Method::Get, "/");
+        request.add_header(headers);
+        let outcome: request::Outcome<AccessControlRequestHeaders, Error> = FromRequest::from_request(&request);
+
+        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let AccessControlRequestHeaders(parsed_headers) = parsed_header;
+        let mut parsed_headers: Vec<String> = parsed_headers.iter().map(|s| s.to_string()).collect();
+        parsed_headers.sort();
+        assert_eq!(vec!["accept-language".to_string(), "date".to_string()], parsed_headers);
     }
 
     #[get("/request_headers")]
