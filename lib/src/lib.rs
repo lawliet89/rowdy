@@ -157,6 +157,50 @@ impl Deserialize for Url {
 const DEFAULT_EXPIRY_DURATION: u64 = 86400;
 
 /// Application configuration. Usually deserialized from JSON for use.
+///
+/// # Examples
+/// This is a standard JSON serialized example.
+///
+/// ```json
+/// {
+///     "issuer": "https://www.acme.com",
+///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///     "audience": ["https://www.example.com", "https://www.foobar.com"],
+///     "signature_algorithm": "RS256",
+///     "secret": {
+///                 "rsa_private": "test/fixtures/rsa_private_key.der",
+///                 "rsa_public": "test/fixtures/rsa_public_key.der"
+///                },
+///     "expiry_duration": 86400
+/// }
+/// ```
+///
+/// ```
+/// extern crate rowdy;
+/// #[macro_use]
+/// extern crate serde_derive;
+/// extern crate serde_json;
+///
+/// use rowdy::Configuration;
+///
+/// # fn main() {
+/// let json = r#"{
+///     "issuer": "https://www.acme.com",
+///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///     "audience": ["https://www.example.com", "https://www.foobar.com"],
+///     "signature_algorithm": "RS256",
+///     "secret": {
+///                 "rsa_private": "test/fixtures/rsa_private_key.der",
+///                 "rsa_public": "test/fixtures/rsa_public_key.der"
+///                },
+///     "expiry_duration": 86400
+/// }"#;
+/// let deserialized: Configuration = serde_json::from_str(json).unwrap();
+/// # }
+/// ```
+///
+/// Variations for the fields `allowed_origins`, `audience` and `secret` exist. Refer to their type documentation for
+/// examples.
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Configuration {
     /// The issuer of the token. Usually the URI of the authentication server.
@@ -218,6 +262,7 @@ impl Configuration {
            })
     }
 
+    /// Based on the configuration, make a token for the subject, along with some private claims.
     pub fn make_token<T: Serialize + Deserialize>(&self,
                                                   subject: &str,
                                                   private_claims: T)

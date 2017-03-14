@@ -203,9 +203,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestHeaders {
 /// # }
 /// ```
 /// ## Allow specific origins
+///
 /// ```json
 /// { "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"] }
 /// ```
+///
 /// ```
 /// extern crate rowdy;
 /// #[macro_use]
