@@ -24,14 +24,12 @@ mod tests {
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     struct TestStruct {
         #[serde(with = "super")]
-        duration: Duration
+        duration: Duration,
     }
 
     #[test]
     fn serialization_round_trip() {
-        let structure = TestStruct {
-            duration: Duration::from_secs(1234)
-        };
+        let structure = TestStruct { duration: Duration::from_secs(1234) };
 
         let expected_json = "{\"duration\":1234}";
         let actual_json = not_err!(serde_json::to_string(&structure));

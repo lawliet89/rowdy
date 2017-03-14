@@ -81,3 +81,45 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
 // TODO: Proper authentication responder, wrapped around like CORS
 // TODO: Send `WWW-Authenticate` header on missing auth instead of a simple 403
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Deref;
+    use hyper::header::{self, Header, HeaderFormatter};
+    use rocket::{self, Outcome};
+    use rocket::request::{self, Request, FromRequest};
+
+    #[test]
+    fn parses_Bearer_auth_correctly() {
+        let auth = header::Authorization(header::Basic {
+                                             username: "Aladdin".to_owned(),
+                                             password: Some("open sesame".to_string()),
+                                         });
+        let mut request = Request::new(rocket::http::Method::Get, "/");
+        let header = rocket::http::Header::new(header::Authorization::<header::Basic>::header_name(),
+                                               format!("{}", HeaderFormatter(&auth)));
+        request.add_header(header);
+        let outcome: request::Outcome<::header::Authorization<header::Basic>, ::header::Error> =
+            FromRequest::from_request(&request);
+
+        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let ::header::Authorization(header::Authorization(header::Basic { username, password })) = parsed_header;
+        assert_eq!(username, "Aladdin");
+        assert_eq!(password, Some("open sesame".to_string()));
+    }
+
+    #[test]
+    fn parses_bearer_auth_correctly() {
+        let auth = header::Authorization(header::Bearer { token: "token".to_string() });
+        let mut request = Request::new(rocket::http::Method::Get, "/");
+        let header = rocket::http::Header::new(header::Authorization::<header::Bearer>::header_name(),
+                                               format!("{}", HeaderFormatter(&auth)));
+        request.add_header(header);
+        let outcome: request::Outcome<::header::Authorization<header::Bearer>, ::header::Error> =
+            FromRequest::from_request(&request);
+
+        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let ::header::Authorization(header::Authorization(header::Bearer { token })) = parsed_header;
+        assert_eq!(token, "token");
+    }
+}
