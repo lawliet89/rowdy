@@ -15,6 +15,14 @@ extern crate serde_json;
 extern crate unicase;
 extern crate uuid;
 
+macro_rules! impl_from_error {
+    ($f: ty, $e: expr) => {
+        impl From<$f> for Error {
+            fn from(f: $f) -> Error { $e(f) }
+        }
+    }
+}
+
 #[cfg(test)]
 #[macro_use]
 mod test;
@@ -23,12 +31,16 @@ pub mod serde_custom;
 pub mod token;
 
 use std::default::Default;
+use std::error;
 use std::fmt;
 use std::str::FromStr;
+use std::time::Duration;
 use std::ops::Deref;
 
-use rocket::State;
+use rocket::http::Status;
 use rocket::http::Method::*;
+use rocket::State;
+use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
 
@@ -41,6 +53,49 @@ macro_rules! impl_deref {
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    CORS(cors::Error),
+    Token(token::Error),
+}
+
+impl_from_error!(cors::Error, Error::CORS);
+impl_from_error!(token::Error, Error::Token);
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::CORS(_) => "CORS Error",
+            Error::Token(_) => "Token error",
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            Error::CORS(ref e) => Some(e as &error::Error),
+            Error::Token(ref e) => Some(e as &error::Error),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::CORS(ref e) => fmt::Display::fmt(e, f),
+            Error::Token(ref e) => fmt::Display::fmt(e, f),
+        }
+    }
+}
+
+impl<'r> Responder<'r> for Error {
+    fn respond(self) -> Result<Response<'r>, Status> {
+        match self {
+            Error::CORS(e) => e.respond(),
+            Error::Token(e) => e.respond(),
         }
     }
 }
@@ -101,9 +156,24 @@ impl Deserialize for Url {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+const DEFAULT_EXPIRY_DURATION: u64 = 86400;
+
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Configuration {
     pub allowed_origins: cors::AllowedOrigins,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature_algorithm: Option<jwt::jws::Algorithm>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secret: Option<token::Secret>,
+    /// Expiry duration of tokens, in seconds
+    #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
+    pub expiry_duration: Duration,
+}
+
+impl Configuration {
+    fn default_expiry_duration() -> Duration {
+        Duration::from_secs(86400)
+    }
 }
 
 struct HelloCorsOptions(cors::Options);
@@ -145,18 +215,18 @@ fn hello_options(origin: cors::Origin,
 fn hello(origin: cors::Origin,
          auth_param: AuthParam,
          options: State<HelloCorsOptions>)
-         -> Result<cors::Response<token::Token<token::PrivateClaim>>, cors::Error> {
+         -> Result<cors::Response<token::Token<token::PrivateClaim>>, Error> {
     let token = token::Token::<token::PrivateClaim> {
-        token: jwt::ClaimsSet::<token::PrivateClaim> {
+        token: jwt::JWT::new_decoded(jwt::jws::Header::default(), jwt::ClaimsSet::<token::PrivateClaim> {
             private: Default::default(),
             registered: Default::default(),
-        },
-        expires_in: std::time::Duration::from_secs(86400),
+        }),
+        expires_in: Duration::from_secs(86400),
         issued_at: chrono::UTC::now(),
         refresh_token: None,
     };
-
-    options.respond(token, &origin)
+    let token = token.encode(jwt::jws::Secret::Bytes("secret".to_string().into_bytes()))?;
+    Ok(options.respond(token, &origin)?)
 }
 
 pub fn launch(config: Configuration) {

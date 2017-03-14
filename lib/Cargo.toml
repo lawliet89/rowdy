@@ -13,7 +13,7 @@ doc = true
 [dependencies]
 chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
-jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "0816f212eb85df143fcb04f6db4e05d1ae020bbd" }
+jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "2776297763332fbadda67e5e4f883518aaf0f4d7" }
 log = "0.3"
 rocket = "0.2.2"
 rocket_codegen = "0.2.2"
