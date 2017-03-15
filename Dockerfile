@@ -1,7 +1,7 @@
 FROM debian:jessie
 MAINTAINER Yong Wen Chua <me@yongwen.xyz>
 
-ARG RUST_VERSION=nightly-2017-03-03
+ARG RUST_VERSION=nightly-2017-03-13
 
 RUN set -x \
     && apt-get update \
@@ -19,16 +19,15 @@ RUN set -x \
 
 ENV PATH "/root/.cargo/bin:${PATH}"
 WORKDIR /app/src
-ENTRYPOINT '/bin/bash'
 
 COPY Cargo.toml Cargo.lock lib/Cargo.toml ./
 RUN cargo fetch
 
 COPY . ./
-RUN cargo build --release
+RUN cargo build --release --all
 
 # FIXME: Better way to deal with this
 VOLUME ["/app/src/config"]
 
 ENTRYPOINT ["cargo"]
-CMD ["run", "--release", "config/Config.json"]
+CMD ["run", "--release", "--package=rowdy", "config/Config.json"]

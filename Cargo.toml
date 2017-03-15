@@ -1,26 +1,37 @@
 [package]
-name = "rowdy"
+name = "rowdy-lib"
 version = "0.1.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 
-[[bin]]
+[lib]
 name = "rowdy"
-path = "src/main.rs"
+path = "src/lib.rs"
 test = true
-doc = false
+doctest = true
+doc = true
 
 [dependencies]
-docopt = "0.7"
+chrono = { version = "0.3", features = ["serde"] }
+hyper = "0.10"
+jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "cea2bfe90d220e9fa226b248008a08f6da379fd4" }
 log = "0.3"
 rocket = "0.2.2"
 rocket_codegen = "0.2.2"
-rowdy-lib = { path = "lib" }
-rustc-serialize = "0.3"
 serde = "0.9"
+serde_derive = "0.9"
 serde_json = "0.9"
+unicase="1.4"
+uuid = { version = "0.4", features = ["use_std", "v5", "serde"] }
+
+clippy = {version = "*", optional = true}
+
+[dependencies.rocket_contrib]
+version = "*"
+default-features = false
+features = ["json", "uuid"]
 
 [dev-dependencies]
 rocket = { version = "*", features = ["testing"] }
 
 [workspace]
-members = ["lib"]
+members = ["bin"]
