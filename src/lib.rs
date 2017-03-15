@@ -25,6 +25,9 @@ extern crate serde_json;
 extern crate unicase;
 extern crate uuid;
 
+#[cfg(test)]
+extern crate serde_test;
+
 #[macro_use]
 mod macros;
 #[cfg(test)]
@@ -35,7 +38,6 @@ pub mod cors;
 pub mod serde_custom;
 pub mod token;
 
-use std::default::Default;
 use std::error;
 use std::fmt;
 use std::io;
@@ -43,13 +45,11 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::ops::Deref;
 
-use chrono::UTC;
 use jwt::jws;
 use rocket::http::Status;
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
-use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum Error {
@@ -245,54 +245,6 @@ impl Configuration {
     fn default_expiry_duration() -> Duration {
         Duration::from_secs(DEFAULT_EXPIRY_DURATION)
     }
-
-    fn make_uuid(&self) -> Uuid {
-        Uuid::new_v5(&uuid::NAMESPACE_URL, &self.issuer)
-    }
-
-    fn make_header(&self) -> jws::Header {
-        jws::Header {
-            algorithm: self.signature_algorithm.unwrap_or_else(|| jws::Algorithm::None),
-            ..Default::default()
-        }
-    }
-
-    fn make_registered_claims(&self, subject: &str) -> Result<jwt::RegisteredClaims, Error> {
-        let now = UTC::now();
-        let expiry_duration = chrono::Duration::from_std(self.expiry_duration).map_err(|e| format!("{}", e))?;
-
-        Ok(jwt::RegisteredClaims {
-               issuer: Some(self.issuer.to_string()),
-               subject: Some(subject.to_string()),
-               audience: self.audience.clone(),
-               issued_at: Some(now.into()),
-               not_before: Some(now.into()),
-               expiry: Some((now + expiry_duration).into()),
-               id: Some(self.make_uuid().urn().to_string()),
-           })
-    }
-
-    /// Based on the configuration, make a token for the subject, along with some private claims.
-    pub fn make_token<T: Serialize + Deserialize>(&self,
-                                                  subject: &str,
-                                                  private_claims: T)
-                                                  -> Result<token::Token<T>, Error> {
-        let header = self.make_header();
-        let registered_claims = self.make_registered_claims(subject)?;
-        let issued_at = registered_claims.issued_at.unwrap(); // we always set it, don't we?
-
-        let token = token::Token::<T> {
-            token: jwt::JWT::new_decoded(header,
-                                         jwt::ClaimsSet::<T> {
-                                             private: private_claims,
-                                             registered: registered_claims,
-                                         }),
-            expires_in: self.expiry_duration,
-            issued_at: *issued_at.deref(),
-            refresh_token: None,
-        };
-        Ok(token)
-    }
 }
 
 /// Launches the Rocket server with the configuration. This function blocks and never returns.
@@ -306,6 +258,44 @@ pub fn launch(config: Configuration) {
         .launch();
 }
 
-
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::default::Default;
+    use std::str::FromStr;
+
+    use serde_test::{Token, assert_tokens};
+
+    use super::*;
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+    struct TestUrl {
+        url: Url,
+    }
+
+    #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+    struct TestClaims {
+        company: String,
+        department: String,
+    }
+
+    impl Default for TestClaims {
+        fn default() -> Self {
+            TestClaims {
+                company: "ACME".to_string(),
+                department: "Toilet Cleaning".to_string(),
+            }
+        }
+    }
+
+    #[test]
+    fn url_serialization_token_round_trip() {
+        let test = TestUrl { url: not_err!(Url::from_str("https://www.example.com/")) };
+
+        assert_tokens(&test,
+                      &[Token::StructStart("TestUrl", 1),
+                        Token::StructSep,
+                        Token::Str("url"),
+                        Token::Str("https://www.example.com/"),
+                        Token::StructEnd]);
+    }
+}

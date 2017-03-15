@@ -4,7 +4,7 @@ use std::fmt;
 use std::io::Cursor;
 use std::time::Duration;
 
-use chrono::{DateTime, UTC};
+use chrono::{self, DateTime, UTC};
 use jwt::{self, jws};
 use hyper;
 use rocket;
@@ -14,6 +14,7 @@ use rocket::response::{Response, Responder};
 use rocket::State;
 use serde::{Serialize, Deserialize};
 use serde_json;
+use uuid::{self, Uuid};
 
 use cors;
 use header;
@@ -24,8 +25,10 @@ pub enum Error {
     TokenAlreadyEncoded,
     /// Raised when attempting to decode an already decoded token
     TokenAlreadyDecoded,
-    /// Raised when attempting to use a decoded token in a response
+    /// Raised when attempting to use a decoded token when an encoded one is expected
     TokenNotEncoded,
+    /// Raised when attempting to use an encoded token when an decoded one is expected
+    TokenNotDecoded,
 
     /// Errors during token encoding/decoding
     JWTError(jwt::errors::Error),
@@ -41,7 +44,8 @@ impl error::Error for Error {
         match *self {
             Error::TokenAlreadyEncoded => "Token is already encoded",
             Error::TokenAlreadyDecoded => "Token is already decoded",
-            Error::TokenNotEncoded => "Token is not encoded and cannot be used in a response",
+            Error::TokenNotEncoded => "Token is not encoded and cannot be used in this context",
+            Error::TokenNotDecoded => "Token is not decoded and cannot be used in this context",
             Error::JWTError(ref e) => e.description(),
             Error::TokenSerializationError(ref e) => e.description(),
         }
@@ -109,6 +113,65 @@ impl<T: Serialize + Deserialize> Token<T> {
         }
     }
 
+    fn make_uuid(uri: &str) -> Uuid {
+        Uuid::new_v5(&uuid::NAMESPACE_URL, uri)
+    }
+
+    fn make_header(signature_algorithm: Option<jws::Algorithm>) -> jws::Header {
+        jws::Header { algorithm: signature_algorithm.unwrap_or_else(|| jws::Algorithm::None), ..Default::default() }
+    }
+
+    fn make_registered_claims(subject: &str,
+                              now: DateTime<UTC>,
+                              expiry_duration: Duration,
+                              issuer: &str,
+                              audience: &Option<jwt::SingleOrMultipleStrings>)
+                              -> Result<jwt::RegisteredClaims, ::Error> {
+        let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| format!("{}", e))?;
+
+        Ok(jwt::RegisteredClaims {
+               issuer: Some(issuer.to_string()),
+               subject: Some(subject.to_string()),
+               audience: audience.clone(),
+               issued_at: Some(now.into()),
+               not_before: Some(now.into()),
+               expiry: Some((now + expiry_duration).into()),
+               id: Some(Self::make_uuid(issuer).urn().to_string()),
+           })
+    }
+
+    /// Internal token creation that allows for us to override the time `now`. For testing
+    fn with_configuration_and_time(config: &::Configuration,
+                                   subject: &str,
+                                   private_claims: T,
+                                   now: DateTime<UTC>)
+                                   -> Result<Self, ::Error> {
+        let header = Self::make_header(config.signature_algorithm);
+        let registered_claims = Self::make_registered_claims(subject,
+                                                             now,
+                                                             config.expiry_duration,
+                                                             &config.issuer,
+                                                             &config.audience)?;
+        let issued_at = registered_claims.issued_at.unwrap(); // we always set it, don't we?
+
+        let token = Token::<T> {
+            token: jwt::JWT::new_decoded(header,
+                                         jwt::ClaimsSet::<T> {
+                                             private: private_claims,
+                                             registered: registered_claims,
+                                         }),
+            expires_in: config.expiry_duration,
+            issued_at: *issued_at.deref(),
+            refresh_token: None,
+        };
+        Ok(token)
+    }
+
+    /// Based on the configuration, make a token for the subject, along with some private claims.
+    pub fn with_configuration(config: &::Configuration, subject: &str, private_claims: T) -> Result<Self, ::Error> {
+        Self::with_configuration_and_time(config, subject, private_claims, UTC::now())
+    }
+
     /// Consumes self and encode the embedded JWT with signature.
     /// If the JWT is already encoded, this returns an error
     pub fn encode(mut self, secret: jws::Secret) -> Result<Self, Error> {
@@ -139,6 +202,72 @@ impl<T: Serialize + Deserialize> Token<T> {
         }
         let serialized = serde_json::to_string(&self)?;
         Ok(serialized)
+    }
+
+    /// Returns whether the wrapped token is decoded
+    pub fn is_decoded(&self) -> bool {
+        match self.token {
+            jwt::JWT::Encoded(_) => false,
+            jwt::JWT::Decoded { .. } => true,
+        }
+    }
+
+    /// Returns whether the wrapped token is encoded
+    pub fn is_encoded(&self) -> bool {
+        !self.is_decoded()
+    }
+
+    /// Convenience function to extract the registered claims from a decoded token
+    pub fn registered_claims(&self) -> Result<&jwt::RegisteredClaims, ::Error> {
+        match self.token {
+            jwt::JWT::Encoded(_) => Err(Error::TokenNotDecoded)?,
+            ref jwt @ jwt::JWT::Decoded { .. } => {
+                Ok(match_extract!(*jwt,
+                                 jwt::JWT::Decoded {
+                                     claims_set: jwt::ClaimsSet { ref registered, .. },
+                                     ..
+                                 },
+                                 registered)?)
+            }
+        }
+    }
+
+    /// Conveneince function to extract the private claims from a decoded token
+    pub fn private_claims(&self) -> Result<&T, ::Error> {
+        match self.token {
+            jwt::JWT::Encoded(_) => Err(Error::TokenNotDecoded)?,
+            ref jwt @ jwt::JWT::Decoded { .. } => {
+                Ok(match_extract!(*jwt,
+                                 jwt::JWT::Decoded {
+                                     claims_set: jwt::ClaimsSet { ref private, .. },
+                                     ..
+                                 },
+                                 private)?)
+            }
+        }
+    }
+
+    /// Convenience function to extract the headers from a decoded token
+    pub fn header(&self) -> Result<&jwt::jws::Header, ::Error> {
+        match self.token {
+            jwt::JWT::Encoded(_) => Err(Error::TokenNotDecoded)?,
+            ref jwt @ jwt::JWT::Decoded { .. } => {
+                Ok(match_extract!(*jwt,
+                                 jwt::JWT::Decoded {
+                                     ref header,
+                                     ..
+                                 },
+                                 header)?)
+            }
+        }
+    }
+
+    /// Convenience mthod to extract the encoded token
+    pub fn encoded_token(&self) -> Result<&str, ::Error> {
+        match self.token {
+            jwt::JWT::Decoded { .. } => Err(Error::TokenNotEncoded)?,
+            jwt::JWT::Encoded(ref encoded) => Ok(encoded),
+        }
     }
 }
 
@@ -322,7 +451,7 @@ fn token_getter(origin: cors::Origin,
                 -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
 
     let ::header::Authorization(hyper::header::Authorization(hyper::header::Basic { username, .. })) = authentication;
-    let token = configuration.make_token::<PrivateClaim>(&username, Default::default())?;
+    let token = Token::<PrivateClaim>::with_configuration(&configuration, &username, Default::default())?;
     let token = token.encode(configuration.secret.for_signing()?)?;
     Ok(cors_options.respond(token, &origin)?)
 }
@@ -333,6 +462,7 @@ mod tests {
     use std::time::Duration;
     use std::str::FromStr;
 
+    use chrono::{DateTime, NaiveDateTime, UTC};
     use hyper;
     use jwt;
     use rocket::http::Header;
@@ -371,17 +501,12 @@ mod tests {
     fn encoding_and_decoding_round_trip() {
         let token = make_token();
         let token = not_err!(token.encode(jwt::jws::Secret::bytes_from_str("secret")));
-        assert_matches!(token, Token { token: jwt::JWT::Encoded(_), .. });
+        assert!(token.is_encoded());
 
         let token = not_err!(token.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
-        let private = assert_matches!(token,
-                                      Token {
-                                          token: jwt::JWT::Decoded { claims_set: jwt::ClaimsSet {private, .. },
-                                                                     .. },
-                                          .. },
-                                      private);
+        let private = not_err!(token.private_claims());
 
-        assert_eq!(private, Default::default());
+        assert_eq!(*private, Default::default());
     }
 
     #[test]
@@ -457,6 +582,46 @@ mod tests {
             rsa_public: "test/fixtures/rsa_public_key.der".to_string(),
         };
         assert_matches_non_debug!(not_err!(rsa.for_verification()), jwt::jws::Secret::PublicKey(_));
+    }
+
+    #[test]
+    fn tokens_are_created_with_the_right_values() {
+        let allowed_origins = ["https://www.example.com"];
+        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
+        let configuration = ::Configuration {
+            issuer: "https://www.acme.com".to_string(),
+            allowed_origins: allowed_origins,
+            audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
+            signature_algorithm: Some(jwt::jws::Algorithm::HS512),
+            secret: Secret::String("secret".to_string()),
+            expiry_duration: Duration::from_secs(120),
+        };
+
+        let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
+        let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
+        let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
+                                                                              "Donald Trump",
+                                                                              Default::default(),
+                                                                              now.clone()));
+
+        // Assert registered claims
+        let registered = not_err!(token.registered_claims());
+
+        assert_eq!(registered.issuer, Some("https://www.acme.com".to_string()));
+        assert_eq!(registered.subject, Some("Donald Trump".to_string()));
+        assert_eq!(registered.audience,
+                   Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())));
+        assert_eq!(registered.issued_at, Some(now.clone().into()));
+        assert_eq!(registered.not_before, Some(now.clone().into()));
+        assert_eq!(registered.expiry, Some(expected_expiry.clone().into()));
+
+        // Assert private claims
+        let private = not_err!(token.private_claims());
+        assert_eq!(*private, Default::default());
+
+        // Assert header
+        let header = not_err!(token.header());
+        assert_eq!(header.algorithm, jwt::jws::Algorithm::HS512);
     }
 
     #[test]
@@ -540,18 +705,15 @@ mod tests {
         let actual_token =
             not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"), jwt::jws::Algorithm::HS512));
 
-        let registered = assert_matches!(actual_token,
-                                         Token {
-                                             token: jwt::JWT::Decoded {
-                                                 claims_set: jwt::ClaimsSet { registered, .. },
-                                                 ..
-                                             },
-                                             ..
-                                         },
-                                         registered);
+        let registered = not_err!(actual_token.registered_claims());
 
         assert_eq!(Some("https://www.acme.com".to_string()), registered.issuer);
         assert_eq!(Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
                    registered.audience);
+
+        // TODO: Test private claims
+
+        let header = not_err!(actual_token.header());
+        assert_eq!(header.algorithm, jwt::jws::Algorithm::HS512);
     }
 }

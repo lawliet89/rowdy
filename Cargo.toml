@@ -31,6 +31,7 @@ default-features = false
 features = ["json", "uuid"]
 
 [dev-dependencies]
+serde_test = "0.9"
 rocket = { version = "*", features = ["testing"] }
 
 [workspace]

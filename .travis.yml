@@ -20,9 +20,9 @@ script:
   - |
     travis-cargo build -- --all-features --all --locked &&
     travis-cargo test -- --all-features --all &&
-    travis-cargo --only nightly doc -- --no-deps --all-features --all
+    travis-cargo --only nightly-2017-03-13 doc -- --no-deps --all-features --all
 after_success:
-  - travis-cargo --only nightly doc-upload
+  - travis-cargo --only nightly-2017-03-13 doc-upload
 env:
   global:
     - TRAVIS_CARGO_NIGHTLY_FEATURE=""
