@@ -1,5 +1,7 @@
 # rowdy
 
+[Documentation](https://lawliet89.github.io/rowdy/)
+
 A [Rocket](https://rocket.rs/) based JSON Web Token authentication server.
 
 ## Requirements

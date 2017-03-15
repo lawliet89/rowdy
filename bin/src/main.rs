@@ -20,10 +20,8 @@ Usage:
   rowdy <configuration-json>
   rowdy (-h | --help)
 
-Provide a configuration JSON file to run `rowdy` with.
-
-To allow all origins, your configuration file would look like: `{ "allowed_origins": null }`
-Otherwise, it should be `{ "allowed_origins": ["http://127.0.0.1:8000/","https://foobar.com/"] }`
+Provide a configuration JSON file to run `rowdy` with. For available fields and examples for the JSON
+configuration, refer to the documentation at https://lawliet89.github.io/rowdy/rowdy/struct.Configuration.html
 
 Options:
   -h --help     Show this screen.
