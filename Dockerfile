@@ -9,6 +9,7 @@ RUN set -x \
                                           build-essential \
                                           ca-certificates \
                                           curl \
+                                          libcurl3 \
                                           git \
                                           file \
                                           libssl-dev \
@@ -20,11 +21,8 @@ RUN set -x \
 ENV PATH "/root/.cargo/bin:${PATH}"
 WORKDIR /app/src
 
-COPY Cargo.toml Cargo.lock bin/Cargo.toml ./
-RUN cargo fetch
-
 COPY . ./
-RUN cargo build --release --all
+RUN cargo build --release --all --locked
 
 # FIXME: Better way to deal with this
 VOLUME ["/app/src/config"]
