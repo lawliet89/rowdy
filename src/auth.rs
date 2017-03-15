@@ -1,4 +1,4 @@
-//! Non-CORS related headers and their `FromRequest` implementation
+//! Authentication
 use std::convert::From;
 use std::error;
 use std::fmt;
@@ -97,11 +97,11 @@ mod tests {
         let header = rocket::http::Header::new(header::Authorization::<header::Basic>::header_name(),
                                                format!("{}", HeaderFormatter(&auth)));
         request.add_header(header);
-        let outcome: request::Outcome<::header::Authorization<header::Basic>, ::header::Error> =
+        let outcome: request::Outcome<::auth::Authorization<header::Basic>, ::auth::Error> =
             FromRequest::from_request(&request);
 
         let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
-        let ::header::Authorization(header::Authorization(header::Basic { username, password })) = parsed_header;
+        let ::auth::Authorization(header::Authorization(header::Basic { username, password })) = parsed_header;
         assert_eq!(username, "Aladdin");
         assert_eq!(password, Some("open sesame".to_string()));
     }
@@ -114,11 +114,11 @@ mod tests {
         let header = rocket::http::Header::new(header::Authorization::<header::Bearer>::header_name(),
                                                format!("{}", HeaderFormatter(&auth)));
         request.add_header(header);
-        let outcome: request::Outcome<::header::Authorization<header::Bearer>, ::header::Error> =
+        let outcome: request::Outcome<::auth::Authorization<header::Bearer>, ::auth::Error> =
             FromRequest::from_request(&request);
 
         let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
-        let ::header::Authorization(header::Authorization(header::Bearer { token })) = parsed_header;
+        let ::auth::Authorization(header::Authorization(header::Bearer { token })) = parsed_header;
         assert_eq!(token, "token");
     }
 }
