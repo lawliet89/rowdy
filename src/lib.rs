@@ -1,7 +1,7 @@
 //! # rowdy
 //!
 //! `rowdy` is a JSON Web token based authentication server based off Docker Registry's
-//! [authtentication protocol](https://docs.docker.com/registry/spec/auth/).
+//! [authentication protocol](https://docs.docker.com/registry/spec/auth/).
 //!
 //! ## Features
 //!
