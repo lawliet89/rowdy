@@ -20,7 +20,7 @@ RUN set -x \
 ENV PATH "/root/.cargo/bin:${PATH}"
 WORKDIR /app/src
 
-COPY Cargo.toml Cargo.lock lib/Cargo.toml ./
+COPY Cargo.toml Cargo.lock bin/Cargo.toml ./
 RUN cargo fetch
 
 COPY . ./
