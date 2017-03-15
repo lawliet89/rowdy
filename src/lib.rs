@@ -33,8 +33,9 @@ mod macros;
 #[cfg(test)]
 #[macro_use]
 mod test;
-pub mod header;
+pub mod auth;
 pub mod cors;
+pub mod routes;
 pub mod serde_custom;
 pub mod token;
 
@@ -249,10 +250,10 @@ impl Configuration {
 
 /// Launches the Rocket server with the configuration. This function blocks and never returns.
 pub fn launch(config: Configuration) {
-    let token_getter_options = token::TokenGetterCorsOptions::new(&config);
+    let token_getter_options = routes::TokenGetterCorsOptions::new(&config);
     rocket::ignite()
         .mount("/",
-               routes![token::token_getter, token::token_getter_options])
+               routes![routes::token_getter, routes::token_getter_options])
         .manage(config)
         .manage(token_getter_options)
         .launch();
