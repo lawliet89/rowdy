@@ -5,11 +5,14 @@
 //!
 //! ## Features
 //!
-//! - `clippy`: Enable clippy lints during builds
+//! - `clippy_lints`: Enable clippy lints during builds
+//! - `simple_authenticator`: A simple CSV based authenticator
+//!
+//! By default, the `simple_authenticator` feature is turned on.
 
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
-#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature="clippy_lints", plugin(clippy))]
 
 extern crate chrono;
 extern crate hyper;
@@ -24,6 +27,11 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate unicase;
 extern crate uuid;
+
+#[cfg(feature = "simple_authenticator")]
+extern crate csv;
+#[cfg(feature = "simple_authenticator")]
+extern crate ring;
 
 #[cfg(test)]
 extern crate serde_test;
@@ -42,9 +50,9 @@ pub mod token;
 use std::error;
 use std::fmt;
 use std::io;
+use std::ops::Deref;
 use std::str::FromStr;
 use std::time::Duration;
-use std::ops::Deref;
 
 use jwt::jws;
 use rocket::http::Status;
@@ -55,11 +63,13 @@ use serde::de;
 #[derive(Debug)]
 pub enum Error {
     GenericError(String),
+    Auth(auth::Error),
     CORS(cors::Error),
     Token(token::Error),
     IOError(io::Error),
 }
 
+impl_from_error!(auth::Error, Error::Auth);
 impl_from_error!(cors::Error, Error::CORS);
 impl_from_error!(token::Error, Error::Token);
 impl_from_error!(String, Error::GenericError);
@@ -68,6 +78,7 @@ impl_from_error!(io::Error, Error::IOError);
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
+            Error::Auth(ref e) => e.description(),
             Error::CORS(ref e) => e.description(),
             Error::Token(ref e) => e.description(),
             Error::IOError(ref e) => e.description(),
@@ -77,6 +88,7 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
+            Error::Auth(ref e) => Some(e as &error::Error),
             Error::CORS(ref e) => Some(e as &error::Error),
             Error::Token(ref e) => Some(e as &error::Error),
             Error::IOError(ref e) => Some(e as &error::Error),
@@ -88,6 +100,7 @@ impl error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Error::Auth(ref e) => fmt::Display::fmt(e, f),
             Error::CORS(ref e) => fmt::Display::fmt(e, f),
             Error::Token(ref e) => fmt::Display::fmt(e, f),
             Error::IOError(ref e) => fmt::Display::fmt(e, f),
@@ -99,6 +112,7 @@ impl fmt::Display for Error {
 impl<'r> Responder<'r> for Error {
     fn respond(self) -> Result<Response<'r>, Status> {
         match self {
+            Error::Auth(e) => e.respond(),
             Error::CORS(e) => e.respond(),
             Error::Token(e) => e.respond(),
             e => {
@@ -215,7 +229,8 @@ const DEFAULT_EXPIRY_DURATION: u64 = 86400;
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Configuration {
     /// The issuer of the token. Usually the URI of the authentication server.
-    /// The issuer URI will also be used in the UUID generation of the tokens.
+    /// The issuer URI will also be used in the UUID generation of the tokens, and is also the `realm` for
+    /// authentication purposes.
     pub issuer: String,
     /// Origins that are allowed to issue CORS request. This is needed for browser
     /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
@@ -249,13 +264,15 @@ impl Configuration {
 }
 
 /// Launches the Rocket server with the configuration. This function blocks and never returns.
-pub fn launch(config: Configuration) {
+pub fn launch(config: Configuration, authenticator: Box<auth::BasicAuthenticator>) {
     let token_getter_options = routes::TokenGetterCorsOptions::new(&config);
+
     rocket::ignite()
         .mount("/",
                routes![routes::token_getter, routes::token_getter_options])
         .manage(config)
         .manage(token_getter_options)
+        .manage(authenticator)
         .launch();
 }
 

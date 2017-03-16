@@ -305,7 +305,7 @@ impl Options {
     }
 }
 
-/// The CORS type, which implements `Responder`. This type allows
+/// A Response which wraps another struct which implements `Responder`. This type allows
 /// you to request resources from another domain.
 pub struct Response<R> {
     responder: R,

@@ -10,6 +10,14 @@ test = true
 doctest = true
 doc = true
 
+[features]
+default = ["simple_authenticator"]
+
+# Build with clippy lints
+clippy_lints = ["clippy"]
+# A simple file based authenticator
+simple_authenticator = ["csv", "ring"]
+
 [dependencies]
 chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
@@ -23,7 +31,10 @@ serde_json = "0.9"
 unicase="1.4"
 uuid = { version = "0.4", features = ["use_std", "v5", "serde"] }
 
-clippy = {version = "*", optional = true}
+# Optional dependencies that are activated by the various features
+clippy = { version = "*", optional = true }
+csv = { version = "0.15", optional = true }
+ring = { version = "*", optional = true } # rust-jwt has this as its dependency
 
 [dependencies.rocket_contrib]
 version = "*"
