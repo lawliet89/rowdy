@@ -50,6 +50,8 @@ mod routes;
 pub mod serde_custom;
 pub mod token;
 
+pub use self::routes::routes;
+
 use std::error;
 use std::fmt;
 use std::io;
@@ -190,6 +192,36 @@ impl Deserialize for Url {
 ///
 /// The type parameter `B` is the [`auth::AuthenticatorConfiguration`] and by its associated
 /// type, the `Authenticator` that is going to be used for HTTP Basic Authentication.
+///
+/// # Examples
+/// ```
+/// extern crate rowdy;
+/// extern crate serde_json;
+///
+/// use rowdy::Configuration;
+/// use rowdy::auth::NoOpConfiguration;
+///
+/// # fn main() {
+/// // We are using the `NoOp` authenticator
+/// let json = r#"{
+///     "token" : {
+///         "issuer": "https://www.acme.com",
+///         "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///         "audience": ["https://www.example.com", "https://www.foobar.com"],
+///         "signature_algorithm": "RS256",
+///         "secret": {
+///                     "rsa_private": "test/fixtures/rsa_private_key.der",
+///                     "rsa_public": "test/fixtures/rsa_public_key.der"
+///                    },
+///         "expiry_duration": 86400
+///        },
+///        "basic_authenticator": {}
+/// }"#;
+/// let config: Configuration<NoOpConfiguration> = serde_json::from_str(json).unwrap();
+/// let rocket = config.ignite().unwrap().mount("/", rowdy::routes());
+/// // then `rocket.launch()`!
+/// # }
+/// ```
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> {
     /// Token configuration. See the type documentation for deserialization examples
@@ -200,7 +232,8 @@ pub struct Configuration<B: auth::AuthenticatorConfiguration<hyper::header::Basi
 
 impl<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> Configuration<B> {
     /// Ignites the rocket with various configuration objects, but does not mount any routes.
-    /// Remember to mount routes and call `launch` on the returned Rocket object
+    /// Remember to mount routes and call `launch` on the returned Rocket object.
+    /// See the struct documentation for an example.
     pub fn ignite(self) -> Result<rocket::Rocket, Error> {
         let token_getter_cors_options = routes::TokenGetterCorsOptions::new(&self.token);
 
@@ -215,6 +248,36 @@ impl<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> Configuration<B>
 ///
 /// # Panics
 /// Panics if during the Rocket igition, something goes wrong.
+///
+/// # Example
+/// ```rust,no_run
+/// extern crate rowdy;
+/// extern crate serde_json;
+///
+/// use rowdy::Configuration;
+/// use rowdy::auth::NoOpConfiguration;
+///
+/// # fn main() {
+/// // We are using the `NoOp` authenticator
+/// let json = r#"{
+///     "token" : {
+///         "issuer": "https://www.acme.com",
+///         "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///         "audience": ["https://www.example.com", "https://www.foobar.com"],
+///         "signature_algorithm": "RS256",
+///         "secret": {
+///                     "rsa_private": "test/fixtures/rsa_private_key.der",
+///                     "rsa_public": "test/fixtures/rsa_public_key.der"
+///                    },
+///         "expiry_duration": 86400
+///        },
+///        "basic_authenticator": {}
+/// }"#;
+/// let config: Configuration<NoOpConfiguration> = serde_json::from_str(json).unwrap();
+///
+/// rowdy::launch(config);
+/// # }
+/// ```
 pub fn launch<B: auth::AuthenticatorConfiguration<hyper::header::Basic>>(config: Configuration<B>) {
     let rocket = config.ignite().unwrap_or_else(|e| panic!("{}", e));
     rocket.mount("/", routes::routes()).launch()
