@@ -262,7 +262,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
 /// to implement this trait. Before launching, `rowdy` will attempt to make an `Authenticator` based off the
 /// configuration by calling the `make_authenticator` method.
 pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>
-    : Send + Sync + Serialize + Deserialize {
+    : Send + Sync + Serialize + Deserialize + 'static {
     /// The `Authenticator` type this configuration is associated with
     type Authenticator: Authenticator<S>;
 

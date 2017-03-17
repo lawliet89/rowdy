@@ -76,6 +76,87 @@ impl<'r> Responder<'r> for Error {
     }
 }
 
+/// Token configuration. Usually deserialized as part of [`rowdy::Configuration`] from JSON for use.
+///
+///
+/// # Examples
+/// This is a standard JSON serialized example.
+///
+/// ```json
+/// {
+///     "issuer": "https://www.acme.com",
+///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///     "audience": ["https://www.example.com", "https://www.foobar.com"],
+///     "signature_algorithm": "RS256",
+///     "secret": {
+///                 "rsa_private": "test/fixtures/rsa_private_key.der",
+///                 "rsa_public": "test/fixtures/rsa_public_key.der"
+///                },
+///     "expiry_duration": 86400
+/// }
+/// ```
+///
+/// ```
+/// extern crate rowdy;
+/// extern crate serde_json;
+///
+/// use rowdy::token::Configuration;
+///
+/// # fn main() {
+/// let json = r#"{
+///     "issuer": "https://www.acme.com",
+///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///     "audience": ["https://www.example.com", "https://www.foobar.com"],
+///     "signature_algorithm": "RS256",
+///     "secret": {
+///                 "rsa_private": "test/fixtures/rsa_private_key.der",
+///                 "rsa_public": "test/fixtures/rsa_public_key.der"
+///                },
+///     "expiry_duration": 86400
+/// }"#;
+/// let deserialized: Configuration = serde_json::from_str(json).unwrap();
+/// # }
+/// ```
+///
+/// Variations for the fields `allowed_origins`, `audience` and `secret` exist. Refer to their type documentation for
+/// examples.
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct Configuration {
+    /// The issuer of the token. Usually the URI of the authentication server.
+    /// The issuer URI will also be used in the UUID generation of the tokens, and is also the `realm` for
+    /// authentication purposes.
+    pub issuer: String,
+    /// Origins that are allowed to issue CORS request. This is needed for browser
+    /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
+    ///
+    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+    ///
+    /// See [`cors::AllowedOrigins`] for serialization examples.
+    pub allowed_origins: ::cors::AllowedOrigins,
+    /// The audience intended for your tokens.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audience: Option<jwt::SingleOrMultipleStrings>,
+    /// Defaults to `none`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature_algorithm: Option<jws::Algorithm>,
+    /// Secrets for use in signing and encrypting a JWT.
+    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+    /// Defaults to `None`.
+    ///
+    /// See [`token::Secret`] for serialization examples
+    #[serde(default)]
+    pub secret: Secret,
+    /// Expiry duration of tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
+    #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
+    pub expiry_duration: Duration,
+}
+const DEFAULT_EXPIRY_DURATION: u64 = 86400;
+impl Configuration {
+    fn default_expiry_duration() -> Duration {
+        Duration::from_secs(DEFAULT_EXPIRY_DURATION)
+    }
+}
+
 /// Private claims that will be included in the JWT embedded. Currently, an empty shell.
 #[derive(Default, Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PrivateClaim {}
@@ -149,7 +230,7 @@ impl<T: Serialize + Deserialize> Token<T> {
     }
 
     /// Internal token creation that allows for us to override the time `now`. For testing
-    fn with_configuration_and_time(config: &::Configuration,
+    fn with_configuration_and_time(config: &Configuration,
                                    subject: &str,
                                    private_claims: T,
                                    now: DateTime<UTC>)
@@ -176,7 +257,7 @@ impl<T: Serialize + Deserialize> Token<T> {
     }
 
     /// Based on the configuration, make a token for the subject, along with some private claims.
-    pub fn with_configuration(config: &::Configuration, subject: &str, private_claims: T) -> Result<Self, ::Error> {
+    pub fn with_configuration(config: &Configuration, subject: &str, private_claims: T) -> Result<Self, ::Error> {
         Self::with_configuration_and_time(config, subject, private_claims, UTC::now())
     }
 
@@ -536,7 +617,7 @@ mod tests {
     fn tokens_are_created_with_the_right_values() {
         let allowed_origins = ["https://www.example.com"];
         let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = ::Configuration {
+        let configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
             audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),

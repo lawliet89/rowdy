@@ -7,7 +7,7 @@ use rocket::http::Method::*;
 
 use auth;
 use cors;
-use token::{Token, PrivateClaim};
+use token::{Token, PrivateClaim, Configuration};
 
 /// A wrapper around `cors::Options` for options specific to the token retrival route
 pub struct TokenGetterCorsOptions(cors::Options);
@@ -17,7 +17,7 @@ const TOKEN_GETTER_METHODS: &[rocket::http::Method] = &[Get];
 const TOKEN_GETTER_HEADERS: &'static [&'static str] = &["Authorization"];
 
 impl TokenGetterCorsOptions {
-    pub fn new(config: &::Configuration) -> Self {
+    pub fn new(config: &Configuration) -> Self {
         TokenGetterCorsOptions(cors::Options {
                                    allowed_origins: config.allowed_origins.clone(),
                                    allowed_methods: TOKEN_GETTER_METHODS.iter().cloned().collect(),
@@ -57,7 +57,7 @@ fn token_getter_options(origin: cors::Origin,
 fn token_getter(origin: cors::Origin,
                 authorization: Option<auth::Authorization<hyper::header::Basic>>,
                 _auth_param: AuthParam,
-                configuration: State<::Configuration>,
+                configuration: State<Configuration>,
                 cors_options: State<TokenGetterCorsOptions>,
                 authenticator: State<Box<auth::BasicAuthenticator>>)
                 -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
@@ -95,7 +95,7 @@ mod tests {
         // Ignite rocket
         let allowed_origins = ["https://www.example.com"];
         let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = ::Configuration {
+        let configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
             audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),

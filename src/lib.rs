@@ -55,9 +55,7 @@ use std::fmt;
 use std::io;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::time::Duration;
 
-use jwt::jws;
 use rocket::http::Status;
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
@@ -188,99 +186,39 @@ impl Deserialize for Url {
     }
 }
 
-const DEFAULT_EXPIRY_DURATION: u64 = 86400;
-
 /// Application configuration. Usually deserialized from JSON for use.
 ///
-/// # Examples
-/// This is a standard JSON serialized example.
-///
-/// ```json
-/// {
-///     "issuer": "https://www.acme.com",
-///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
-///     "audience": ["https://www.example.com", "https://www.foobar.com"],
-///     "signature_algorithm": "RS256",
-///     "secret": {
-///                 "rsa_private": "test/fixtures/rsa_private_key.der",
-///                 "rsa_public": "test/fixtures/rsa_public_key.der"
-///                },
-///     "expiry_duration": 86400
-/// }
-/// ```
-///
-/// ```
-/// extern crate rowdy;
-/// extern crate serde_json;
-///
-/// use rowdy::Configuration;
-///
-/// # fn main() {
-/// let json = r#"{
-///     "issuer": "https://www.acme.com",
-///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
-///     "audience": ["https://www.example.com", "https://www.foobar.com"],
-///     "signature_algorithm": "RS256",
-///     "secret": {
-///                 "rsa_private": "test/fixtures/rsa_private_key.der",
-///                 "rsa_public": "test/fixtures/rsa_public_key.der"
-///                },
-///     "expiry_duration": 86400
-/// }"#;
-/// let deserialized: Configuration = serde_json::from_str(json).unwrap();
-/// # }
-/// ```
-///
-/// Variations for the fields `allowed_origins`, `audience` and `secret` exist. Refer to their type documentation for
-/// examples.
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct Configuration {
-    /// The issuer of the token. Usually the URI of the authentication server.
-    /// The issuer URI will also be used in the UUID generation of the tokens, and is also the `realm` for
-    /// authentication purposes.
-    pub issuer: String,
-    /// Origins that are allowed to issue CORS request. This is needed for browser
-    /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
-    ///
-    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
-    ///
-    /// See [`cors::AllowedOrigins`] for serialization examples.
-    pub allowed_origins: cors::AllowedOrigins,
-    /// The audience intended for your tokens.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub audience: Option<jwt::SingleOrMultipleStrings>,
-    /// Defaults to `none`
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature_algorithm: Option<jws::Algorithm>,
-    /// Secrets for use in signing and encrypting a JWT.
-    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
-    /// Defaults to `None`.
-    ///
-    /// See [`token::Secret`] for serialization examples
-    #[serde(default)]
-    pub secret: token::Secret,
-    /// Expiry duration of tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
-    #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
-    pub expiry_duration: Duration,
+/// The type parameter `B` is the [`auth::AuthenticatorConfiguration`] and by its associated
+/// type, the `Authenticator` that is going to be used for HTTP Basic Authentication.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Configuration<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> {
+    /// Token configuration. See the type documentation for deserialization examples
+    pub token: token::Configuration,
+    /// The configuration for the authenticator that will handle HTTP Basic Authentication.
+    pub basic_authenticator: B,
 }
 
-impl Configuration {
-    fn default_expiry_duration() -> Duration {
-        Duration::from_secs(DEFAULT_EXPIRY_DURATION)
+impl<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> Configuration<B> {
+    /// Launches the Rocket server with the configuration. This function blocks and never returns.
+    ///
+    /// # Panics
+    /// This function will panic, if during the making of the authenticator, something goes wrong.
+    pub fn launch(self) {
+        let token_getter_cors_options = routes::TokenGetterCorsOptions::new(&self.token);
+
+        let basic_authenticator = self.basic_authenticator
+                                    .make_authenticator()
+                                    .unwrap_or_else(|e| panic!("Error making Basic Authenticator: {}", e));
+        let basic_authenticator: Box<auth::BasicAuthenticator> = Box::new(basic_authenticator);
+
+        rocket::ignite()
+            .mount("/",
+                routes![routes::token_getter, routes::token_getter_options])
+            .manage(self.token)
+            .manage(token_getter_cors_options)
+            .manage(basic_authenticator)
+            .launch();
     }
-}
-
-/// Launches the Rocket server with the configuration. This function blocks and never returns.
-pub fn launch(config: Configuration, authenticator: Box<auth::BasicAuthenticator>) {
-    let token_getter_options = routes::TokenGetterCorsOptions::new(&config);
-
-    rocket::ignite()
-        .mount("/",
-               routes![routes::token_getter, routes::token_getter_options])
-        .manage(config)
-        .manage(token_getter_options)
-        .manage(authenticator)
-        .launch();
 }
 
 #[cfg(test)]
