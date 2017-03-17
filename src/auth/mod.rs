@@ -171,10 +171,10 @@ impl Authorization<String> {
 /// ```
 /// #![feature(plugin, custom_derive)]
 /// #![plugin(rocket_codegen)]
+/// extern crate hyper;
 /// extern crate rocket;
 /// extern crate rowdy;
 ///
-/// use hyper::header;
 /// use rocket::{State, Rocket};
 /// use rocket::http::{self, Status};
 /// use rocket::http::Method::Get;
