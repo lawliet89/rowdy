@@ -4,6 +4,81 @@
 //! on the way. In the mean time, we adopt an
 //! [example implementation](https://github.com/SergioBenitez/Rocket/pull/141) to nest `Responders` to acheive
 //! the same effect in the short run.
+//!
+//! # Examples
+//! ```
+//! #![feature(plugin, custom_derive)]
+//! #![plugin(rocket_codegen)]
+//! extern crate hyper;
+//! extern crate rocket;
+//! extern crate rowdy;
+//!
+//! use std::default::Default;
+//! use std::str::FromStr;
+//!
+//! use rocket::State;
+//! use rocket::http::Method::*;
+//! use rocket::http::{Header, Status};
+//! use rocket::testing::MockRequest;
+//! use rowdy::cors;
+//! use rowdy::cors::*;
+//!
+//! #[options("/")]
+//! fn cors_options(origin: Origin,
+//!                 method: AccessControlRequestMethod,
+//!                 headers: AccessControlRequestHeaders,
+//!                 options: State<cors::Options>)
+//!                 -> Result<Response<()>, Error> {
+//!     options.preflight(&origin, &method, Some(&headers))
+//! }
+//!
+//! #[get("/")]
+//! fn cors(origin: Origin, options: State<cors::Options>)
+//!         -> Result<Response<&'static str>, Error>
+//! {
+//!     options.respond("Hello CORS", &origin)
+//! }
+//!
+//! # fn main() {
+//! let (allowed_origins, failed_origins) =
+//!     AllowedOrigins::new_from_str_list(&["https://www.acme.com"]);
+//! assert!(failed_origins.is_empty());
+//! let cors_options = cors::Options {
+//!     allowed_origins: allowed_origins,
+//!     allowed_methods: [Get].iter().cloned().collect(),
+//!     allowed_headers: ["Authorization"].iter().map(|s| s.to_string().into()).collect(),
+//!     allow_credentials: true,
+//!     ..Default::default()
+//! };
+//! let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(cors_options);
+//!
+//! // `Options` pre-flight checks
+//! let origin_header =
+//!     Header::from(hyper::header::Origin::from_str("https://www.acme.com").unwrap());
+//! let method_header =
+//!     Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Get));
+//! let request_headers =
+//!     hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization").unwrap()]);
+//! let request_headers = Header::from(request_headers);
+//! let mut req =
+//!     MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
+//!
+//! let response = req.dispatch_with(&rocket);
+//! assert_eq!(response.status(), Status::Ok);
+//!
+//! // "Actual" request
+//! let origin_header =
+//!     Header::from(hyper::header::Origin::from_str("https://www.acme.com").unwrap());
+//! let authorization = Header::new("Authorization", "let me in");
+//! let mut req = MockRequest::new(Get, "/").header(origin_header).header(authorization);
+//!
+//! let mut response = req.dispatch_with(&rocket);
+//! assert_eq!(response.status(), Status::Ok);
+//! let body_str = response.body().and_then(|body| body.into_string());
+//! assert_eq!(body_str, Some("Hello CORS".to_string()));
+//! # }
+//! ```
+
 use std::collections::{HashSet, HashMap};
 use std::default::Default;
 use std::error;
@@ -21,15 +96,24 @@ use unicase::UniCase;
 
 use Url;
 
+/// CORS related error
 #[derive(Debug)]
 pub enum Error {
+    /// The HTTP request header `Origin` is required but was not provided
     MissingOrigin,
+    /// The HTTP request header `Origin` could not be parsed correctly.
     BadOrigin(ParseError),
+    /// The request header `Access-Control-Request-Method` is required but is missing
     MissingRequestMethod,
+    /// The request header `Access-Control-Request-Method` has an invalid value
     BadRequestMethod(rocket::Error),
+    /// The request header `Access-Control-Request-Headers`  is required but is missing.
     MissingRequestHeaders,
+    /// Origin is not allowed to make this request
     OriginNotAllowed,
+    /// Requested method is not allowed
     MethodNotAllowed,
+    /// One or more headers requested are not allowed
     HeadersNotAllowed,
 }
 
@@ -148,6 +232,7 @@ pub struct AccessControlRequestHeaders(pub HeaderFieldNamesSet);
 impl FromStr for AccessControlRequestHeaders {
     type Err = ();
 
+    /// Will never fail
     fn from_str(headers: &str) -> Result<Self, Self::Err> {
         if headers.trim().is_empty() {
             return Ok(AccessControlRequestHeaders(HashSet::new()));
@@ -228,7 +313,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestHeaders {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AllowedOrigins {
+    /// All origins are allowed. Equivalent to the "*" value.
     All,
+    /// Only origins listed are allowed.
     Some(HashSet<Url>),
 }
 
@@ -239,6 +326,9 @@ impl Default for AllowedOrigins {
 }
 
 impl AllowedOrigins {
+    /// New `AllowedOrigins` from a list of URL strings.
+    /// Returns a tuple where the first element is the struct `AllowedOrigins`, and the second element
+    /// is a map of strings which failed to parse into URLs and their associated parse errors.
     pub fn new_from_str_list(urls: &[&str]) -> (Self, HashMap<String, ParseError>) {
         let urls: HashMap<String, Result<Url, ParseError>> =
             urls.iter().map(|s| (s.to_string(), Url::from_str(s))).collect();
@@ -257,21 +347,29 @@ impl AllowedOrigins {
     }
 }
 
-/// Options to aid in the building of a CORS response during pre-flight or after
+/// Options to aid in the building of a CORS response during pre-flight or after.
+/// See module level documentation for usage examples.
 #[derive(Clone, Debug, Default)]
 pub struct Options {
+    /// Origins that are allowed to make requests. Will be verified against the `Origin` request header.
     pub allowed_origins: AllowedOrigins,
-    /// Only used in preflight
+    /// Methods that the clients are allowed to request in.
+    /// Will be verified against the `Access-Control-Request-Method` request header during pre-flight only.
     pub allowed_methods: HashSet<rocket::http::Method>,
-    /// Only used in pre-flight
+    /// Headers that the clients are allowed to request in.
+    /// Will be verified against the `Access-Control-Request-Headers` request header during pre-flight only.
     pub allowed_headers: HeaderFieldNamesSet,
+    /// The `Access-Control-Allow-Credentials` response header
     pub allow_credentials: bool,
+    /// The `Access-Control-Expose-Headers` responde header
     pub expose_headers: HashSet<String>,
+    /// The `Access-Control-Max-Age` response header
     pub max_age: Option<usize>,
 }
 
 impl Options {
-    /// Construct a pre-flight response based on the options
+    /// Construct a preflight response based on the options. Will return an `Err` if any of the preflight checks
+    /// fail.
     pub fn preflight(&self,
                      origin: &Origin,
                      method: &AccessControlRequestMethod,
@@ -288,12 +386,12 @@ impl Options {
         }
     }
 
-    /// Use options to respond
+    /// Respond to a request based on the settings
     pub fn respond<'r, R: Responder<'r>>(&self, responder: R, origin: &Origin) -> Result<Response<R>, Error> {
         self.append(Response::<R>::allowed_origin(responder, origin, &self.allowed_origins))
     }
 
-    pub fn append<'r, R: Responder<'r>>(&self, response: Result<Response<R>, Error>) -> Result<Response<R>, Error> {
+    fn append<'r, R: Responder<'r>>(&self, response: Result<Response<R>, Error>) -> Result<Response<R>, Error> {
         Ok(response?
                .credentials(self.allow_credentials)
                .exposed_headers(self.expose_headers
@@ -305,8 +403,9 @@ impl Options {
     }
 }
 
-/// A Response which wraps another struct which implements `Responder`. This type allows
-/// you to request resources from another domain.
+/// A CORS Response which wraps another struct which implements `Responder`. You will typically
+/// use [`rowdy::cors::Options`] instead to verify and build the response instead of this directly.
+/// See module level documentation for usage examples.
 pub struct Response<R> {
     responder: R,
     allow_origin: String,

@@ -1,21 +1,4 @@
-//! A simple authenticator that uses a CSV backed user database.
-//!
-//! The user database should be a CSV file, or a "CSV-like" file
-//! (meaning you can choose to use some other character as field delimiter instead of comma)
-//! where the first column is the username, and the second column
-//! is a hashed password.
-//!
-//! # Password Hashing
-//! See `SimpleAuthenticator::hash_password` for the implementation of password hashing.
-//! The password is hashed from a _UTF-8 encoded password string_ `password` and the bytes of a
-//! salt `salt`, by concatenating the bytes in the order `password` then `salt` and then taking a SHA256 digest
-//! of the concatenated bytes. The bytes are then represented as Hexadecimal and stored.
-//!
-//! If your password is `password`, and the salt is `salty`, you can use `openssl` to generate the digest:
-//!
-//! ```sh
-//! echo -n 'passwordsalty' | openssl dgst -sha256
-//! ```
+//! Simple authenticator module
 use std::io::Read;
 use std::collections::HashMap;
 
@@ -31,7 +14,26 @@ use super::Error;
 
 type Users = HashMap<String, Vec<u8>>;
 
-/// The simple simple authenticator struct
+/// A simple authenticator that uses a CSV backed user database.
+///
+/// Requires the `simple_authenticator` feature, which is enabled by default.
+///
+/// The user database should be a CSV file, or a "CSV-like" file
+/// (meaning you can choose to use some other character as field delimiter instead of comma)
+/// where the first column is the username, and the second column
+/// is a hashed password.
+///
+/// # Password Hashing
+/// See `SimpleAuthenticator::hash_password` for the implementation of password hashing.
+/// The password is hashed from a _UTF-8 encoded password string_ `password` and the bytes of a
+/// salt `salt`, by concatenating the bytes in the order `password` then `salt` and then taking a SHA256 digest
+/// of the concatenated bytes. The bytes are then represented as Hexadecimal and stored.
+///
+/// If your password is `password`, and the salt is `salty`, you can use `openssl` to generate the digest:
+///
+/// ```sh
+/// echo -n 'passwordsalty' | openssl dgst -sha256
+/// ```
 pub struct SimpleAuthenticator {
     users: Users,
     salt: Vec<u8>,
@@ -40,6 +42,21 @@ pub struct SimpleAuthenticator {
 static CHARS: &'static [u8] = b"0123456789abcdef";
 
 impl SimpleAuthenticator {
+    /// Create a new `SimpleAuthenticator` with the provided salt and a CSV Reader.
+    ///
+    /// # Examples
+    /// ```
+    /// extern crate csv;
+    /// extern crate rowdy;
+    ///
+    /// use rowdy::auth::SimpleAuthenticator;
+    /// # fn main() {
+    /// let csv = "foobar,29d6afd14bbcdf0b43d1f2c4fd8ecbe8bdedd5ee255e5fa530a3fb968cbbfa1a
+    /// mei,e3cd32c1bafe41ba0d6998d5ea8623f453cf91244fd2cce6ab6ed90eacb0bd38";
+    /// let csv_reader = csv::Reader::from_string(csv).has_headers(false);
+    /// let authenticator = SimpleAuthenticator::new(b"salty", csv_reader).unwrap();
+    /// # }
+    /// ```
     pub fn new<R: Read>(salt: &[u8], csv: csv::Reader<R>) -> Result<Self, Error> {
 
         Ok(SimpleAuthenticator {
@@ -48,6 +65,14 @@ impl SimpleAuthenticator {
            })
     }
 
+    /// Create a new `SimpleAuthenticator` with the provided salt and a path to a CSV file.
+    ///
+    /// # Examples
+    /// ```
+    /// use rowdy::auth::SimpleAuthenticator;
+    ///
+    /// let authenticator = SimpleAuthenticator::with_csv_file(b"salty", "test/fixtures/users.csv", false, ',' as u8);
+    /// ```
     pub fn with_csv_file(salt: &[u8], path: &str, has_headers: bool, delimiter: u8) -> Result<Self, Error> {
         let reader = csv::Reader::from_file(path)
             .map_err(|e| format!("{}", e))?
@@ -78,7 +103,7 @@ impl SimpleAuthenticator {
         Ok(users.into_iter().map(|(u, h)| (u, h.unwrap())).collect())
     }
 
-    /// Hash a password with the salt. See module level documentation for the algorithm used.
+    /// Hash a password with the salt. See struct level documentation for the algorithm used.
     // TODO: Write an "example" tool to salt easily
     pub fn hash_password(&self, password: &str) -> String {
         Self::hex_dump(self.hash_password_digest(password).as_ref())

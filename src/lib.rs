@@ -14,6 +14,9 @@
 #![plugin(rocket_codegen)]
 #![cfg_attr(feature="clippy_lints", plugin(clippy))]
 
+#![warn(missing_docs)]
+#![doc(test(attr(allow(unused_variables), deny(warnings))))]
+
 extern crate chrono;
 extern crate hyper;
 extern crate jwt;
@@ -43,7 +46,7 @@ mod macros;
 mod test;
 pub mod auth;
 pub mod cors;
-pub mod routes;
+mod routes;
 pub mod serde_custom;
 pub mod token;
 
@@ -60,12 +63,18 @@ use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
 
+/// Top level error enum
 #[derive(Debug)]
 pub enum Error {
+    /// A generic/unknown error
     GenericError(String),
+    /// Authentication error
     Auth(auth::Error),
+    /// CORS error
     CORS(cors::Error),
+    /// Token Error
     Token(token::Error),
+    /// IO errors
     IOError(io::Error),
 }
 
@@ -202,8 +211,6 @@ const DEFAULT_EXPIRY_DURATION: u64 = 86400;
 ///
 /// ```
 /// extern crate rowdy;
-/// #[macro_use]
-/// extern crate serde_derive;
 /// extern crate serde_json;
 ///
 /// use rowdy::Configuration;

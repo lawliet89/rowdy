@@ -9,6 +9,7 @@ use auth;
 use cors;
 use token::{Token, PrivateClaim};
 
+/// A wrapper around `cors::Options` for options specific to the token retrival route
 pub struct TokenGetterCorsOptions(cors::Options);
 impl_deref!(TokenGetterCorsOptions, cors::Options);
 
@@ -34,6 +35,7 @@ struct AuthParam {
     offline_token: Option<bool>,
 }
 
+/// CORS pre-flight route for token retrieval
 #[allow(unmounted_route)]
 // mounted via `::launch()`
 #[options("/?<_auth_param>")]
@@ -47,6 +49,7 @@ fn token_getter_options(origin: cors::Origin,
     options.preflight(&origin, &method, Some(&headers))
 }
 
+/// Token retrieval route
 #[allow(unmounted_route)]
 // mounted via `::launch()`
 #[get("/?<_auth_param>")]

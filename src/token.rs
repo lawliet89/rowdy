@@ -1,3 +1,8 @@
+//! Authentication token structs, and methods
+//!
+//! This module provides the `Token` struct which encapsulates a JSON Web Token or `JWT`.
+//! Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
+//! to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
 use std::ops::Deref;
 use std::error;
 use std::fmt;
@@ -12,6 +17,7 @@ use serde::{Serialize, Deserialize};
 use serde_json;
 use uuid::{self, Uuid};
 
+/// Token errors
 #[derive(Debug)]
 pub enum Error {
     /// Raised when attempting to encode an already encoded token
@@ -70,15 +76,23 @@ impl<'r> Responder<'r> for Error {
     }
 }
 
+/// Private claims that will be included in the JWT embedded. Currently, an empty shell.
 #[derive(Default, Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PrivateClaim {}
 
+/// A token that will be serialized into JSON and passed to clients. This encapsulates a JSON Web Token or `JWT`.
+/// Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
+/// to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct Token<T: Serialize + Deserialize> {
+    /// Tne encapsulated JWT.
     pub token: jwt::JWT<T>,
+    /// The duration from `issued_at` where the token will expire
     #[serde(with = "::serde_custom::duration")]
     pub expires_in: Duration,
+    /// Time the token was issued at
     pub issued_at: DateTime<UTC>,
+    /// Refresh token. Not used/implemented at the moment
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<String>, // TODO
 }
@@ -97,6 +111,7 @@ impl<T> Clone for Token<T>
 }
 
 impl<T: Serialize + Deserialize> Token<T> {
+    /// Convenience method to create a new token issued `Now`.
     pub fn new(header: jws::Header, claims_set: jwt::ClaimsSet<T>, expires_in: &Duration) -> Self {
         Token {
             token: jwt::JWT::new_decoded(header, claims_set),

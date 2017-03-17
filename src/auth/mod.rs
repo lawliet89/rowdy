@@ -1,4 +1,4 @@
-//! Authentication
+//! Authentication module, including traits for identity provider and `Responder`s for authentication.
 use std::convert::From;
 use std::error;
 use std::fmt;
@@ -16,18 +16,30 @@ mod simple;
 #[cfg(feature = "simple_authenticator")]
 pub use self::simple::SimpleAuthenticator;
 
+/// A typedef for an `Authenticator` trait object that requires HTTP Basic authentication
 pub type BasicAuthenticator = Authenticator<hyper::header::Basic>;
+/// A typedef for an `Authenticator` trait object that requires Bearer authentication.
 pub type BearerAuthenticator = Authenticator<hyper::header::Bearer>;
+/// A typedef for an `Authenticator` trait object that uses an arbitrary string
 pub type StringAuthenticator = Authenticator<String>;
 
 /// Authentication errors
 #[derive(Debug)]
 pub enum Error {
+    /// Authentication was attempted successfully, but failed because of bad user credentials, or other reasons.
     AuthenticationFailure,
+    /// A generic error
     GenericError(String),
+    /// An error due to `hyper`, such as header parsing failure
     HyperError(hyper::error::Error),
-    MissingAuthorization { realm: String },
+    /// The `Authorization` HTTP request header was required but was missing. This variant will `respond` with the
+    /// appropriate `WWW-Authenticate` header.
+    MissingAuthorization {
+        /// The HTTP basic authentication realm
+        realm: String,
+    },
 }
+
 impl_from_error!(String, Error::GenericError);
 impl_from_error!(hyper::error::Error, Error::HyperError);
 
@@ -100,11 +112,13 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
 }
 
 impl Authorization<header::Basic> {
+    /// Convenience method to retrieve the username from a HTTP Basic Authorization request header
     pub fn username(&self) -> String {
         let Authorization(header::Authorization(header::Basic { ref username, .. })) = *self;
         username.to_string()
     }
 
+    /// Convenience method to retrieve the password from a HTTP Basic Authorization request header
     pub fn password(&self) -> Option<String> {
         let Authorization(header::Authorization(header::Basic { ref password, .. })) = *self;
         password.clone()
@@ -112,6 +126,7 @@ impl Authorization<header::Basic> {
 }
 
 impl Authorization<header::Bearer> {
+    /// Convenience method to retrieve the token from a bearer Authorization request header.
     pub fn token(&self) -> String {
         let Authorization(header::Authorization(header::Bearer { ref token })) = *self;
         token.to_string()
@@ -119,13 +134,112 @@ impl Authorization<header::Bearer> {
 }
 
 impl Authorization<String> {
+    /// Convenience method to retrieve the token from an arbitrary Authorization request header.
     pub fn string(&self) -> String {
         let Authorization(header::Authorization(ref s)) = *self;
         s.to_string()
     }
 }
 
-/// Authenticator trait which will be used to authenticate users
+/// Authenticator trait to be implemented by identity provider (idp) adapters to provide authentication.
+/// Each idp may support all the [schemes](https://hyper.rs/hyper/v0.10.5/hyper/header/trait.Scheme.html)
+/// supported, or just one.
+///
+/// Usually, you will want to include an `Authenticator` trait object as part of Rocket's
+/// [managed state](https://rocket.rs/guide/state/). Before you can do that, however, you will need to `Box` it up.
+/// See example below.
+///
+/// # Examples
+/// Consider the following mock authenticator that authenticates only the following:
+///
+/// - Basic: User `mei` with password `冻住，不许走!`
+/// - Bearer: Token `这样可以挡住他们。`
+/// - String: `哦，对不起啦。`
+///
+/// After defining the authenticator, the example will show how it can be used in a route.
+///
+/// ```
+/// #![feature(plugin, custom_derive)]
+/// #![plugin(rocket_codegen)]
+/// extern crate hyper;
+/// extern crate rocket;
+/// extern crate rowdy;
+///
+/// use hyper::header;
+/// use rocket::{State, Rocket};
+/// use rocket::http::{self, Status};
+/// use rocket::http::Method::Get;
+/// use rocket::testing::MockRequest;
+/// use rowdy::auth::*;
+/// pub struct MockAuthenticator {}
+///
+/// impl Authenticator<header::Basic> for MockAuthenticator {
+///     fn authenticate(&self, authorization: &Authorization<header::Basic>) -> Result<(), Error> {
+///         let username = authorization.username();
+///         let password = authorization.password().unwrap_or_else(|| "".to_string());
+///
+///         if username == "mei" && password == "冻住，不许走!" {
+///             Ok(())
+///         } else {
+///             Err(Error::AuthenticationFailure)
+///         }
+///     }
+/// }
+///
+/// impl Authenticator<header::Bearer> for MockAuthenticator {
+///     fn authenticate(&self, authorization: &Authorization<header::Bearer>) -> Result<(), Error> {
+///         let token = authorization.token();
+///
+///         if token == "这样可以挡住他们。" {
+///             Ok(())
+///         } else {
+///             Err(Error::AuthenticationFailure)
+///         }
+///     }
+/// }
+///
+/// impl Authenticator<String> for MockAuthenticator {
+///     fn authenticate(&self, authorization: &Authorization<String>) -> Result<(), Error> {
+///         let string = authorization.string();
+///
+///         if string == "哦，对不起啦。" {
+///             Ok(())
+///         } else {
+///             Err(Error::AuthenticationFailure)
+///         }
+///     }
+/// }
+/// #[get("/")]
+/// #[allow(unmounted_route)]
+/// fn auth_basic(authorization: Option<Authorization<header::Basic>>,
+///               authenticator: State<Box<Authenticator<header::Basic>>>)
+///               -> Result<&str, rowdy::Error> {
+///
+///     authenticator.prepare_response("https://www.acme.com", authorization)
+///         .and_then(|_| Ok("Hello world"))
+/// }
+///
+/// fn ignite_basic(authenticator: Box<Authenticator<header::Basic>>) -> Rocket {
+///     // Ignite rocket
+///     rocket::ignite().mount("/", routes![auth_basic]).manage(authenticator)
+/// }
+///
+/// # #[allow(deprecated)]
+/// # fn main() {
+/// let rocket = ignite_basic(Box::new(MockAuthenticator {}));
+/// let auth_header = hyper::header::Authorization(hyper::header::Basic {
+///                                                     username: "mei".to_owned(),
+///                                                     password: Some("冻住，不许走!".to_string()),
+///                                                 });
+/// let auth_header = http::Header::new("Authorization",
+///                                     format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+/// // Make and dispatch request
+/// let mut req = MockRequest::new(Get, "/").header(auth_header);
+/// let response = req.dispatch_with(&rocket);
+///
+/// assert_eq!(response.status(), Status::Ok);
+/// # }
+/// ```
 // XXX: Assocaited type or generic? https://stackoverflow.com/questions/32059370/
 pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
     /// Verify the credentials provided in the headers with the authenticator. Not usually called by users.
