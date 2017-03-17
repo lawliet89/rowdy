@@ -171,7 +171,6 @@ impl Authorization<String> {
 /// ```
 /// #![feature(plugin, custom_derive)]
 /// #![plugin(rocket_codegen)]
-/// extern crate hyper;
 /// extern crate rocket;
 /// extern crate rowdy;
 ///
