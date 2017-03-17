@@ -17,9 +17,9 @@
 #![warn(missing_docs)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
+extern crate biscuit as jwt;
 extern crate chrono;
 extern crate hyper;
-extern crate jwt;
 #[macro_use]
 extern crate log;
 #[macro_use]
