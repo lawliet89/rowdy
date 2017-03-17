@@ -150,6 +150,28 @@ impl super::Authenticator<Basic> for SimpleAuthenticator {
     }
 }
 
+/// (De)Serializable configuration for `SimpleAuthenticator`. This struct should be included
+/// in the base `Configuration`.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SimpleAuthenticatorConfiguration {
+    csv_path: String,
+    has_headers: bool,
+    delimiter: char,
+    salt: Vec<u8>,
+}
+
+impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfiguration {
+    type Authenticator = SimpleAuthenticator;
+
+    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
+        Ok(SimpleAuthenticator::with_csv_file(self.salt.as_slice(),
+                                              &self.csv_path,
+                                              self.has_headers,
+                                              self.delimiter as u8)?)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;

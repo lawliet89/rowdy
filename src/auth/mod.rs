@@ -10,6 +10,7 @@ use rocket::http::Status;
 use rocket::request::{self, Request, FromRequest};
 use rocket::response;
 use rocket::Outcome;
+use serde::{Serialize, Deserialize};
 
 #[cfg(feature = "simple_authenticator")]
 mod simple;
@@ -240,7 +241,6 @@ impl Authorization<String> {
 /// assert_eq!(response.status(), Status::Ok);
 /// # }
 /// ```
-// XXX: Assocaited type or generic? https://stackoverflow.com/questions/32059370/
 pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
     /// Verify the credentials provided in the headers with the authenticator. Not usually called by users.
     /// Use `prepare_response` instead.
@@ -258,13 +258,37 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
         }
     }
 }
+/// Configuration for the associated type `Authenticator`. [`rowdy::Configuration`] expects its `authenticator` field
+/// to implement this trait. Before launching, `rowdy` will attempt to make an `Authenticator` based off the
+/// configuration by calling the `make_authenticator` method.
+pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>
+    : Send + Sync + Serialize + Deserialize {
+    /// The `Authenticator` type this configuration is associated with
+    type Authenticator: Authenticator<S>;
+
+    /// Using the configuration struct, create a new `Authenticator`.
+    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error>;
+}
 
 /// A "no-op" authenticator that lets everything through
+#[derive(Debug)]
 pub struct NoOp {}
 
 impl<S: header::Scheme + 'static> Authenticator<S> for NoOp {
     fn authenticate(&self, _authorization: &Authorization<S>) -> Result<(), Error> {
         Ok(())
+    }
+}
+
+/// Configuration for the `no-op` authenticator. Nothing to configure.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NoOpConfiguration {}
+
+impl<S: header::Scheme + 'static> AuthenticatorConfiguration<S> for NoOpConfiguration {
+    type Authenticator = NoOp;
+
+    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
+        Ok(Self::Authenticator {})
     }
 }
 
@@ -287,7 +311,7 @@ pub mod tests {
     /// - String: 哦，对不起啦。
     pub struct MockAuthenticator {}
 
-    impl super::Authenticator<header::Basic> for MockAuthenticator {
+    impl Authenticator<header::Basic> for MockAuthenticator {
         fn authenticate(&self, authorization: &Authorization<header::Basic>) -> Result<(), Error> {
             let username = authorization.username();
             let password = authorization.password().unwrap_or_else(|| "".to_string());
@@ -300,7 +324,7 @@ pub mod tests {
         }
     }
 
-    impl super::Authenticator<header::Bearer> for MockAuthenticator {
+    impl Authenticator<header::Bearer> for MockAuthenticator {
         fn authenticate(&self, authorization: &Authorization<header::Bearer>) -> Result<(), Error> {
             let token = authorization.token();
 
@@ -312,7 +336,7 @@ pub mod tests {
         }
     }
 
-    impl super::Authenticator<String> for MockAuthenticator {
+    impl Authenticator<String> for MockAuthenticator {
         fn authenticate(&self, authorization: &Authorization<String>) -> Result<(), Error> {
             let string = authorization.string();
 
@@ -321,6 +345,20 @@ pub mod tests {
             } else {
                 Err(Error::AuthenticationFailure)
             }
+        }
+    }
+
+    /// Configuration struct for `MockAuthenticator`.
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct MockAuthenticatorConfiguration {}
+
+    impl<S: header::Scheme + 'static> AuthenticatorConfiguration<S> for MockAuthenticatorConfiguration
+        where MockAuthenticator: Authenticator<S>
+    {
+        type Authenticator = MockAuthenticator;
+
+        fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
+            Ok(Self::Authenticator {})
         }
     }
 
