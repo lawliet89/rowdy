@@ -2,7 +2,7 @@
 use std::ops::Deref;
 
 use hyper;
-use rocket::{self, State};
+use rocket::{self, State, Route};
 use rocket::http::Method::*;
 
 use auth;
@@ -71,6 +71,11 @@ fn token_getter(origin: cors::Origin,
     })
 }
 
+/// Return routes provided by rowdy
+pub fn routes() -> Vec<Route> {
+    routes![token_getter, token_getter_options]
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -87,15 +92,11 @@ mod tests {
     use super::*;
     use token::Secret;
 
-    fn make_authenticator() -> Box<auth::BasicAuthenticator> {
-        Box::new(::auth::tests::MockAuthenticator {})
-    }
-
     fn ignite() -> Rocket {
         // Ignite rocket
         let allowed_origins = ["https://www.example.com"];
         let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = Configuration {
+        let token_configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
             audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
@@ -103,14 +104,13 @@ mod tests {
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
         };
-        let token_getter_cors_options = TokenGetterCorsOptions::new(&configuration);
+        let configuration = ::Configuration {
+            token: token_configuration,
+            basic_authenticator: ::auth::tests::MockAuthenticatorConfiguration {},
+        };
 
-        rocket::ignite()
-            .mount("/",
-                   routes![::routes::token_getter_options, ::routes::token_getter])
-            .manage(configuration)
-            .manage(make_authenticator())
-            .manage(token_getter_cors_options)
+        let rocket = not_err!(configuration.ignite());
+        rocket.mount("/", routes())
     }
 
     #[test]

@@ -199,26 +199,25 @@ pub struct Configuration<B: auth::AuthenticatorConfiguration<hyper::header::Basi
 }
 
 impl<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> Configuration<B> {
-    /// Launches the Rocket server with the configuration. This function blocks and never returns.
-    ///
-    /// # Panics
-    /// This function will panic, if during the making of the authenticator, something goes wrong.
-    pub fn launch(self) {
+    /// Ignites the rocket with various configuration objects, but does not mount any routes.
+    /// Remember to mount routes and call `launch` on the returned Rocket object
+    pub fn ignite(self) -> Result<rocket::Rocket, Error> {
         let token_getter_cors_options = routes::TokenGetterCorsOptions::new(&self.token);
 
-        let basic_authenticator = self.basic_authenticator
-                                    .make_authenticator()
-                                    .unwrap_or_else(|e| panic!("Error making Basic Authenticator: {}", e));
+        let basic_authenticator = self.basic_authenticator.make_authenticator()?;
         let basic_authenticator: Box<auth::BasicAuthenticator> = Box::new(basic_authenticator);
 
-        rocket::ignite()
-            .mount("/",
-                routes![routes::token_getter, routes::token_getter_options])
-            .manage(self.token)
-            .manage(token_getter_cors_options)
-            .manage(basic_authenticator)
-            .launch();
+        Ok(rocket::ignite().manage(self.token).manage(token_getter_cors_options).manage(basic_authenticator))
     }
+}
+
+/// Convenience function to ignite and launch rowdy. This function will never return
+///
+/// # Panics
+/// Panics if during the Rocket igition, something goes wrong.
+pub fn launch<B: auth::AuthenticatorConfiguration<hyper::header::Basic>>(config: Configuration<B>) {
+    let rocket = config.ignite().unwrap_or_else(|e| panic!("{}", e));
+    rocket.mount("/", routes::routes()).launch()
 }
 
 #[cfg(test)]
