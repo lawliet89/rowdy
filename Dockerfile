@@ -28,4 +28,4 @@ RUN cargo build --release --all --locked
 VOLUME ["/app/src/config"]
 
 ENTRYPOINT ["cargo"]
-CMD ["run", "--release", "--package=rowdy", "config/Config.json"]
+CMD ["run", "--release", "--package=rowdy-cli", "config/Config.json"]

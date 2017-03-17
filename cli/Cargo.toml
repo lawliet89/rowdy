@@ -1,10 +1,10 @@
 [package]
-name = "rowdy"
+name = "rowdy-cli"
 version = "0.1.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 
 [[bin]]
-name = "rowdy"
+name = "rowdy-cli"
 path = "src/main.rs"
 test = true
 doc = false
@@ -14,7 +14,7 @@ docopt = "0.7"
 log = "0.3"
 rocket = "0.2.2"
 rocket_codegen = "0.2.2"
-rowdy-lib = { path = "../" }
+rowdy = { path = "../" }
 rustc-serialize = "0.3"
 serde = "0.9"
 serde_json = "0.9"

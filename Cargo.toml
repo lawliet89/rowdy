@@ -1,5 +1,5 @@
 [package]
-name = "rowdy-lib"
+name = "rowdy"
 version = "0.1.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 
