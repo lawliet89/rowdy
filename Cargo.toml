@@ -46,4 +46,4 @@ serde_test = "0.9"
 rocket = { version = "*", features = ["testing"] }
 
 [workspace]
-members = ["bin"]
+members = ["cli"]
