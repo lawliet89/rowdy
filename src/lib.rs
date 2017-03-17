@@ -188,6 +188,28 @@ impl Deserialize for Url {
     }
 }
 
+/// A sequence of bytes, either as an array of unsigned 8 bit integers, or a string which will be
+/// treated as UTF-8.
+/// This enum is (de)serialized [`untagged`](https://serde.rs/enum-representations.html).
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum ByteSequence {
+    /// A string which will be converted to UTF-8 and then to bytes.
+    String(String),
+    /// A sequence of unsigned 8 bits integers which will be treated as bytes.
+    Bytes(Vec<u8>),
+}
+
+impl ByteSequence {
+    /// Returns the byte sequence.
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match *self {
+            ByteSequence::String(ref string) => string.to_string().into_bytes(),
+            ByteSequence::Bytes(ref bytes) => bytes.to_vec(),
+        }
+    }
+}
+
 /// Application configuration. Usually deserialized from JSON for use.
 ///
 /// The type parameter `B` is the [`auth::AuthenticatorConfiguration`] and by its associated
@@ -223,14 +245,14 @@ impl Deserialize for Url {
 /// # }
 /// ```
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Configuration<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> {
+pub struct Configuration<B: auth::AuthenticatorConfiguration<auth::Basic>> {
     /// Token configuration. See the type documentation for deserialization examples
     pub token: token::Configuration,
     /// The configuration for the authenticator that will handle HTTP Basic Authentication.
     pub basic_authenticator: B,
 }
 
-impl<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> Configuration<B> {
+impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
     /// Ignites the rocket with various configuration objects, but does not mount any routes.
     /// Remember to mount routes and call `launch` on the returned Rocket object.
     /// See the struct documentation for an example.
@@ -278,7 +300,7 @@ impl<B: auth::AuthenticatorConfiguration<hyper::header::Basic>> Configuration<B>
 /// rowdy::launch(config);
 /// # }
 /// ```
-pub fn launch<B: auth::AuthenticatorConfiguration<hyper::header::Basic>>(config: Configuration<B>) {
+pub fn launch<B: auth::AuthenticatorConfiguration<auth::Basic>>(config: Configuration<B>) {
     let rocket = config.ignite().unwrap_or_else(|e| panic!("{}", e));
     rocket.mount("/", routes::routes()).launch()
 }

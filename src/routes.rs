@@ -1,7 +1,6 @@
 //! Routes mounted into Rocket
 use std::ops::Deref;
 
-use hyper;
 use rocket::{self, State, Route};
 use rocket::http::Method::*;
 
@@ -55,7 +54,7 @@ fn token_getter_options(origin: cors::Origin,
 #[get("/?<_auth_param>")]
 #[allow(needless_pass_by_value)]
 fn token_getter(origin: cors::Origin,
-                authorization: Option<auth::Authorization<hyper::header::Basic>>,
+                authorization: Option<auth::Authorization<auth::Basic>>,
                 _auth_param: AuthParam,
                 configuration: State<Configuration>,
                 cors_options: State<TokenGetterCorsOptions>,
@@ -142,7 +141,7 @@ mod tests {
 
         // Make headers
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
-        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+        let auth_header = hyper::header::Authorization(auth::Basic {
                                                            username: "mei".to_owned(),
                                                            password: Some("冻住，不许走!".to_string()),
                                                        });
@@ -180,7 +179,7 @@ mod tests {
 
         // Make headers
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
-        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+        let auth_header = hyper::header::Authorization(auth::Basic {
                                                            username: "Aladin".to_owned(),
                                                            password: Some("let me in".to_string()),
                                                        });

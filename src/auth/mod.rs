@@ -16,11 +16,20 @@ use serde::{Serialize, Deserialize};
 mod simple;
 #[cfg(feature = "simple_authenticator")]
 pub use self::simple::SimpleAuthenticator;
+#[cfg(feature = "simple_authenticator")]
+pub use self::simple::SimpleAuthenticatorConfiguration;
+
+/// Re-exported [`hyper::header::Scheme`]
+pub type Scheme = hyper::header::Scheme<Err = hyper::error::Error>;
+/// Re-exported [`hyper::header::Basic`].
+pub type Basic = hyper::header::Basic;
+/// Re-exported [`hyper::header::Bearer`].
+pub type Bearer = hyper::header::Bearer;
 
 /// A typedef for an `Authenticator` trait object that requires HTTP Basic authentication
-pub type BasicAuthenticator = Authenticator<hyper::header::Basic>;
+pub type BasicAuthenticator = Authenticator<Basic>;
 /// A typedef for an `Authenticator` trait object that requires Bearer authentication.
-pub type BearerAuthenticator = Authenticator<hyper::header::Bearer>;
+pub type BearerAuthenticator = Authenticator<Bearer>;
 /// A typedef for an `Authenticator` trait object that uses an arbitrary string
 pub type StringAuthenticator = Authenticator<String>;
 
@@ -112,24 +121,24 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
     }
 }
 
-impl Authorization<header::Basic> {
+impl Authorization<Basic> {
     /// Convenience method to retrieve the username from a HTTP Basic Authorization request header
     pub fn username(&self) -> String {
-        let Authorization(header::Authorization(header::Basic { ref username, .. })) = *self;
+        let Authorization(header::Authorization(Basic { ref username, .. })) = *self;
         username.to_string()
     }
 
     /// Convenience method to retrieve the password from a HTTP Basic Authorization request header
     pub fn password(&self) -> Option<String> {
-        let Authorization(header::Authorization(header::Basic { ref password, .. })) = *self;
+        let Authorization(header::Authorization(Basic { ref password, .. })) = *self;
         password.clone()
     }
 }
 
-impl Authorization<header::Bearer> {
+impl Authorization<Bearer> {
     /// Convenience method to retrieve the token from a bearer Authorization request header.
     pub fn token(&self) -> String {
-        let Authorization(header::Authorization(header::Bearer { ref token })) = *self;
+        let Authorization(header::Authorization(Bearer { ref token })) = *self;
         token.to_string()
     }
 }
@@ -174,8 +183,8 @@ impl Authorization<String> {
 /// use rowdy::auth::*;
 /// pub struct MockAuthenticator {}
 ///
-/// impl Authenticator<header::Basic> for MockAuthenticator {
-///     fn authenticate(&self, authorization: &Authorization<header::Basic>) -> Result<(), Error> {
+/// impl Authenticator<Basic> for MockAuthenticator {
+///     fn authenticate(&self, authorization: &Authorization<Basic>) -> Result<(), Error> {
 ///         let username = authorization.username();
 ///         let password = authorization.password().unwrap_or_else(|| "".to_string());
 ///
@@ -187,8 +196,8 @@ impl Authorization<String> {
 ///     }
 /// }
 ///
-/// impl Authenticator<header::Bearer> for MockAuthenticator {
-///     fn authenticate(&self, authorization: &Authorization<header::Bearer>) -> Result<(), Error> {
+/// impl Authenticator<Bearer> for MockAuthenticator {
+///     fn authenticate(&self, authorization: &Authorization<Bearer>) -> Result<(), Error> {
 ///         let token = authorization.token();
 ///
 ///         if token == "这样可以挡住他们。" {
@@ -212,15 +221,15 @@ impl Authorization<String> {
 /// }
 /// #[get("/")]
 /// #[allow(unmounted_route)]
-/// fn auth_basic(authorization: Option<Authorization<header::Basic>>,
-///               authenticator: State<Box<Authenticator<header::Basic>>>)
+/// fn auth_basic(authorization: Option<Authorization<Basic>>,
+///               authenticator: State<Box<Authenticator<Basic>>>)
 ///               -> Result<&str, rowdy::Error> {
 ///
 ///     authenticator.prepare_response("https://www.acme.com", authorization)
 ///         .and_then(|_| Ok("Hello world"))
 /// }
 ///
-/// fn ignite_basic(authenticator: Box<Authenticator<header::Basic>>) -> Rocket {
+/// fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
 ///     // Ignite rocket
 ///     rocket::ignite().mount("/", routes![auth_basic]).manage(authenticator)
 /// }
@@ -228,7 +237,7 @@ impl Authorization<String> {
 /// # #[allow(deprecated)]
 /// # fn main() {
 /// let rocket = ignite_basic(Box::new(MockAuthenticator {}));
-/// let auth_header = hyper::header::Authorization(hyper::header::Basic {
+/// let auth_header = hyper::header::Authorization(Basic {
 ///                                                     username: "mei".to_owned(),
 ///                                                     password: Some("冻住，不许走!".to_string()),
 ///                                                 });
@@ -311,8 +320,8 @@ pub mod tests {
     /// - String: 哦，对不起啦。
     pub struct MockAuthenticator {}
 
-    impl Authenticator<header::Basic> for MockAuthenticator {
-        fn authenticate(&self, authorization: &Authorization<header::Basic>) -> Result<(), Error> {
+    impl Authenticator<Basic> for MockAuthenticator {
+        fn authenticate(&self, authorization: &Authorization<Basic>) -> Result<(), Error> {
             let username = authorization.username();
             let password = authorization.password().unwrap_or_else(|| "".to_string());
 
@@ -324,8 +333,8 @@ pub mod tests {
         }
     }
 
-    impl Authenticator<header::Bearer> for MockAuthenticator {
-        fn authenticate(&self, authorization: &Authorization<header::Bearer>) -> Result<(), Error> {
+    impl Authenticator<Bearer> for MockAuthenticator {
+        fn authenticate(&self, authorization: &Authorization<Bearer>) -> Result<(), Error> {
             let token = authorization.token();
 
             if token == "这样可以挡住他们。" {
@@ -362,7 +371,7 @@ pub mod tests {
         }
     }
 
-    fn ignite_basic(authenticator: Box<Authenticator<header::Basic>>) -> Rocket {
+    fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
         // Ignite rocket
         rocket::ignite().mount("/", routes![auth_basic]).manage(authenticator)
     }
@@ -370,14 +379,14 @@ pub mod tests {
     #[get("/")]
     #[allow(unmounted_route)]
     #[allow(needless_pass_by_value)]
-    fn auth_basic(authorization: Option<Authorization<header::Basic>>,
-                  authenticator: State<Box<Authenticator<header::Basic>>>)
+    fn auth_basic(authorization: Option<Authorization<Basic>>,
+                  authenticator: State<Box<Authenticator<Basic>>>)
                   -> Result<(), ::Error> {
 
         authenticator.prepare_response("https://www.acme.com", authorization).and_then(|_| Ok(()))
     }
 
-    fn ignite_bearer(authenticator: Box<Authenticator<header::Bearer>>) -> Rocket {
+    fn ignite_bearer(authenticator: Box<Authenticator<Bearer>>) -> Rocket {
         // Ignite rocket
         rocket::ignite().mount("/", routes![auth_bearer]).manage(authenticator)
     }
@@ -385,8 +394,8 @@ pub mod tests {
     #[get("/")]
     #[allow(unmounted_route)]
     #[allow(needless_pass_by_value)]
-    fn auth_bearer(authorization: Option<Authorization<header::Bearer>>,
-                   authenticator: State<Box<Authenticator<header::Bearer>>>)
+    fn auth_bearer(authorization: Option<Authorization<Bearer>>,
+                   authenticator: State<Box<Authenticator<Bearer>>>)
                    -> Result<(), ::Error> {
 
         authenticator.prepare_response("https://www.acme.com", authorization).and_then(|_| Ok(()))
@@ -410,19 +419,19 @@ pub mod tests {
     #[test]
     #[allow(deprecated)]
     fn parses_basic_auth_correctly() {
-        let auth = header::Authorization(header::Basic {
+        let auth = header::Authorization(Basic {
                                              username: "Aladdin".to_owned(),
                                              password: Some("open sesame".to_string()),
                                          });
         let mut request = Request::new(rocket::http::Method::Get, "/");
-        let header = rocket::http::Header::new(header::Authorization::<header::Basic>::header_name(),
+        let header = rocket::http::Header::new(header::Authorization::<Basic>::header_name(),
                                                format!("{}", HeaderFormatter(&auth)));
         request.add_header(header);
-        let outcome: request::Outcome<::auth::Authorization<header::Basic>, ::auth::Error> =
+        let outcome: request::Outcome<::auth::Authorization<Basic>, ::auth::Error> =
             FromRequest::from_request(&request);
 
         let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
-        let ::auth::Authorization(header::Authorization(header::Basic { username, password })) = parsed_header;
+        let ::auth::Authorization(header::Authorization(Basic { username, password })) = parsed_header;
         assert_eq!(username, "Aladdin");
         assert_eq!(password, Some("open sesame".to_string()));
     }
@@ -430,16 +439,16 @@ pub mod tests {
     #[test]
     #[allow(deprecated)]
     fn parses_bearer_auth_correctly() {
-        let auth = header::Authorization(header::Bearer { token: "token".to_string() });
+        let auth = header::Authorization(Bearer { token: "token".to_string() });
         let mut request = Request::new(rocket::http::Method::Get, "/");
-        let header = rocket::http::Header::new(header::Authorization::<header::Bearer>::header_name(),
+        let header = rocket::http::Header::new(header::Authorization::<Bearer>::header_name(),
                                                format!("{}", HeaderFormatter(&auth)));
         request.add_header(header);
-        let outcome: request::Outcome<::auth::Authorization<header::Bearer>, ::auth::Error> =
+        let outcome: request::Outcome<::auth::Authorization<Bearer>, ::auth::Error> =
             FromRequest::from_request(&request);
 
         let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
-        let ::auth::Authorization(header::Authorization(header::Bearer { token })) = parsed_header;
+        let ::auth::Authorization(header::Authorization(Bearer { token })) = parsed_header;
         assert_eq!(token, "token");
     }
 
@@ -465,7 +474,7 @@ pub mod tests {
         let rocket = ignite_basic(Box::new(MockAuthenticator {}));
 
         // Make headers
-        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+        let auth_header = hyper::header::Authorization(Basic {
                                                            username: "mei".to_owned(),
                                                            password: Some("冻住，不许走!".to_string()),
                                                        });
@@ -486,7 +495,7 @@ pub mod tests {
 
         // Make headers
         let auth_header =
-            hyper::header::Authorization(hyper::header::Bearer { token: "这样可以挡住他们。".to_string() });
+            hyper::header::Authorization(Bearer { token: "这样可以挡住他们。".to_string() });
         let auth_header = http::Header::new("Authorization",
                                             format!("{}", hyper::header::HeaderFormatter(&auth_header)));
         // Make and dispatch request
@@ -521,7 +530,7 @@ pub mod tests {
         let rocket = ignite_basic(Box::new(MockAuthenticator {}));
 
         // Make headers
-        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+        let auth_header = hyper::header::Authorization(Basic {
                                                            username: "Aladin".to_owned(),
                                                            password: Some("let me in".to_string()),
                                                        });
@@ -542,7 +551,7 @@ pub mod tests {
         let rocket = ignite_bearer(Box::new(MockAuthenticator {}));
 
         // Make headers
-        let auth_header = hyper::header::Authorization(hyper::header::Bearer { token: "bad".to_string() });
+        let auth_header = hyper::header::Authorization(Bearer { token: "bad".to_string() });
         let auth_header = http::Header::new("Authorization",
                                             format!("{}", hyper::header::HeaderFormatter(&auth_header)));
         // Make and dispatch request
@@ -594,7 +603,7 @@ pub mod tests {
         let rocket = ignite_basic(Box::new(NoOp {}));
 
         // Make headers
-        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+        let auth_header = hyper::header::Authorization(Basic {
                                                            username: "anything".to_owned(),
                                                            password: Some("let me in".to_string()),
                                                        });
@@ -614,7 +623,7 @@ pub mod tests {
         let rocket = ignite_bearer(Box::new(NoOp {}));
 
         // Make headers
-        let auth_header = hyper::header::Authorization(hyper::header::Bearer { token: "foobar".to_string() });
+        let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
         let auth_header = http::Header::new("Authorization",
                                             format!("{}", hyper::header::HeaderFormatter(&auth_header)));
         // Make and dispatch request
