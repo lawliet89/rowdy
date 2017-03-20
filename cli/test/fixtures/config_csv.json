@@ -1,0 +1,23 @@
+{
+  "token": {
+    "issuer": "https://www.acme.com",
+    "allowed_origins": [
+      "https://www.example.com",
+      "https://www.foobar.com"
+    ],
+    "audience": [
+      "https://www.example.com",
+      "https://www.foobar.com"
+    ],
+    "signature_algorithm": "RS256",
+    "secret": {
+      "rsa_private": "test/fixtures/rsa_private_key.der",
+      "rsa_public": "test/fixtures/rsa_public_key.der"
+    },
+    "expiry_duration": 86400
+  },
+  "basic_authenticator": {
+    "csv_path": "tests/fixtures/users.csv",
+    "salt": "salty"
+  }
+}

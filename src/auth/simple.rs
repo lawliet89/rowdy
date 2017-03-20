@@ -3,11 +3,10 @@ use std::io::Read;
 use std::collections::HashMap;
 
 use csv;
-use hyper::header::Basic;
 use ring::{digest, test};
 use ring::constant_time::verify_slices_are_equal;
 
-use super::Error;
+use super::{Basic, Error};
 
 // Code for conversion to hex stolen from rustc-serialize:
 // https://doc.rust-lang.org/rustc-serialize/src/rustc_serialize/hex.rs.html
@@ -150,6 +149,51 @@ impl super::Authenticator<Basic> for SimpleAuthenticator {
     }
 }
 
+/// (De)Serializable configuration for `SimpleAuthenticator`. This struct should be included
+/// in the base `Configuration`.
+/// # Examples
+/// ```json
+/// {
+///     "csv_path": "test/fixtures/users.csv",
+///     "salt": "salty",
+///     "has_headers": false,
+///     "delimiter": " "
+/// }
+/// ```
+#[derive(Eq, PartialEq, Serialize, Deserialize, Debug)]
+pub struct SimpleAuthenticatorConfiguration {
+    /// Path to the CSV database, in the format described by `SimpleAuthenticator`. This should be
+    /// relative to the working directory, or an absolute path
+    pub csv_path: String,
+    /// Whether the CSV file has a header row or not. Defaults to `false`.
+    #[serde(default)]
+    pub has_headers: bool,
+    /// The delimiter char. By default, this is ','.
+    /// Because of the limitation of the `CSV` crate which elects to only allow delimiters with one byte,
+    /// the `char` will be truncated to only one byte. This means you should only use delimiters that
+    /// are ASCII.
+    #[serde(default = "default_delimiter")]
+    pub delimiter: char,
+    /// The salt to be used when verifying passwords
+    pub salt: ::ByteSequence,
+}
+
+fn default_delimiter() -> char {
+    ','
+}
+
+impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfiguration {
+    type Authenticator = SimpleAuthenticator;
+
+    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
+        Ok(SimpleAuthenticator::with_csv_file(self.salt.as_bytes().as_slice(),
+                                              &self.csv_path,
+                                              self.has_headers,
+                                              self.delimiter as u8)?)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +245,30 @@ mod tests {
 
         not_err!(authenticator.verify("foobar", "password"));
         not_err!(authenticator.verify("mei", "冻住，不许走!"));
+    }
+
+    #[test]
+    fn simple_authenticator_configuration_deserialization() {
+        use serde_json;
+        use auth::AuthenticatorConfiguration;
+
+        let salt = ::ByteSequence::String("salty".to_string());
+        let json = r#"{
+            "csv_path": "test/fixtures/users.csv",
+            "salt": "salty",
+            "delimiter": ","
+        }"#;
+
+        let deserialized: SimpleAuthenticatorConfiguration = not_err!(serde_json::from_str(json));
+        let expected_config = SimpleAuthenticatorConfiguration {
+            csv_path: "test/fixtures/users.csv".to_string(),
+            salt: salt.clone(),
+            has_headers: false,
+            delimiter: ',',
+        };
+        assert_eq!(deserialized, expected_config);
+
+        let authenticator = expected_config.make_authenticator().unwrap();
+        assert!(verify_slices_are_equal(salt.as_bytes().as_slice(), authenticator.salt.as_slice()).is_ok())
     }
 }

@@ -17,9 +17,9 @@
 #![warn(missing_docs)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
+extern crate biscuit as jwt;
 extern crate chrono;
 extern crate hyper;
-extern crate jwt;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -50,14 +50,14 @@ mod routes;
 pub mod serde_custom;
 pub mod token;
 
+pub use self::routes::routes;
+
 use std::error;
 use std::fmt;
 use std::io;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::time::Duration;
 
-use jwt::jws;
 use rocket::http::Status;
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
@@ -188,99 +188,121 @@ impl Deserialize for Url {
     }
 }
 
-const DEFAULT_EXPIRY_DURATION: u64 = 86400;
+/// A sequence of bytes, either as an array of unsigned 8 bit integers, or a string which will be
+/// treated as UTF-8.
+/// This enum is (de)serialized [`untagged`](https://serde.rs/enum-representations.html).
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum ByteSequence {
+    /// A string which will be converted to UTF-8 and then to bytes.
+    String(String),
+    /// A sequence of unsigned 8 bits integers which will be treated as bytes.
+    Bytes(Vec<u8>),
+}
+
+impl ByteSequence {
+    /// Returns the byte sequence.
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match *self {
+            ByteSequence::String(ref string) => string.to_string().into_bytes(),
+            ByteSequence::Bytes(ref bytes) => bytes.to_vec(),
+        }
+    }
+}
 
 /// Application configuration. Usually deserialized from JSON for use.
 ///
+/// The type parameter `B` is the [`auth::AuthenticatorConfiguration`] and by its associated
+/// type, the `Authenticator` that is going to be used for HTTP Basic Authentication.
+///
 /// # Examples
-/// This is a standard JSON serialized example.
-///
-/// ```json
-/// {
-///     "issuer": "https://www.acme.com",
-///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
-///     "audience": ["https://www.example.com", "https://www.foobar.com"],
-///     "signature_algorithm": "RS256",
-///     "secret": {
-///                 "rsa_private": "test/fixtures/rsa_private_key.der",
-///                 "rsa_public": "test/fixtures/rsa_public_key.der"
-///                },
-///     "expiry_duration": 86400
-/// }
-/// ```
-///
 /// ```
 /// extern crate rowdy;
 /// extern crate serde_json;
 ///
 /// use rowdy::Configuration;
+/// use rowdy::auth::NoOpConfiguration;
 ///
 /// # fn main() {
+/// // We are using the `NoOp` authenticator
 /// let json = r#"{
-///     "issuer": "https://www.acme.com",
-///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
-///     "audience": ["https://www.example.com", "https://www.foobar.com"],
-///     "signature_algorithm": "RS256",
-///     "secret": {
-///                 "rsa_private": "test/fixtures/rsa_private_key.der",
-///                 "rsa_public": "test/fixtures/rsa_public_key.der"
-///                },
-///     "expiry_duration": 86400
+///     "token" : {
+///         "issuer": "https://www.acme.com",
+///         "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///         "audience": ["https://www.example.com", "https://www.foobar.com"],
+///         "signature_algorithm": "RS256",
+///         "secret": {
+///                     "rsa_private": "test/fixtures/rsa_private_key.der",
+///                     "rsa_public": "test/fixtures/rsa_public_key.der"
+///                    },
+///         "expiry_duration": 86400
+///        },
+///        "basic_authenticator": {}
 /// }"#;
-/// let deserialized: Configuration = serde_json::from_str(json).unwrap();
+/// let config: Configuration<NoOpConfiguration> = serde_json::from_str(json).unwrap();
+/// let rocket = config.ignite().unwrap().mount("/", rowdy::routes());
+/// // then `rocket.launch()`!
 /// # }
 /// ```
-///
-/// Variations for the fields `allowed_origins`, `audience` and `secret` exist. Refer to their type documentation for
-/// examples.
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct Configuration {
-    /// The issuer of the token. Usually the URI of the authentication server.
-    /// The issuer URI will also be used in the UUID generation of the tokens, and is also the `realm` for
-    /// authentication purposes.
-    pub issuer: String,
-    /// Origins that are allowed to issue CORS request. This is needed for browser
-    /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
-    ///
-    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
-    ///
-    /// See [`cors::AllowedOrigins`] for serialization examples.
-    pub allowed_origins: cors::AllowedOrigins,
-    /// The audience intended for your tokens.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub audience: Option<jwt::SingleOrMultipleStrings>,
-    /// Defaults to `none`
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature_algorithm: Option<jws::Algorithm>,
-    /// Secrets for use in signing and encrypting a JWT.
-    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
-    /// Defaults to `None`.
-    ///
-    /// See [`token::Secret`] for serialization examples
-    #[serde(default)]
-    pub secret: token::Secret,
-    /// Expiry duration of tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
-    #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
-    pub expiry_duration: Duration,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Configuration<B: auth::AuthenticatorConfiguration<auth::Basic>> {
+    /// Token configuration. See the type documentation for deserialization examples
+    pub token: token::Configuration,
+    /// The configuration for the authenticator that will handle HTTP Basic Authentication.
+    pub basic_authenticator: B,
 }
 
-impl Configuration {
-    fn default_expiry_duration() -> Duration {
-        Duration::from_secs(DEFAULT_EXPIRY_DURATION)
+impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
+    /// Ignites the rocket with various configuration objects, but does not mount any routes.
+    /// Remember to mount routes and call `launch` on the returned Rocket object.
+    /// See the struct documentation for an example.
+    pub fn ignite(self) -> Result<rocket::Rocket, Error> {
+        let token_getter_cors_options = routes::TokenGetterCorsOptions::new(&self.token);
+
+        let basic_authenticator = self.basic_authenticator.make_authenticator()?;
+        let basic_authenticator: Box<auth::BasicAuthenticator> = Box::new(basic_authenticator);
+
+        Ok(rocket::ignite().manage(self.token).manage(token_getter_cors_options).manage(basic_authenticator))
     }
 }
 
-/// Launches the Rocket server with the configuration. This function blocks and never returns.
-pub fn launch(config: Configuration, authenticator: Box<auth::BasicAuthenticator>) {
-    let token_getter_options = routes::TokenGetterCorsOptions::new(&config);
-
-    rocket::ignite()
-        .mount("/",
-               routes![routes::token_getter, routes::token_getter_options])
-        .manage(config)
-        .manage(token_getter_options)
-        .manage(authenticator)
-        .launch();
+/// Convenience function to ignite and launch rowdy. This function will never return
+///
+/// # Panics
+/// Panics if during the Rocket igition, something goes wrong.
+///
+/// # Example
+/// ```rust,no_run
+/// extern crate rowdy;
+/// extern crate serde_json;
+///
+/// use rowdy::Configuration;
+/// use rowdy::auth::NoOpConfiguration;
+///
+/// # fn main() {
+/// // We are using the `NoOp` authenticator
+/// let json = r#"{
+///     "token" : {
+///         "issuer": "https://www.acme.com",
+///         "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///         "audience": ["https://www.example.com", "https://www.foobar.com"],
+///         "signature_algorithm": "RS256",
+///         "secret": {
+///                     "rsa_private": "test/fixtures/rsa_private_key.der",
+///                     "rsa_public": "test/fixtures/rsa_public_key.der"
+///                    },
+///         "expiry_duration": 86400
+///        },
+///        "basic_authenticator": {}
+/// }"#;
+/// let config: Configuration<NoOpConfiguration> = serde_json::from_str(json).unwrap();
+///
+/// rowdy::launch(config);
+/// # }
+/// ```
+pub fn launch<B: auth::AuthenticatorConfiguration<auth::Basic>>(config: Configuration<B>) {
+    let rocket = config.ignite().unwrap_or_else(|e| panic!("{}", e));
+    rocket.mount("/", routes::routes()).launch()
 }
 
 #[cfg(test)]

@@ -19,9 +19,9 @@ clippy_lints = ["clippy"]
 simple_authenticator = ["csv", "ring"]
 
 [dependencies]
+biscuit = "0.0.1"
 chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
-jwt = { git = "https://github.com/lawliet89/rust-jwt", rev = "4f3165ccaad16e05aaefa9d0f8edfbbf874c37b2" }
 log = "0.3"
 rocket = "0.2.2"
 rocket_codegen = "0.2.2"

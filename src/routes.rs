@@ -1,13 +1,12 @@
 //! Routes mounted into Rocket
 use std::ops::Deref;
 
-use hyper;
-use rocket::{self, State};
+use rocket::{self, State, Route};
 use rocket::http::Method::*;
 
 use auth;
 use cors;
-use token::{Token, PrivateClaim};
+use token::{Token, PrivateClaim, Configuration};
 
 /// A wrapper around `cors::Options` for options specific to the token retrival route
 pub struct TokenGetterCorsOptions(cors::Options);
@@ -17,7 +16,7 @@ const TOKEN_GETTER_METHODS: &[rocket::http::Method] = &[Get];
 const TOKEN_GETTER_HEADERS: &'static [&'static str] = &["Authorization"];
 
 impl TokenGetterCorsOptions {
-    pub fn new(config: &::Configuration) -> Self {
+    pub fn new(config: &Configuration) -> Self {
         TokenGetterCorsOptions(cors::Options {
                                    allowed_origins: config.allowed_origins.clone(),
                                    allowed_methods: TOKEN_GETTER_METHODS.iter().cloned().collect(),
@@ -55,9 +54,9 @@ fn token_getter_options(origin: cors::Origin,
 #[get("/?<_auth_param>")]
 #[allow(needless_pass_by_value)]
 fn token_getter(origin: cors::Origin,
-                authorization: Option<auth::Authorization<hyper::header::Basic>>,
+                authorization: Option<auth::Authorization<auth::Basic>>,
                 _auth_param: AuthParam,
-                configuration: State<::Configuration>,
+                configuration: State<Configuration>,
                 cors_options: State<TokenGetterCorsOptions>,
                 authenticator: State<Box<auth::BasicAuthenticator>>)
                 -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
@@ -69,6 +68,11 @@ fn token_getter(origin: cors::Origin,
         let token = token.encode(configuration.secret.for_signing()?)?;
         Ok(cors_options.respond(token, &origin)?)
     })
+}
+
+/// Return routes provided by rowdy
+pub fn routes() -> Vec<Route> {
+    routes![token_getter, token_getter_options]
 }
 
 #[cfg(test)]
@@ -87,15 +91,11 @@ mod tests {
     use super::*;
     use token::Secret;
 
-    fn make_authenticator() -> Box<auth::BasicAuthenticator> {
-        Box::new(::auth::tests::MockAuthenticator {})
-    }
-
     fn ignite() -> Rocket {
         // Ignite rocket
         let allowed_origins = ["https://www.example.com"];
         let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = ::Configuration {
+        let token_configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
             audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
@@ -103,14 +103,13 @@ mod tests {
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
         };
-        let token_getter_cors_options = TokenGetterCorsOptions::new(&configuration);
+        let configuration = ::Configuration {
+            token: token_configuration,
+            basic_authenticator: ::auth::tests::MockAuthenticatorConfiguration {},
+        };
 
-        rocket::ignite()
-            .mount("/",
-                   routes![::routes::token_getter_options, ::routes::token_getter])
-            .manage(configuration)
-            .manage(make_authenticator())
-            .manage(token_getter_cors_options)
+        let rocket = not_err!(configuration.ignite());
+        rocket.mount("/", routes())
     }
 
     #[test]
@@ -142,7 +141,7 @@ mod tests {
 
         // Make headers
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
-        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+        let auth_header = hyper::header::Authorization(auth::Basic {
                                                            username: "mei".to_owned(),
                                                            password: Some("冻住，不许走!".to_string()),
                                                        });
@@ -180,7 +179,7 @@ mod tests {
 
         // Make headers
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
-        let auth_header = hyper::header::Authorization(hyper::header::Basic {
+        let auth_header = hyper::header::Authorization(auth::Basic {
                                                            username: "Aladin".to_owned(),
                                                            password: Some("let me in".to_string()),
                                                        });
