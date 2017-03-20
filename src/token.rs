@@ -3,10 +3,11 @@
 //! This module provides the `Token` struct which encapsulates a JSON Web Token or `JWT`.
 //! Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
 //! to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
-use std::ops::Deref;
 use std::error;
 use std::fmt;
 use std::io::Cursor;
+use std::ops::Deref;
+use std::str::FromStr;
 use std::time::Duration;
 
 use chrono::{self, DateTime, UTC};
@@ -135,7 +136,7 @@ pub struct Configuration {
     pub allowed_origins: ::cors::AllowedOrigins,
     /// The audience intended for your tokens.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audience: Option<jwt::SingleOrMultipleStrings>,
+    pub audience: Option<jwt::SingleOrMultiple<jwt::StringOrUri>>,
     /// Defaults to `none`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_algorithm: Option<jws::Algorithm>,
@@ -214,13 +215,13 @@ impl<T: Serialize + Deserialize> Token<T> {
                               now: DateTime<UTC>,
                               expiry_duration: Duration,
                               issuer: &str,
-                              audience: &Option<jwt::SingleOrMultipleStrings>)
+                              audience: &Option<jwt::SingleOrMultiple<jwt::StringOrUri>>)
                               -> Result<jwt::RegisteredClaims, ::Error> {
         let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| format!("{}", e))?;
 
         Ok(jwt::RegisteredClaims {
-               issuer: Some(issuer.to_string()),
-               subject: Some(subject.to_string()),
+               issuer: Some(FromStr::from_str(issuer).map_err(Error::JWTError)?),
+               subject: Some(FromStr::from_str(subject).map_err(Error::JWTError)?),
                audience: audience.clone(),
                issued_at: Some(now.into()),
                not_before: Some(now.into()),
@@ -620,7 +621,7 @@ mod tests {
         let configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
-            audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
+            audience: Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())),
             signature_algorithm: Some(jwt::jws::Algorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
@@ -636,10 +637,10 @@ mod tests {
         // Assert registered claims
         let registered = not_err!(token.registered_claims());
 
-        assert_eq!(registered.issuer, Some("https://www.acme.com".to_string()));
-        assert_eq!(registered.subject, Some("Donald Trump".to_string()));
+        assert_eq!(registered.issuer, Some(FromStr::from_str("https://www.acme.com").unwrap()));
+        assert_eq!(registered.subject, Some(FromStr::from_str("Donald Trump").unwrap()));
         assert_eq!(registered.audience,
-                   Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())));
+                   Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())));
         assert_eq!(registered.issued_at, Some(now.clone().into()));
         assert_eq!(registered.not_before, Some(now.clone().into()));
         assert_eq!(registered.expiry, Some(expected_expiry.clone().into()));

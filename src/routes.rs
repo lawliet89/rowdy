@@ -98,7 +98,7 @@ mod tests {
         let token_configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
-            audience: Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
+            audience: Some(jwt::SingleOrMultiple::Single(not_err!(FromStr::from_str("https://www.example.com")))),
             signature_algorithm: Some(jwt::jws::Algorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
@@ -161,8 +161,8 @@ mod tests {
 
         let registered = not_err!(actual_token.registered_claims());
 
-        assert_eq!(Some("https://www.acme.com".to_string()), registered.issuer);
-        assert_eq!(Some(jwt::SingleOrMultipleStrings::Single("https://www.example.com".to_string())),
+        assert_eq!(Some(FromStr::from_str("https://www.acme.com").unwrap()), registered.issuer);
+        assert_eq!(Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())),
                    registered.audience);
 
         // TODO: Test private claims
