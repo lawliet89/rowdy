@@ -4,5 +4,3 @@ services:
     build: .
     expose:
       - 8000
-    volumes:
-      - ./config:/app/src/config

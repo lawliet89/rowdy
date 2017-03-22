@@ -23,9 +23,3 @@ WORKDIR /app/src
 
 COPY . ./
 RUN cargo build --release --all --locked
-
-# FIXME: Better way to deal with this
-VOLUME ["/app/src/config"]
-
-ENTRYPOINT ["cargo"]
-CMD ["run", "--release", "--package=rowdy-cli", "config/Config.json"]
