@@ -22,4 +22,4 @@ ENV PATH "/root/.cargo/bin:${PATH}"
 WORKDIR /app/src
 
 COPY . ./
-RUN cargo build --release --all --locked
+RUN cargo build --release --all --locked --all-features
