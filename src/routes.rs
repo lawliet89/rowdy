@@ -51,11 +51,11 @@ fn token_getter_options(origin: cors::Origin,
 /// Token retrieval route
 #[allow(unmounted_route)]
 // mounted via `::launch()`
-#[get("/?<_auth_param>")]
+#[get("/?<auth_param>")]
 #[allow(needless_pass_by_value)]
 fn token_getter(origin: cors::Origin,
                 authorization: Option<auth::Authorization<auth::Basic>>,
-                _auth_param: AuthParam,
+                auth_param: AuthParam,
                 configuration: State<Configuration>,
                 cors_options: State<TokenGetterCorsOptions>,
                 authenticator: State<Box<auth::BasicAuthenticator>>)
@@ -64,6 +64,7 @@ fn token_getter(origin: cors::Origin,
     authenticator.prepare_response(&configuration.issuer, authorization).and_then(|authorization| {
         let token = Token::<PrivateClaim>::with_configuration(&configuration,
                                                               &authorization.username(),
+                                                              &auth_param.service,
                                                               Default::default())?;
         let token = token.encode(configuration.secret.for_signing()?)?;
         Ok(cors_options.respond(token, &origin)?)
@@ -98,7 +99,7 @@ mod tests {
         let token_configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
-            audience: Some(jwt::SingleOrMultiple::Single(not_err!(FromStr::from_str("https://www.example.com")))),
+            audience: jwt::SingleOrMultiple::Single(not_err!(FromStr::from_str("https://www.example.com"))),
             signature_algorithm: Some(jwt::jws::Algorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
@@ -124,7 +125,7 @@ mod tests {
         let request_headers = Header::from(request_headers);
 
         // Make and dispatch request
-        let mut req = MockRequest::new(Options, "/?service=foobar&scope=all")
+        let mut req = MockRequest::new(Options, "/?service=https://www.example.com&scope=all")
             .header(origin_header)
             .header(method_header)
             .header(request_headers);
@@ -148,7 +149,9 @@ mod tests {
         let auth_header = Header::new("Authorization",
                                       format!("{}", hyper::header::HeaderFormatter(&auth_header)));
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all").header(origin_header).header(auth_header);
+        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
+            .header(origin_header)
+            .header(auth_header);
         let mut response = req.dispatch_with(&rocket);
 
         // Assert
@@ -161,7 +164,8 @@ mod tests {
 
         let registered = not_err!(actual_token.registered_claims());
 
-        assert_eq!(Some(FromStr::from_str("https://www.acme.com").unwrap()), registered.issuer);
+        assert_eq!(Some(FromStr::from_str("https://www.acme.com").unwrap()),
+                   registered.issuer);
         assert_eq!(Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())),
                    registered.audience);
 
@@ -186,7 +190,9 @@ mod tests {
         let auth_header = Header::new("Authorization",
                                       format!("{}", hyper::header::HeaderFormatter(&auth_header)));
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all").header(origin_header).header(auth_header);
+        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
+            .header(origin_header)
+            .header(auth_header);
         let response = req.dispatch_with(&rocket);
 
         // Assert
@@ -203,7 +209,7 @@ mod tests {
         let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
 
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all").header(origin_header);
+        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all").header(origin_header);
         let response = req.dispatch_with(&rocket);
 
         // Assert
@@ -211,5 +217,27 @@ mod tests {
 
         let www_header: Vec<_> = response.header_values("WWW-Authenticate").collect();
         assert_eq!(www_header, vec!["Basic realm=https://www.acme.com"]);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn token_getter_get_invalid_service() {
+        // Ignite rocket
+        let rocket = ignite();
+
+        // Make headers
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
+        let auth_header = hyper::header::Authorization(auth::Basic {
+                                                           username: "mei".to_owned(),
+                                                           password: Some("冻住，不许走!".to_string()),
+                                                       });
+        let auth_header = Header::new("Authorization",
+                                      format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+        // Make and dispatch request
+        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all").header(origin_header).header(auth_header);
+        let response = req.dispatch_with(&rocket);
+
+        // Assert
+        assert_eq!(response.status(), Status::Forbidden);
     }
 }
