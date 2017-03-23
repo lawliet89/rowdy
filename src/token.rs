@@ -29,6 +29,8 @@ pub enum Error {
     TokenNotEncoded,
     /// Raised when attempting to use an encoded token when an decoded one is expected
     TokenNotDecoded,
+    /// Raised when the service requested is not in the list of intended audiences
+    InvalidService,
 
     /// Errors during token encoding/decoding
     JWTError(jwt::errors::Error),
@@ -46,6 +48,7 @@ impl error::Error for Error {
             Error::TokenAlreadyDecoded => "Token is already decoded",
             Error::TokenNotEncoded => "Token is not encoded and cannot be used in this context",
             Error::TokenNotDecoded => "Token is not decoded and cannot be used in this context",
+            Error::InvalidService => "Service requested is not in the list of intended audiences",
             Error::JWTError(ref e) => e.description(),
             Error::TokenSerializationError(ref e) => e.description(),
         }
@@ -73,7 +76,10 @@ impl fmt::Display for Error {
 impl<'r> Responder<'r> for Error {
     fn respond(self) -> Result<Response<'r>, Status> {
         error_!("Token Error: {:?}", self);
-        Err(Status::InternalServerError)
+        match self {
+            Error::InvalidService => Err(Status::Forbidden),
+            _ => Err(Status::InternalServerError),
+        }
     }
 }
 
@@ -121,7 +127,7 @@ impl<'r> Responder<'r> for Error {
 ///
 /// Variations for the fields `allowed_origins`, `audience` and `secret` exist. Refer to their type documentation for
 /// examples.
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
     /// The issuer of the token. Usually the URI of the authentication server.
     /// The issuer URI will also be used in the UUID generation of the tokens, and is also the `realm` for
@@ -134,9 +140,8 @@ pub struct Configuration {
     ///
     /// See [`cors::AllowedOrigins`] for serialization examples.
     pub allowed_origins: ::cors::AllowedOrigins,
-    /// The audience intended for your tokens.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub audience: Option<jwt::SingleOrMultiple<jwt::StringOrUri>>,
+    /// The audience intended for your tokens. The `service` request paremeter will be validated against this
+    pub audience: jwt::SingleOrMultiple<jwt::StringOrUri>,
     /// Defaults to `none`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_algorithm: Option<jws::Algorithm>,
@@ -215,14 +220,14 @@ impl<T: Serialize + Deserialize> Token<T> {
                               now: DateTime<UTC>,
                               expiry_duration: Duration,
                               issuer: &str,
-                              audience: &Option<jwt::SingleOrMultiple<jwt::StringOrUri>>)
+                              audience: &jwt::SingleOrMultiple<jwt::StringOrUri>)
                               -> Result<jwt::RegisteredClaims, ::Error> {
         let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| format!("{}", e))?;
 
         Ok(jwt::RegisteredClaims {
                issuer: Some(FromStr::from_str(issuer).map_err(Error::JWTError)?),
                subject: Some(FromStr::from_str(subject).map_err(Error::JWTError)?),
-               audience: audience.clone(),
+               audience: Some(audience.clone()),
                issued_at: Some(now.into()),
                not_before: Some(now.into()),
                expiry: Some((now + expiry_duration).into()),
@@ -230,12 +235,23 @@ impl<T: Serialize + Deserialize> Token<T> {
            })
     }
 
+    fn verify_service(config: &Configuration, service: &str) -> Result<(), Error> {
+        if !config.audience.contains(&FromStr::from_str(service)?) {
+            Err(Error::InvalidService)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Internal token creation that allows for us to override the time `now`. For testing
     fn with_configuration_and_time(config: &Configuration,
                                    subject: &str,
+                                   service: &str,
                                    private_claims: T,
                                    now: DateTime<UTC>)
                                    -> Result<Self, ::Error> {
+
+        Self::verify_service(config, service)?;
         let header = Self::make_header(config.signature_algorithm);
         let registered_claims = Self::make_registered_claims(subject,
                                                              now,
@@ -258,8 +274,12 @@ impl<T: Serialize + Deserialize> Token<T> {
     }
 
     /// Based on the configuration, make a token for the subject, along with some private claims.
-    pub fn with_configuration(config: &Configuration, subject: &str, private_claims: T) -> Result<Self, ::Error> {
-        Self::with_configuration_and_time(config, subject, private_claims, UTC::now())
+    pub fn with_configuration(config: &Configuration,
+                              subject: &str,
+                              service: &str,
+                              private_claims: T)
+                              -> Result<Self, ::Error> {
+        Self::with_configuration_and_time(config, subject, service, private_claims, UTC::now())
     }
 
     /// Consumes self and encode the embedded JWT with signature.
@@ -517,7 +537,6 @@ mod tests {
         }
     }
 
-
     fn make_token() -> Token<TestClaims> {
         Token::new(jwt::jws::Header::default(),
                    jwt::ClaimsSet {
@@ -621,7 +640,7 @@ mod tests {
         let configuration = Configuration {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
-            audience: Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())),
+            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
             signature_algorithm: Some(jwt::jws::Algorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
@@ -631,8 +650,9 @@ mod tests {
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
         let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
                                                                               "Donald Trump",
+                                                                              "https://www.example.com/",
                                                                               Default::default(),
-                                                                              now.clone()));
+                                                                              now));
 
         // Assert registered claims
         let registered = not_err!(token.registered_claims());
@@ -641,9 +661,9 @@ mod tests {
         assert_eq!(registered.subject, Some(FromStr::from_str("Donald Trump").unwrap()));
         assert_eq!(registered.audience,
                    Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())));
-        assert_eq!(registered.issued_at, Some(now.clone().into()));
-        assert_eq!(registered.not_before, Some(now.clone().into()));
-        assert_eq!(registered.expiry, Some(expected_expiry.clone().into()));
+        assert_eq!(registered.issued_at, Some(now.into()));
+        assert_eq!(registered.not_before, Some(now.into()));
+        assert_eq!(registered.expiry, Some(expected_expiry.into()));
 
         // Assert private claims
         let private = not_err!(token.private_claims());
@@ -652,5 +672,28 @@ mod tests {
         // Assert header
         let header = not_err!(token.header());
         assert_eq!(header.algorithm, jwt::jws::Algorithm::HS512);
+    }
+
+    #[test]
+    #[should_panic(expected = "InvalidService")]
+    fn validates_service_correctly() {
+        let allowed_origins = ["https://www.example.com"];
+        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
+        let configuration = Configuration {
+            issuer: "https://www.acme.com".to_string(),
+            allowed_origins: allowed_origins,
+            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
+            signature_algorithm: Some(jwt::jws::Algorithm::HS512),
+            secret: Secret::String("secret".to_string()),
+            expiry_duration: Duration::from_secs(120),
+        };
+
+        let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
+        Token::<TestClaims>::with_configuration_and_time(&configuration,
+                                                         "Donald Trump",
+                                                         "invalid",
+                                                         Default::default(),
+                                                         now)
+                .unwrap();
     }
 }

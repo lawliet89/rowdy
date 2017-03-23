@@ -493,8 +493,7 @@ pub mod tests {
         let rocket = ignite_bearer(Box::new(MockAuthenticator {}));
 
         // Make headers
-        let auth_header =
-            hyper::header::Authorization(Bearer { token: "这样可以挡住他们。".to_string() });
+        let auth_header = hyper::header::Authorization(Bearer { token: "这样可以挡住他们。".to_string() });
         let auth_header = http::Header::new("Authorization",
                                             format!("{}", hyper::header::HeaderFormatter(&auth_header)));
         // Make and dispatch request

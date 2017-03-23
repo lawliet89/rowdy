@@ -19,7 +19,7 @@ clippy_lints = ["clippy"]
 simple_authenticator = ["csv", "ring"]
 
 [dependencies]
-biscuit = { git = "https://github.com/lawliet89/biscuit", rev = "991586cbcfcb2d7c36ee595ad3e522ba85395fc8" }
+biscuit = { git = "https://github.com/lawliet89/biscuit", rev = "991a2f1cb3c5dc0774a132ec3a78fb36530189cc" }
 chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
 log = "0.3"
