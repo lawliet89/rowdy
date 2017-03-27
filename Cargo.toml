@@ -2,6 +2,7 @@
 name = "rowdy"
 version = "0.1.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
+build = "build.rs"
 
 [lib]
 name = "rowdy"
@@ -44,6 +45,10 @@ features = ["json", "uuid"]
 [dev-dependencies]
 serde_test = "0.9"
 rocket = { version = "*", features = ["testing"] }
+
+[build-dependencies]
+ansi_term = "0.9"
+version_check = "0.1"
 
 [workspace]
 members = ["cli"]

@@ -1,7 +1,7 @@
 FROM debian:jessie
 MAINTAINER Yong Wen Chua <me@yongwen.xyz>
 
-ARG RUST_VERSION=nightly-2017-03-13
+ARG RUST_VERSION=nightly-2017-03-26
 
 RUN set -x \
     && apt-get update \

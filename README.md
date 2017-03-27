@@ -9,6 +9,8 @@ A [Rocket](https://rocket.rs/) based JSON Web Token authentication server.
 Rocket requires nightly Rust. You should probably install Rust with [rustup](https://www.rustup.rs/), then override the code directory to use nightly instead of stable. See
 [installation instructions](https://rocket.rs/guide/getting-started/#installing-rust).
 
+In particular, `rowdy` is currently targetted for `nightly-2017-03-26`.
+
 ## Testing
 
 To separate the dependencies of the `library` part of the crate from the `binary` part, the crate is set up
