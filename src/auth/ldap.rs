@@ -57,7 +57,7 @@ pub struct LdapAuthenticator {
     pub bind_password: String,
     /// Base to use when searching for user. `{account}` is expanded to the user's account
     pub search_base: String,
-    /// Filter to use when searching for user. {account}` is expanded to the user's account
+    /// Filter to use when searching for user. `{account}` is expanded to the user's account
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search_filter: Option<String>,
 }
