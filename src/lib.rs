@@ -7,6 +7,7 @@
 //!
 //! - `clippy_lints`: Enable clippy lints during builds
 //! - `simple_authenticator`: A simple CSV based authenticator
+//! - `ldap_authenticator`: An LDAP based authenticator
 //!
 //! By default, the `simple_authenticator` feature is turned on.
 
@@ -35,6 +36,10 @@ extern crate uuid;
 extern crate csv;
 #[cfg(feature = "simple_authenticator")]
 extern crate ring;
+#[cfg(feature = "ldap_authenticator")]
+extern crate openldap;
+#[cfg(feature = "ldap_authenticator")]
+extern crate strfmt;
 
 #[cfg(test)]
 extern crate serde_test;

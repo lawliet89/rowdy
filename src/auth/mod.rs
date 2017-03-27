@@ -19,6 +19,11 @@ pub use self::simple::SimpleAuthenticator;
 #[cfg(feature = "simple_authenticator")]
 pub use self::simple::SimpleAuthenticatorConfiguration;
 
+#[cfg(feature="ldap_authenticator")]
+mod ldap;
+#[cfg(feature="ldap_authenticator")]
+pub use self::ldap::LdapAuthenticator;
+
 /// Re-exported [`hyper::header::Scheme`]
 pub type Scheme = hyper::header::Scheme<Err = hyper::error::Error>;
 /// Re-exported [`hyper::header::Basic`].

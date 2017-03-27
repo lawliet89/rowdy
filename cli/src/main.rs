@@ -37,6 +37,8 @@ The subcommands will change the format expected by the `basic_authenticator` key
   - noop: The key is expected to be simply an empty map: i.e. `{}`
   - csv: The key should behave according to the format documented at
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.SimpleAuthenticatorConfiguration.html
+  - ldap: The key should behave according to the format documented at
+    https://lawliet89.github.io/rowdy/rowdy/auth/struct.LdapAuthenticator.html
 
 Options:
   -h --help                 Show this screen.
@@ -47,6 +49,7 @@ struct Args {
     arg_configuration_json: String,
     cmd_noop: bool,
     cmd_csv: bool,
+    cmd_ldap: bool,
 }
 
 fn main() {
@@ -56,6 +59,8 @@ fn main() {
         ignite::<auth::NoOpConfiguration>(&args.arg_configuration_json)
     } else if args.cmd_csv {
         ignite::<auth::SimpleAuthenticatorConfiguration>(&args.arg_configuration_json)
+    } else if args.cmd_ldap {
+        ignite::<auth::LdapAuthenticator>(&args.arg_configuration_json)
     } else {
         unreachable!("Should never happen");
     };
@@ -104,5 +109,10 @@ mod tests {
     #[test]
     fn ignite_csv() {
         ignite::<auth::NoOpConfiguration>("test/fixtures/config_csv.json").unwrap();
+    }
+
+    #[test]
+    fn ignite_ldap() {
+        ignite::<auth::NoOpConfiguration>("test/fixtures/config_ldap.json").unwrap();
     }
 }

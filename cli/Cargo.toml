@@ -14,7 +14,7 @@ docopt = "0.7"
 log = "0.3"
 rocket = "0.2.2"
 rocket_codegen = "0.2.2"
-rowdy = { path = "../" }
+rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
 rustc-serialize = "0.3"
 serde = "0.9"
 serde_json = "0.9"
