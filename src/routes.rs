@@ -39,13 +39,13 @@ struct AuthParam {
 // mounted via `::launch()`
 #[options("/?<_auth_param>")]
 #[allow(needless_pass_by_value)]
-fn token_getter_options(origin: cors::Origin,
+fn token_getter_options(origin: Option<cors::Origin>,
                         method: cors::AccessControlRequestMethod,
                         headers: cors::AccessControlRequestHeaders,
                         options: State<TokenGetterCorsOptions>,
                         _auth_param: AuthParam)
                         -> Result<cors::Response<()>, cors::Error> {
-    options.preflight(&origin, &method, Some(&headers))
+    options.preflight(origin, &method, Some(&headers))
 }
 
 /// Token retrieval route
@@ -53,7 +53,7 @@ fn token_getter_options(origin: cors::Origin,
 // mounted via `::launch()`
 #[get("/?<auth_param>")]
 #[allow(needless_pass_by_value)]
-fn token_getter(origin: cors::Origin,
+fn token_getter(origin: Option<cors::Origin>,
                 authorization: Option<auth::Authorization<auth::Basic>>,
                 auth_param: AuthParam,
                 configuration: State<Configuration>,
@@ -67,7 +67,7 @@ fn token_getter(origin: cors::Origin,
                                                               &auth_param.service,
                                                               Default::default())?;
         let token = token.encode(configuration.secret.for_signing()?)?;
-        Ok(cors_options.respond(token, &origin)?)
+        Ok(cors_options.respond(token, origin)?)
     })
 }
 

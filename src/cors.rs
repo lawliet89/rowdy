@@ -24,19 +24,19 @@
 //! use rowdy::cors::*;
 //!
 //! #[options("/")]
-//! fn cors_options(origin: Origin,
+//! fn cors_options(origin: Option<Origin>,
 //!                 method: AccessControlRequestMethod,
 //!                 headers: AccessControlRequestHeaders,
 //!                 options: State<cors::Options>)
 //!                 -> Result<Response<()>, Error> {
-//!     options.preflight(&origin, &method, Some(&headers))
+//!     options.preflight(origin, &method, Some(&headers))
 //! }
 //!
 //! #[get("/")]
-//! fn cors(origin: Origin, options: State<cors::Options>)
+//! fn cors(origin: Option<Origin>, options: State<cors::Options>)
 //!         -> Result<Response<&'static str>, Error>
 //! {
-//!     options.respond("Hello CORS", &origin)
+//!     options.respond("Hello CORS", origin)
 //! }
 //!
 //! # fn main() {
@@ -159,7 +159,9 @@ impl<'r> Responder<'r> for Error {
     fn respond(self) -> Result<response::Response<'r>, Status> {
         error_!("CORS Error: {:?}", self);
         Err(match self {
-                Error::OriginNotAllowed | Error::MethodNotAllowed | Error::HeadersNotAllowed => Status::Forbidden,
+                Error::MissingOrigin | Error::OriginNotAllowed | Error::MethodNotAllowed | Error::HeadersNotAllowed => {
+                    Status::Forbidden
+                }
                 _ => Status::BadRequest,
             })
     }
@@ -189,7 +191,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Origin {
                     Err(e) => Outcome::Failure((Status::BadRequest, Error::BadOrigin(e))),
                 }
             }
-            None => Outcome::Failure((Status::Forbidden, Error::MissingOrigin)),
+            None => Outcome::Forward(()),
         }
     }
 }
@@ -371,27 +373,33 @@ impl Options {
     /// Construct a preflight response based on the options. Will return an `Err` if any of the preflight checks
     /// fail.
     pub fn preflight(&self,
-                     origin: &Origin,
+                     origin: Option<Origin>,
                      method: &AccessControlRequestMethod,
                      headers: Option<&AccessControlRequestHeaders>)
                      -> Result<Response<()>, Error> {
 
 
-        let response = Response::<()>::allowed_origin((), origin, &self.allowed_origins)?
-            .allowed_methods(method, self.allowed_methods.clone())?;
+        match origin {
+            None => Err(Error::MissingOrigin),
+            Some(origin) => {
+                let response = Response::<()>::allowed_origin((), &origin, &self.allowed_origins)?
+                    .allowed_methods(method, self.allowed_methods.clone())?;
 
-        match headers {
-            Some(headers) => self.append(response.allowed_headers(headers, &self.allowed_headers)),
-            None => Ok(response),
+                match headers {
+                    Some(headers) => self.append(response.allowed_headers(headers, &self.allowed_headers)),
+                    None => Ok(response),
+                }
+            }
         }
     }
 
     /// Respond to a request based on the settings.
-    /// If the `Origin` is not provided, then this request was not made by a browser and we can ignore it.
+    /// If the `Origin` is not provided, then this request was not made by a browser and there is no
+    /// CORS enforcement.
     pub fn respond<'r, R: Responder<'r>>(&self, responder: R, origin: Option<Origin>) -> Result<Response<R>, Error> {
         match origin {
-            None => responder.respond()?,
-            Some(origin) => self.append(Response::<R>::allowed_origin(responder, origin, &self.allowed_origins))
+            None => Ok(Response::<R>::any(responder)),
+            Some(origin) => self.append(Response::<R>::allowed_origin(responder, &origin, &self.allowed_origins)),
         }
     }
 
@@ -723,18 +731,18 @@ X-Ping, accept-language"#;
 
     #[options("/")]
     #[allow(needless_pass_by_value)]
-    fn cors_options(origin: Origin,
+    fn cors_options(origin: Option<Origin>,
                     method: AccessControlRequestMethod,
                     headers: AccessControlRequestHeaders,
                     options: State<cors::Options>)
                     -> Result<Response<()>, Error> {
-        options.preflight(&origin, &method, Some(&headers))
+        options.preflight(origin, &method, Some(&headers))
     }
 
     #[get("/")]
     #[allow(needless_pass_by_value)]
-    fn cors(origin: Origin, options: State<cors::Options>) -> Result<Response<&'static str>, Error> {
-        options.respond("Hello CORS", &origin)
+    fn cors(origin: Option<Origin>, options: State<cors::Options>) -> Result<Response<&'static str>, Error> {
+        options.respond("Hello CORS", origin)
     }
 
     fn make_cors_options() -> cors::Options {
@@ -780,6 +788,20 @@ X-Ping, accept-language"#;
         assert_eq!(body_str, Some("Hello CORS".to_string()));
     }
 
+    /// This test is to check that non CORS compliant requests to GET should still work. (i.e. curl)
+    #[test]
+    fn cors_get_no_origin() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let authorization = Header::new("Authorization", "let me in");
+        let mut req = MockRequest::new(Get, "/").header(authorization);
+
+        let mut response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Ok);
+        let body_str = response.body().and_then(|body| body.into_string());
+        assert_eq!(body_str, Some("Hello CORS".to_string()));
+    }
+
     #[test]
     fn cors_options_bad_origin() {
         let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
@@ -791,6 +813,20 @@ X-Ping, accept-language"#;
         let request_headers = Header::from(request_headers);
         let mut req =
             MockRequest::new(Options, "/").header(origin_header).header(method_header).header(request_headers);
+
+        let response = req.dispatch_with(&rocket);
+        assert_eq!(response.status(), Status::Forbidden);
+    }
+
+    #[test]
+    fn cors_options_missing_origin() {
+        let rocket = rocket::ignite().mount("/", routes![cors, cors_options]).manage(make_cors_options());
+
+        let method_header = Header::from(hyper::header::AccessControlRequestMethod(hyper::method::Method::Get));
+        let request_headers = hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization")
+                                                                                  .unwrap()]);
+        let request_headers = Header::from(request_headers);
+        let mut req = MockRequest::new(Options, "/").header(method_header).header(request_headers);
 
         let response = req.dispatch_with(&rocket);
         assert_eq!(response.status(), Status::Forbidden);
