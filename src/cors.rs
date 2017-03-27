@@ -386,9 +386,13 @@ impl Options {
         }
     }
 
-    /// Respond to a request based on the settings
-    pub fn respond<'r, R: Responder<'r>>(&self, responder: R, origin: &Origin) -> Result<Response<R>, Error> {
-        self.append(Response::<R>::allowed_origin(responder, origin, &self.allowed_origins))
+    /// Respond to a request based on the settings.
+    /// If the `Origin` is not provided, then this request was not made by a browser and we can ignore it.
+    pub fn respond<'r, R: Responder<'r>>(&self, responder: R, origin: Option<Origin>) -> Result<Response<R>, Error> {
+        match origin {
+            None => responder.respond()?,
+            Some(origin) => self.append(Response::<R>::allowed_origin(responder, origin, &self.allowed_origins))
+        }
     }
 
     fn append<'r, R: Responder<'r>>(&self, response: Result<Response<R>, Error>) -> Result<Response<R>, Error> {
