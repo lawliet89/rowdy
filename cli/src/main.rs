@@ -21,6 +21,7 @@ rowdy JSON Web Token Authentication Server
 Usage:
   rowdy noop <configuration-json>
   rowdy csv <configuration-json>
+  rowdy ldap <configuration-json>
   rowdy (-h | --help)
 
 Provide a configuration JSON file to run `rowdy` with. For available fields and examples for the JSON
