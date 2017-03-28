@@ -45,7 +45,7 @@ Options:
   -h --help                 Show this screen.
 "#;
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, RustcDecodable, PartialEq)]
 struct Args {
     arg_configuration_json: String,
     cmd_noop: bool,
@@ -115,5 +115,58 @@ mod tests {
     #[test]
     fn ignite_ldap() {
         ignite::<auth::NoOpConfiguration>("test/fixtures/config_ldap.json").unwrap();
+    }
+
+    #[test]
+    fn docopt_usage_string_parsing() {
+        Docopt::new(USAGE).unwrap();
+    }
+
+    #[test]
+    fn docopt_noop() {
+        let docopt = Docopt::new(USAGE).unwrap();
+        let docopt = docopt.argv(["rowdy", "noop", "test/fixtures/config/noop.json"].iter());
+        let args = docopt.decode().unwrap();
+
+        let expected_args = Args {
+            arg_configuration_json: "test/fixtures/config/noop.json".to_string(),
+            cmd_noop: true,
+            cmd_csv: false,
+            cmd_ldap: false,
+        };
+
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn docopt_csv() {
+        let docopt = Docopt::new(USAGE).unwrap();
+        let docopt = docopt.argv(["rowdy", "csv", "test/fixtures/config/csv.json"].iter());
+        let args = docopt.decode().unwrap();
+
+        let expected_args = Args {
+            arg_configuration_json: "test/fixtures/config/csv.json".to_string(),
+            cmd_noop: false,
+            cmd_csv: true,
+            cmd_ldap: false,
+        };
+
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn docopt_ldap() {
+        let docopt = Docopt::new(USAGE).unwrap();
+        let docopt = docopt.argv(["rowdy", "ldap", "test/fixtures/config/ldap.json"].iter());
+        let args = docopt.decode().unwrap();
+
+        let expected_args = Args {
+            arg_configuration_json: "test/fixtures/config/ldap.json".to_string(),
+            cmd_noop: false,
+            cmd_csv: false,
+            cmd_ldap: true,
+        };
+
+        assert_eq!(expected_args, args);
     }
 }
