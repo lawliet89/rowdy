@@ -74,7 +74,7 @@ impl SimpleAuthenticator {
     /// ```
     pub fn with_csv_file(salt: &[u8], path: &str, has_headers: bool, delimiter: u8) -> Result<Self, Error> {
         let reader = csv::Reader::from_file(path)
-            .map_err(|e| format!("{}", e))?
+            .map_err(|e| e.to_string())?
             .has_headers(has_headers)
             .delimiter(delimiter);
         Self::new(salt, reader)
@@ -84,7 +84,7 @@ impl SimpleAuthenticator {
         let records: Vec<csv::Result<(String, String)>> = csv.decode().collect();
 
         if let Some(error) = records.iter().find(|record| record.is_err()) {
-            error.as_ref().map_err(|e| format!("{}", e))?;
+            error.as_ref().map_err(|e| e.to_string())?;
         }
 
         let users: HashMap<String, Result<Vec<u8>, String>> = records.iter()

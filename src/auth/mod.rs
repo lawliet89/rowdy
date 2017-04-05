@@ -1,5 +1,4 @@
 //! Authentication module, including traits for identity provider and `Responder`s for authentication.
-use std::convert::From;
 use std::error;
 use std::fmt;
 
@@ -246,7 +245,7 @@ impl Authorization<String> {
 ///                                                     password: Some("冻住，不许走!".to_string()),
 ///                                                 });
 /// let auth_header = http::Header::new("Authorization",
-///                                     format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+///                                     hyper::header::HeaderFormatter(&auth_header).to_string());
 /// // Make and dispatch request
 /// let mut req = MockRequest::new(Get, "/").header(auth_header);
 /// let response = req.dispatch_with(&rocket);
@@ -429,7 +428,7 @@ pub mod tests {
                                          });
         let mut request = Request::new(rocket::http::Method::Get, "/");
         let header = rocket::http::Header::new(header::Authorization::<Basic>::header_name(),
-                                               format!("{}", HeaderFormatter(&auth)));
+                                               HeaderFormatter(&auth).to_string());
         request.add_header(header);
         let outcome: request::Outcome<::auth::Authorization<Basic>, ::auth::Error> =
             FromRequest::from_request(&request);
@@ -446,7 +445,7 @@ pub mod tests {
         let auth = header::Authorization(Bearer { token: "token".to_string() });
         let mut request = Request::new(rocket::http::Method::Get, "/");
         let header = rocket::http::Header::new(header::Authorization::<Bearer>::header_name(),
-                                               format!("{}", HeaderFormatter(&auth)));
+                                               HeaderFormatter(&auth).to_string());
         request.add_header(header);
         let outcome: request::Outcome<::auth::Authorization<Bearer>, ::auth::Error> =
             FromRequest::from_request(&request);
@@ -462,7 +461,7 @@ pub mod tests {
         let auth = header::Authorization("hello".to_string());
         let mut request = Request::new(rocket::http::Method::Get, "/");
         let header = rocket::http::Header::new(header::Authorization::<String>::header_name(),
-                                               format!("{}", HeaderFormatter(&auth)));
+                                               HeaderFormatter(&auth).to_string());
         request.add_header(header);
         let outcome: request::Outcome<::auth::Authorization<String>, ::auth::Error> =
             FromRequest::from_request(&request);
@@ -483,7 +482,7 @@ pub mod tests {
                                                            password: Some("冻住，不许走!".to_string()),
                                                        });
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -500,7 +499,7 @@ pub mod tests {
         // Make headers
         let auth_header = hyper::header::Authorization(Bearer { token: "这样可以挡住他们。".to_string() });
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -517,7 +516,7 @@ pub mod tests {
         // Make headers
         let auth_header = hyper::header::Authorization("哦，对不起啦。".to_string());
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -538,7 +537,7 @@ pub mod tests {
                                                            password: Some("let me in".to_string()),
                                                        });
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -556,7 +555,7 @@ pub mod tests {
         // Make headers
         let auth_header = hyper::header::Authorization(Bearer { token: "bad".to_string() });
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -574,7 +573,7 @@ pub mod tests {
         // Make headers
         let auth_header = hyper::header::Authorization("bad".to_string());
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -611,7 +610,7 @@ pub mod tests {
                                                            password: Some("let me in".to_string()),
                                                        });
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -628,7 +627,7 @@ pub mod tests {
         // Make headers
         let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -645,7 +644,7 @@ pub mod tests {
         // Make headers
         let auth_header = hyper::header::Authorization("anything goes".to_string());
         let auth_header = http::Header::new("Authorization",
-                                            format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                            hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);

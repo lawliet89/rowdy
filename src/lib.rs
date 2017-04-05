@@ -179,13 +179,13 @@ impl Deserialize for Url {
             fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
                 where E: de::Error
             {
-                Ok(Url(hyper::Url::from_str(&value).map_err(|e| E::custom(format!("{}", e)))?))
+                Ok(Url(hyper::Url::from_str(&value).map_err(|e| E::custom(e.to_string()))?))
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
                 where E: de::Error
             {
-                Ok(Url(hyper::Url::from_str(value).map_err(|e| E::custom(format!("{}", e)))?))
+                Ok(Url(hyper::Url::from_str(value).map_err(|e| E::custom(e.to_string()))?))
             }
         }
 
@@ -312,7 +312,6 @@ pub fn launch<B: auth::AuthenticatorConfiguration<auth::Basic>>(config: Configur
 
 #[cfg(test)]
 mod tests {
-    use std::default::Default;
     use std::str::FromStr;
 
     use serde_test::{Token, assert_tokens};

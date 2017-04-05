@@ -14,21 +14,21 @@ use super::{Basic, Error};
 /// Error mapping for `LDAPError`
 impl From<LDAPError> for Error {
     fn from(ldap_error: LDAPError) -> Error {
-        Error::GenericError(format!("{}", ldap_error))
+        Error::GenericError(ldap_error.to_string())
     }
 }
 
 /// Error mapping for `LDAPError`
 impl From<LDAPError> for ::Error {
     fn from(ldap_error: LDAPError) -> ::Error {
-        ::Error::GenericError(format!("{}", ldap_error))
+        ::Error::GenericError(ldap_error.to_string())
     }
 }
 
 /// Error mapping for `FmtError`
 impl From<FmtError> for Error {
     fn from(e: FmtError) -> Error {
-        Error::GenericError(format!("{}", e))
+        Error::GenericError(e.to_string())
     }
 }
 

@@ -222,7 +222,7 @@ impl<T: Serialize + Deserialize> Token<T> {
                               issuer: &str,
                               audience: &jwt::SingleOrMultiple<jwt::StringOrUri>)
                               -> Result<jwt::RegisteredClaims, ::Error> {
-        let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| format!("{}", e))?;
+        let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| e.to_string())?;
 
         Ok(jwt::RegisteredClaims {
                issuer: Some(FromStr::from_str(issuer).map_err(Error::JWTError)?),
@@ -513,7 +513,6 @@ impl Secret {
 
 #[cfg(test)]
 mod tests {
-    use std::default::Default;
     use std::time::Duration;
 
     use chrono::{DateTime, NaiveDateTime, UTC};

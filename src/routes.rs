@@ -147,7 +147,7 @@ mod tests {
                                                            password: Some("冻住，不许走!".to_string()),
                                                        });
         let auth_header = Header::new("Authorization",
-                                      format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                      hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
             .header(origin_header)
@@ -188,7 +188,7 @@ mod tests {
                                                            password: Some("let me in".to_string()),
                                                        });
         let auth_header = Header::new("Authorization",
-                                      format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                      hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
             .header(origin_header)
@@ -232,7 +232,7 @@ mod tests {
                                                            password: Some("冻住，不许走!".to_string()),
                                                        });
         let auth_header = Header::new("Authorization",
-                                      format!("{}", hyper::header::HeaderFormatter(&auth_header)));
+                                      hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/?service=foobar&scope=all").header(origin_header).header(auth_header);
         let response = req.dispatch_with(&rocket);

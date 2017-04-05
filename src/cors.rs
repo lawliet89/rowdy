@@ -13,7 +13,6 @@
 //! extern crate rocket;
 //! extern crate rowdy;
 //!
-//! use std::default::Default;
 //! use std::str::FromStr;
 //!
 //! use rocket::State;
@@ -80,7 +79,6 @@
 //! ```
 
 use std::collections::{HashSet, HashMap};
-use std::default::Default;
 use std::error;
 use std::fmt;
 use std::ops::Deref;
