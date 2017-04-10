@@ -87,7 +87,8 @@ impl SimpleAuthenticator {
             error.as_ref().map_err(|e| e.to_string())?;
         }
 
-        let users: HashMap<String, Result<Vec<u8>, String>> = records.iter()
+        let users: HashMap<String, Result<Vec<u8>, String>> = records
+            .iter()
             .map(|r| {
                      let &(ref username, ref hash) = r.as_ref().unwrap(); // safe to unwrap
                      (username.to_string(), test::from_hex(hash))
@@ -99,7 +100,10 @@ impl SimpleAuthenticator {
             error.as_ref().map_err(|e| e.to_string())?;
         }
 
-        Ok(users.into_iter().map(|(u, h)| (u, h.unwrap())).collect())
+        Ok(users
+               .into_iter()
+               .map(|(u, h)| (u, h.unwrap()))
+               .collect())
     }
 
     /// Hash a password with the salt. See struct level documentation for the algorithm used.
@@ -144,7 +148,9 @@ impl SimpleAuthenticator {
 impl super::Authenticator<Basic> for SimpleAuthenticator {
     fn authenticate(&self, authorization: &super::Authorization<Basic>) -> Result<(), Error> {
         let username = authorization.username();
-        let password = authorization.password().unwrap_or_else(|| "".to_string());
+        let password = authorization
+            .password()
+            .unwrap_or_else(|| "".to_string());
         self.verify(&username, &password)
     }
 }
@@ -199,13 +205,12 @@ mod tests {
     use super::*;
 
     fn make_authenticator() -> SimpleAuthenticator {
-        not_err!(SimpleAuthenticator::with_csv_file(b"salty", "test/fixtures/users.csv", false, ',' as u8))
+        not_err!(SimpleAuthenticator::with_csv_file(b"salty", "test/fixtures/users.csv", false, b','))
     }
 
     #[test]
     fn test_hex_dump() {
-        assert_eq!(SimpleAuthenticator::hex_dump("foobar".as_bytes()),
-                   "666f6f626172");
+        assert_eq!(SimpleAuthenticator::hex_dump(b"foobar"), "666f6f626172");
     }
 
     #[test]
@@ -236,10 +241,7 @@ mod tests {
     fn smoke_test() {
         let authenticator = make_authenticator();
         let expected_keys = vec!["foobar".to_string(), "mei".to_string()];
-        let mut actual_keys: Vec<String> = authenticator.users
-            .keys()
-            .cloned()
-            .collect();
+        let mut actual_keys: Vec<String> = authenticator.users.keys().cloned().collect();
         actual_keys.sort();
         assert_eq!(expected_keys, actual_keys);
 

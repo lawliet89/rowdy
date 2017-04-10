@@ -179,13 +179,15 @@ impl Deserialize for Url {
             fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
                 where E: de::Error
             {
-                Ok(Url(hyper::Url::from_str(&value).map_err(|e| E::custom(e.to_string()))?))
+                Ok(Url(hyper::Url::from_str(&value)
+                           .map_err(|e| E::custom(e.to_string()))?))
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
                 where E: de::Error
             {
-                Ok(Url(hyper::Url::from_str(value).map_err(|e| E::custom(e.to_string()))?))
+                Ok(Url(hyper::Url::from_str(value)
+                           .map_err(|e| E::custom(e.to_string()))?))
             }
         }
 
@@ -267,7 +269,10 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
         let basic_authenticator = self.basic_authenticator.make_authenticator()?;
         let basic_authenticator: Box<auth::BasicAuthenticator> = Box::new(basic_authenticator);
 
-        Ok(rocket::ignite().manage(self.token).manage(token_getter_cors_options).manage(basic_authenticator))
+        Ok(rocket::ignite()
+               .manage(self.token)
+               .manage(token_getter_cors_options)
+               .manage(basic_authenticator))
     }
 }
 

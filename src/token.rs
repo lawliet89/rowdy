@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use chrono::{self, DateTime, UTC};
-use jwt::{self, jws};
+use jwt::{self, jws, jwa};
 use rocket::http::{ContentType, Status};
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Deserialize};
@@ -144,7 +144,7 @@ pub struct Configuration {
     pub audience: jwt::SingleOrMultiple<jwt::StringOrUri>,
     /// Defaults to `none`
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature_algorithm: Option<jws::Algorithm>,
+    pub signature_algorithm: Option<jwa::SignatureAlgorithm>,
     /// Secrets for use in signing and encrypting a JWT.
     /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
     /// Defaults to `None`.
@@ -171,9 +171,9 @@ pub struct PrivateClaim {}
 /// Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
 /// to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub struct Token<T: Serialize + Deserialize> {
+pub struct Token<T: Serialize + Deserialize + 'static> {
     /// Tne encapsulated JWT.
-    pub token: jwt::JWT<T>,
+    pub token: jwt::JWT<T, jwt::Empty>,
     /// The duration from `issued_at` where the token will expire
     #[serde(with = "::serde_custom::duration")]
     pub expires_in: Duration,
@@ -197,9 +197,9 @@ impl<T> Clone for Token<T>
     }
 }
 
-impl<T: Serialize + Deserialize> Token<T> {
+impl<T: Serialize + Deserialize + 'static> Token<T> {
     /// Convenience method to create a new token issued `Now`.
-    pub fn new(header: jws::Header, claims_set: jwt::ClaimsSet<T>, expires_in: &Duration) -> Self {
+    pub fn new(header: jws::Header<jwt::Empty>, claims_set: jwt::ClaimsSet<T>, expires_in: &Duration) -> Self {
         Token {
             token: jwt::JWT::new_decoded(header, claims_set),
             expires_in: *expires_in,
@@ -212,8 +212,12 @@ impl<T: Serialize + Deserialize> Token<T> {
         Uuid::new_v5(&uuid::NAMESPACE_URL, uri)
     }
 
-    fn make_header(signature_algorithm: Option<jws::Algorithm>) -> jws::Header {
-        jws::Header { algorithm: signature_algorithm.unwrap_or_else(|| jws::Algorithm::None), ..Default::default() }
+    fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Header<jwt::Empty> {
+        let registered = jws::RegisteredHeader {
+            algorithm: signature_algorithm.unwrap_or_else(|| jwa::SignatureAlgorithm::None),
+            ..Default::default()
+        };
+        jws::Header::from_registered_header(registered)
     }
 
     fn make_registered_claims(subject: &str,
@@ -222,7 +226,8 @@ impl<T: Serialize + Deserialize> Token<T> {
                               issuer: &str,
                               audience: &jwt::SingleOrMultiple<jwt::StringOrUri>)
                               -> Result<jwt::RegisteredClaims, ::Error> {
-        let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| e.to_string())?;
+        let expiry_duration = chrono::Duration::from_std(expiry_duration)
+            .map_err(|e| e.to_string())?;
 
         Ok(jwt::RegisteredClaims {
                issuer: Some(FromStr::from_str(issuer).map_err(Error::JWTError)?),
@@ -286,8 +291,8 @@ impl<T: Serialize + Deserialize> Token<T> {
     /// If the JWT is already encoded, this returns an error
     pub fn encode(mut self, secret: jws::Secret) -> Result<Self, Error> {
         match self.token {
-            jwt::JWT::Encoded(_) => Err(Error::TokenAlreadyEncoded),
-            jwt @ jwt::JWT::Decoded { .. } => {
+            jwt::jws::Compact::Encoded(_) => Err(Error::TokenAlreadyEncoded),
+            jwt @ jwt::jws::Compact::Decoded { .. } => {
                 self.token = jwt.into_encoded(secret)?;
                 Ok(self)
             }
@@ -296,18 +301,18 @@ impl<T: Serialize + Deserialize> Token<T> {
 
     /// Consumes self and decode the embedded JWT with signature verification
     /// If the JWT is already decoded, this returns an error
-    pub fn decode(mut self, secret: jws::Secret, algorithm: jws::Algorithm) -> Result<Self, Error> {
+    pub fn decode(mut self, secret: jws::Secret, algorithm: jwa::SignatureAlgorithm) -> Result<Self, Error> {
         match self.token {
-            jwt @ jwt::JWT::Encoded(_) => {
+            jwt @ jwt::jws::Compact::Encoded(_) => {
                 self.token = jwt.into_decoded(secret, algorithm)?;
                 Ok(self)
             }
-            jwt::JWT::Decoded { .. } => Err(Error::TokenAlreadyDecoded),
+            jwt::jws::Compact::Decoded { .. } => Err(Error::TokenAlreadyDecoded),
         }
     }
 
     fn serialize_and_respond(self) -> Result<String, Error> {
-        if let jwt::JWT::Decoded { .. } = self.token {
+        if let jwt::jws::Compact::Decoded { .. } = self.token {
             Err(Error::TokenNotEncoded)?
         }
         let serialized = serde_json::to_string(&self)?;
@@ -317,8 +322,8 @@ impl<T: Serialize + Deserialize> Token<T> {
     /// Returns whether the wrapped token is decoded
     pub fn is_decoded(&self) -> bool {
         match self.token {
-            jwt::JWT::Encoded(_) => false,
-            jwt::JWT::Decoded { .. } => true,
+            jwt::jws::Compact::Encoded(_) => false,
+            jwt::jws::Compact::Decoded { .. } => true,
         }
     }
 
@@ -330,11 +335,11 @@ impl<T: Serialize + Deserialize> Token<T> {
     /// Convenience function to extract the registered claims from a decoded token
     pub fn registered_claims(&self) -> Result<&jwt::RegisteredClaims, ::Error> {
         match self.token {
-            jwt::JWT::Encoded(_) => Err(Error::TokenNotDecoded)?,
-            ref jwt @ jwt::JWT::Decoded { .. } => {
+            jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
+            ref jwt @ jwt::jws::Compact::Decoded { .. } => {
                 Ok(match_extract!(*jwt,
-                                 jwt::JWT::Decoded {
-                                     claims_set: jwt::ClaimsSet { ref registered, .. },
+                                 jwt::jws::Compact::Decoded {
+                                     payload: jwt::ClaimsSet { ref registered, .. },
                                      ..
                                  },
                                  registered)?)
@@ -345,11 +350,11 @@ impl<T: Serialize + Deserialize> Token<T> {
     /// Conveneince function to extract the private claims from a decoded token
     pub fn private_claims(&self) -> Result<&T, ::Error> {
         match self.token {
-            jwt::JWT::Encoded(_) => Err(Error::TokenNotDecoded)?,
-            ref jwt @ jwt::JWT::Decoded { .. } => {
+            jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
+            ref jwt @ jwt::jws::Compact::Decoded { .. } => {
                 Ok(match_extract!(*jwt,
-                                 jwt::JWT::Decoded {
-                                     claims_set: jwt::ClaimsSet { ref private, .. },
+                                 jwt::jws::Compact::Decoded {
+                                     payload: jwt::ClaimsSet { ref private, .. },
                                      ..
                                  },
                                  private)?)
@@ -358,12 +363,12 @@ impl<T: Serialize + Deserialize> Token<T> {
     }
 
     /// Convenience function to extract the headers from a decoded token
-    pub fn header(&self) -> Result<&jwt::jws::Header, ::Error> {
+    pub fn header(&self) -> Result<&jwt::jws::Header<jwt::Empty>, ::Error> {
         match self.token {
-            jwt::JWT::Encoded(_) => Err(Error::TokenNotDecoded)?,
-            ref jwt @ jwt::JWT::Decoded { .. } => {
+            jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
+            ref jwt @ jwt::jws::Compact::Decoded { .. } => {
                 Ok(match_extract!(*jwt,
-                                 jwt::JWT::Decoded {
+                                 jwt::jws::Compact::Decoded {
                                      ref header,
                                      ..
                                  },
@@ -373,18 +378,20 @@ impl<T: Serialize + Deserialize> Token<T> {
     }
 
     /// Convenience mthod to extract the encoded token
-    pub fn encoded_token(&self) -> Result<&str, ::Error> {
-        match self.token {
-            jwt::JWT::Decoded { .. } => Err(Error::TokenNotEncoded)?,
-            jwt::JWT::Encoded(ref encoded) => Ok(encoded),
-        }
+    pub fn encoded_token(&self) -> Result<String, ::Error> {
+        Ok(self.token.encoded().map_err(Error::JWTError)?)
     }
 }
 
 impl<'r, T: Serialize + Deserialize> Responder<'r> for Token<T> {
     fn respond(self) -> Result<Response<'r>, Status> {
         match self.serialize_and_respond() {
-            Ok(serialized) => Response::build().header(ContentType::JSON).sized_body(Cursor::new(serialized)).ok(),
+            Ok(serialized) => {
+                Response::build()
+                    .header(ContentType::JSON)
+                    .sized_body(Cursor::new(serialized))
+                    .ok()
+            }
             Err(e) => Err::<String, Error>(e).respond(),
         }
     }
@@ -562,15 +569,18 @@ mod tests {
     fn panics_when_encoding_encoded() {
         let token = make_token();
         let token = not_err!(token.encode(jwt::jws::Secret::bytes_from_str("secret")));
-        token.encode(jwt::jws::Secret::bytes_from_str("secret")).unwrap();
+        token
+            .encode(jwt::jws::Secret::bytes_from_str("secret"))
+            .unwrap();
     }
 
     #[test]
     #[should_panic(expected = "TokenAlreadyDecoded")]
     fn panics_when_decoding_decoded() {
         let token = make_token();
-        token.decode(jwt::jws::Secret::bytes_from_str("secret"),
-                     Default::default())
+        token
+            .decode(jwt::jws::Secret::bytes_from_str("secret"),
+                    Default::default())
             .unwrap();
     }
 
@@ -640,7 +650,7 @@ mod tests {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
             audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
-            signature_algorithm: Some(jwt::jws::Algorithm::HS512),
+            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
         };
@@ -670,7 +680,7 @@ mod tests {
 
         // Assert header
         let header = not_err!(token.header());
-        assert_eq!(header.algorithm, jwt::jws::Algorithm::HS512);
+        assert_eq!(header.registered.algorithm, jwt::jwa::SignatureAlgorithm::HS512);
     }
 
     #[test]
@@ -682,7 +692,7 @@ mod tests {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
             audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
-            signature_algorithm: Some(jwt::jws::Algorithm::HS512),
+            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
         };

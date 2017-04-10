@@ -89,7 +89,10 @@ impl LdapAuthenticator {
 
     /// Search for the specified account in the directory
     fn search(&self, connection: &RustLDAP, account: &str) -> Result<LDAPResponse, Error> {
-        let account: HashMap<String, String> = [("account".to_string(), account.to_string())].iter().cloned().collect();
+        let account: HashMap<String, String> = [("account".to_string(), account.to_string())]
+            .iter()
+            .cloned()
+            .collect();
         let search_base = strfmt(&self.search_base, &account)?;
         let search_filter = match self.search_filter {
             None => None,
@@ -97,15 +100,16 @@ impl LdapAuthenticator {
         };
 
         let search_attrs_vec = vec!["cn", "dn"];
-        let results = connection.ldap_search(&search_base,
-                                             scopes::LDAP_SCOPE_SUBTREE,
-                                             search_filter.as_ref().map(|s| &**s),
-                                             Some(search_attrs_vec),
-                                             false,
-                                             None,
-                                             None,
-                                             ptr::null_mut(),
-                                             -1)?;
+        let results = connection
+            .ldap_search(&search_base,
+                         scopes::LDAP_SCOPE_SUBTREE,
+                         search_filter.as_ref().map(|s| &**s),
+                         Some(search_attrs_vec),
+                         false,
+                         None,
+                         None,
+                         ptr::null_mut(),
+                         -1)?;
 
         Ok(results)
     }
@@ -116,7 +120,8 @@ impl LdapAuthenticator {
             // First, we search for the user
             let connection = self.connect()?;
             self.searcher_bind(&connection)?;
-            let user = self.search(&connection, username).map_err(|_e| Error::AuthenticationFailure)?;
+            let user = self.search(&connection, username)
+                .map_err(|_e| Error::AuthenticationFailure)?;
             if user.len() != 1 {
                 Err(Error::AuthenticationFailure)?;
             }
@@ -127,7 +132,8 @@ impl LdapAuthenticator {
         {
             // Attempt a bind with the user's DN and password
             let connection = self.connect()?;
-            self.bind(&connection, &user_dn, password).map_err(|_e| Error::AuthenticationFailure)?;
+            self.bind(&connection, &user_dn, password)
+                .map_err(|_e| Error::AuthenticationFailure)?;
         }
 
         Ok(())
@@ -137,7 +143,9 @@ impl LdapAuthenticator {
 impl super::Authenticator<Basic> for LdapAuthenticator {
     fn authenticate(&self, authorization: &super::Authorization<Basic>) -> Result<(), Error> {
         let username = authorization.username();
-        let password = authorization.password().unwrap_or_else(|| "".to_string());
+        let password = authorization
+            .password()
+            .unwrap_or_else(|| "".to_string());
         self.verify(&username, &password)
     }
 }

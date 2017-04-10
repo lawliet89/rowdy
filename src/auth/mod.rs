@@ -92,7 +92,10 @@ impl<'r> response::Responder<'r> for Error {
                 // TODO: Support other schemes!
                 let www_header = rocket::http::Header::new("WWW-Authenticate", format!("Basic realm={}", realm));
 
-                Ok(response::Response::build().status(Status::Unauthorized).header(www_header).finalize())
+                Ok(response::Response::build()
+                       .status(Status::Unauthorized)
+                       .header(www_header)
+                       .finalize())
             }
             Error::AuthenticationFailure => Err(Status::Unauthorized),
             Error::HyperError(_) => Err(Status::BadRequest),
@@ -326,7 +329,9 @@ pub mod tests {
     impl Authenticator<Basic> for MockAuthenticator {
         fn authenticate(&self, authorization: &Authorization<Basic>) -> Result<(), Error> {
             let username = authorization.username();
-            let password = authorization.password().unwrap_or_else(|| "".to_string());
+            let password = authorization
+                .password()
+                .unwrap_or_else(|| "".to_string());
 
             if username == "mei" && password == "冻住，不许走!" {
                 Ok(())
@@ -376,7 +381,9 @@ pub mod tests {
 
     fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
         // Ignite rocket
-        rocket::ignite().mount("/", routes![auth_basic]).manage(authenticator)
+        rocket::ignite()
+            .mount("/", routes![auth_basic])
+            .manage(authenticator)
     }
 
     #[get("/")]
@@ -386,12 +393,16 @@ pub mod tests {
                   authenticator: State<Box<Authenticator<Basic>>>)
                   -> Result<(), ::Error> {
 
-        authenticator.prepare_response("https://www.acme.com", authorization).and_then(|_| Ok(()))
+        authenticator
+            .prepare_response("https://www.acme.com", authorization)
+            .and_then(|_| Ok(()))
     }
 
     fn ignite_bearer(authenticator: Box<Authenticator<Bearer>>) -> Rocket {
         // Ignite rocket
-        rocket::ignite().mount("/", routes![auth_bearer]).manage(authenticator)
+        rocket::ignite()
+            .mount("/", routes![auth_bearer])
+            .manage(authenticator)
     }
 
     #[get("/")]
@@ -401,12 +412,16 @@ pub mod tests {
                    authenticator: State<Box<Authenticator<Bearer>>>)
                    -> Result<(), ::Error> {
 
-        authenticator.prepare_response("https://www.acme.com", authorization).and_then(|_| Ok(()))
+        authenticator
+            .prepare_response("https://www.acme.com", authorization)
+            .and_then(|_| Ok(()))
     }
 
     fn ignite_string(authenticator: Box<Authenticator<String>>) -> Rocket {
         // Ignite rocket
-        rocket::ignite().mount("/", routes![auth_string]).manage(authenticator)
+        rocket::ignite()
+            .mount("/", routes![auth_string])
+            .manage(authenticator)
     }
 
     #[get("/")]
@@ -416,7 +431,9 @@ pub mod tests {
                    authenticator: State<Box<Authenticator<String>>>)
                    -> Result<(), ::Error> {
 
-        authenticator.prepare_response("https://www.acme.com", authorization).and_then(|_| Ok(()))
+        authenticator
+            .prepare_response("https://www.acme.com", authorization)
+            .and_then(|_| Ok(()))
     }
 
     #[test]

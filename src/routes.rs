@@ -20,7 +20,10 @@ impl TokenGetterCorsOptions {
         TokenGetterCorsOptions(cors::Options {
                                    allowed_origins: config.allowed_origins.clone(),
                                    allowed_methods: TOKEN_GETTER_METHODS.iter().cloned().collect(),
-                                   allowed_headers: TOKEN_GETTER_HEADERS.iter().map(|s| s.to_string().into()).collect(),
+                                   allowed_headers: TOKEN_GETTER_HEADERS
+                                       .iter()
+                                       .map(|s| s.to_string().into())
+                                       .collect(),
                                    allow_credentials: true,
                                    ..Default::default()
                                })
@@ -61,14 +64,16 @@ fn token_getter(origin: Option<cors::Origin>,
                 authenticator: State<Box<auth::BasicAuthenticator>>)
                 -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
 
-    authenticator.prepare_response(&configuration.issuer, authorization).and_then(|authorization| {
-        let token = Token::<PrivateClaim>::with_configuration(&configuration,
-                                                              &authorization.username(),
-                                                              &auth_param.service,
-                                                              Default::default())?;
-        let token = token.encode(configuration.secret.for_signing()?)?;
-        Ok(cors_options.respond(token, origin)?)
-    })
+    authenticator
+        .prepare_response(&configuration.issuer, authorization)
+        .and_then(|authorization| {
+                      let token = Token::<PrivateClaim>::with_configuration(&configuration,
+                                                                            &authorization.username(),
+                                                                            &auth_param.service,
+                                                                            Default::default())?;
+                      let token = token.encode(configuration.secret.for_signing()?)?;
+                      Ok(cors_options.respond(token, origin)?)
+                  })
 }
 
 /// Return routes provided by rowdy
@@ -100,7 +105,7 @@ mod tests {
             issuer: "https://www.acme.com".to_string(),
             allowed_origins: allowed_origins,
             audience: jwt::SingleOrMultiple::Single(not_err!(FromStr::from_str("https://www.example.com"))),
-            signature_algorithm: Some(jwt::jws::Algorithm::HS512),
+            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
         };
@@ -160,7 +165,7 @@ mod tests {
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
         let actual_token = not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"),
-                                                        jwt::jws::Algorithm::HS512));
+                                                        jwt::jwa::SignatureAlgorithm::HS512));
 
         let registered = not_err!(actual_token.registered_claims());
 
@@ -172,7 +177,8 @@ mod tests {
         // TODO: Test private claims
 
         let header = not_err!(actual_token.header());
-        assert_eq!(header.algorithm, jwt::jws::Algorithm::HS512);
+        assert_eq!(header.registered.algorithm,
+                   jwt::jwa::SignatureAlgorithm::HS512);
     }
 
     #[test]
@@ -234,7 +240,9 @@ mod tests {
         let auth_header = Header::new("Authorization",
                                       hyper::header::HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all").header(origin_header).header(auth_header);
+        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all")
+            .header(origin_header)
+            .header(auth_header);
         let response = req.dispatch_with(&rocket);
 
         // Assert
