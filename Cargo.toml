@@ -26,8 +26,8 @@ biscuit = { git = "https://github.com/lawliet89/biscuit", rev = "991a2f1cb3c5dc0
 chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
 log = "0.3"
-rocket = "0.2.2"
-rocket_codegen = "0.2.2"
+rocket = "= 0.2.4"
+rocket_codegen = "= 0.2.4"
 serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
@@ -35,9 +35,9 @@ unicase="1.4"
 uuid = { version = "0.4", features = ["use_std", "v5", "serde"] }
 
 # Optional dependencies that are activated by the various features
-clippy = { version = "*", optional = true }
+clippy = { version = "=0.0.122", optional = true }
 csv = { version = "0.15", optional = true }
-openldap = { version = "1.1", optional = true, git = "https://github.com/lawliet89/rust-cldap.git", branch="dn" }
+openldap = { version = "1.2.1", optional = true }
 ring = { version = "*", optional = true } # rust-jwt has this as its dependency
 strfmt = { version = "0.1.5", optional = true }
 

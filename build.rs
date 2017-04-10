@@ -9,9 +9,9 @@ use ansi_term::Color::{Red, Yellow, Blue, White};
 use version_check::{is_nightly, is_min_version, is_min_date};
 
 // Specifies the minimum nightly version that is targetted
-// Note that sometimes the `rustc` date might be older than the nightly version
-const MIN_DATE: &'static str = "2017-03-24";
-const MIN_VERSION: &'static str = "1.17.0-nightly";
+// Note that sometimes the `rustc` date might be older than the nightly version, usually one day older
+const MIN_DATE: &'static str = "2017-04-09";
+const MIN_VERSION: &'static str = "1.18.0-nightly";
 
 // Convenience macro for writing to stderr.
 macro_rules! printerr {
