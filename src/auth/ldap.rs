@@ -8,20 +8,15 @@ use openldap::errors::LDAPError;
 use openldap::codes::options;
 use openldap::codes::scopes;
 use strfmt::{FmtError, strfmt};
+use serde_json::value;
 
-use super::{Basic, Error};
+use {Error, JsonValue, JsonMap};
+use super::{Basic, AuthenticationResult};
 
 /// Error mapping for `LDAPError`
 impl From<LDAPError> for Error {
     fn from(ldap_error: LDAPError) -> Error {
         Error::GenericError(ldap_error.to_string())
-    }
-}
-
-/// Error mapping for `LDAPError`
-impl From<LDAPError> for ::Error {
-    fn from(ldap_error: LDAPError) -> ::Error {
-        ::Error::GenericError(ldap_error.to_string())
     }
 }
 
@@ -31,6 +26,9 @@ impl From<FmtError> for Error {
         Error::GenericError(e.to_string())
     }
 }
+
+/// Typedef of a "User" from `openldap`
+type User = HashMap<String, Vec<String>>;
 
 /// LDAP based authenticator
 ///
@@ -114,39 +112,86 @@ impl LdapAuthenticator {
         Ok(results)
     }
 
+    /// Serialize a user as payload for a refresh token
+    fn serialize_refresh_token_payload(user: User) -> Result<JsonValue, Error> {
+        let user = value::to_value(user)
+            .map_err(|_| super::Error::AuthenticationFailure)?;
+        let mut map = JsonMap::with_capacity(1);
+        map.insert("user".to_string(), user);
+        Ok(JsonValue::Object(map))
+    }
+
+    /// Deserialize a user from a refresh token payload
+    fn deserialize_refresh_token_payload(payload: JsonValue) -> Result<User, Error> {
+        match payload {
+            JsonValue::Object(ref map) => {
+                let user = map.get("user")
+                    .ok_or_else(|| Error::Auth(super::Error::AuthenticationFailure))?;
+                Ok(value::from_value(user.clone())
+                       .map_err(|_| super::Error::AuthenticationFailure)?)
+            }
+            _ => Err(Error::Auth(super::Error::AuthenticationFailure)),
+        }
+    }
+
+    /// Build an `AuthenticationResult` for a `User`
+    fn build_authentication_result(user: User, refresh_payload: bool) -> Result<AuthenticationResult, Error> {
+        let user_dn = user["dn"][0].clone();
+        let payload = if refresh_payload {
+            Some(Self::serialize_refresh_token_payload(user)?)
+        } else {
+            None
+        };
+        Ok(AuthenticationResult {
+               subject: user_dn,
+               payload: payload,
+           })
+    }
+
     /// Authenticate the user with the username/password
-    pub fn verify(&self, username: &str, password: &str) -> Result<(), Error> {
-        let user_dn = {
+    pub fn verify(&self, username: &str, password: &str, refresh_payload: bool) -> Result<AuthenticationResult, Error> {
+        let user = {
             // First, we search for the user
             let connection = self.connect()?;
             self.searcher_bind(&connection)?;
             let user = self.search(&connection, username)
-                .map_err(|_e| Error::AuthenticationFailure)?;
+                .map_err(|_e| super::Error::AuthenticationFailure)?;
             if user.len() != 1 {
-                Err(Error::AuthenticationFailure)?;
+                Err(super::Error::AuthenticationFailure)?;
             }
 
-            user[0]["dn"][0].clone()
+            user[0].clone()
         };
+
+        let user_dn = user["dn"][0].clone();
 
         {
             // Attempt a bind with the user's DN and password
             let connection = self.connect()?;
             self.bind(&connection, &user_dn, password)
-                .map_err(|_e| Error::AuthenticationFailure)?;
+                .map_err(|_e| super::Error::AuthenticationFailure)?;
         }
 
-        Ok(())
+        Self::build_authentication_result(user, refresh_payload)
     }
 }
 
 impl super::Authenticator<Basic> for LdapAuthenticator {
-    fn authenticate(&self, authorization: &super::Authorization<Basic>) -> Result<(), Error> {
+    fn authenticate(&self,
+                    authorization: &super::Authorization<Basic>,
+                    refresh_payload: bool)
+                    -> Result<AuthenticationResult, Error> {
         let username = authorization.username();
         let password = authorization
             .password()
             .unwrap_or_else(|| "".to_string());
-        self.verify(&username, &password)
+        self.verify(&username, &password, refresh_payload)
+    }
+
+    // TODO: Implement retrieving updated information from LDAP server
+    fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+        let user = Self::deserialize_refresh_token_payload(payload.clone())?;
+        Self::build_authentication_result(user, false)
     }
 }
 
@@ -168,6 +213,7 @@ impl super::AuthenticatorConfiguration<Basic> for LdapAuthenticator {
 #[cfg(test)]
 mod tests {
     //! These tests might intermittently fail due to Test server being inaccessible
+    use auth::Authenticator;
     use super::*;
 
     /// Test LDAP server: http://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/
@@ -182,22 +228,33 @@ mod tests {
     }
 
     #[test]
-    fn authentication_smoke_test() {
+    fn authentication() {
         let authenticator = make_authenticator();
-        not_err!(authenticator.verify("euler", "password"));
+        let result = not_err!(authenticator.verify("euler", "password", false));
+        assert!(result.payload.is_none());
+
+        let result = not_err!(authenticator.verify("euler", "password", true));
+        assert!(result.payload.is_some());
+
+        let refresh_result = not_err!(authenticator.authenticate_refresh_token(result.payload.as_ref().unwrap()));
+        assert!(refresh_result.payload.is_none());
+
+        assert_eq!(result.subject, refresh_result.subject);
     }
 
     #[test]
     #[should_panic(expected = "AuthenticationFailure")]
     fn authentication_invalid_user() {
         let authenticator = make_authenticator();
-        authenticator.verify("donald_trump", "password").unwrap();
+        authenticator
+            .verify("donald_trump", "password", false)
+            .unwrap();
     }
 
     #[test]
     #[should_panic(expected = "AuthenticationFailure")]
     fn authentication_invalid_password() {
         let authenticator = make_authenticator();
-        authenticator.verify("einstein", "FTL").unwrap();
+        authenticator.verify("einstein", "FTL", false).unwrap();
     }
 }

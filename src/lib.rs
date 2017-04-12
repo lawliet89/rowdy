@@ -68,6 +68,9 @@ use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de;
 
+pub use serde_json::Value as JsonValue;
+pub use serde_json::Map as JsonMap;
+
 /// Top level error enum
 #[derive(Debug)]
 pub enum Error {
@@ -83,6 +86,9 @@ pub enum Error {
     Token(token::Error),
     /// IO errors
     IOError(io::Error),
+
+    /// Unsupported operation
+    UnsupportedOperation,
 }
 
 impl_from_error!(auth::Error, Error::Auth);
@@ -94,6 +100,7 @@ impl_from_error!(io::Error, Error::IOError);
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
+            Error::UnsupportedOperation => "This operation is not supported",
             Error::Auth(ref e) => e.description(),
             Error::CORS(ref e) => e.description(),
             Error::Token(ref e) => e.description(),
@@ -109,6 +116,7 @@ impl error::Error for Error {
             Error::CORS(ref e) => Some(e as &error::Error),
             Error::Token(ref e) => Some(e as &error::Error),
             Error::IOError(ref e) => Some(e as &error::Error),
+            Error::UnsupportedOperation |
             Error::GenericError(_) |
             Error::BadRequest(_) => Some(self as &error::Error),
         }
@@ -118,6 +126,7 @@ impl error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Error::UnsupportedOperation => write!(f, "{}", error::Error::description(self)),
             Error::Auth(ref e) => fmt::Display::fmt(e, f),
             Error::CORS(ref e) => fmt::Display::fmt(e, f),
             Error::Token(ref e) => fmt::Display::fmt(e, f),

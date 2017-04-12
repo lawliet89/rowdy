@@ -6,14 +6,15 @@ use csv;
 use ring::{digest, test};
 use ring::constant_time::verify_slices_are_equal;
 
-use super::{Basic, Error};
+use {Error, JsonValue, JsonMap};
+use super::{Basic, AuthenticationResult};
 
 // Code for conversion to hex stolen from rustc-serialize:
 // https://doc.rust-lang.org/rustc-serialize/src/rustc_serialize/hex.rs.html
 
 type Users = HashMap<String, Vec<u8>>;
 
-/// A simple authenticator that uses a CSV backed user database.
+/// A simple authenticator that uses a CSV backed user database. _DO NOT USE THIS IN PRODUCTION_
 ///
 /// Requires the `simple_authenticator` feature, which is enabled by default.
 ///
@@ -57,7 +58,7 @@ impl SimpleAuthenticator {
     /// # }
     /// ```
     pub fn new<R: Read>(salt: &[u8], csv: csv::Reader<R>) -> Result<Self, Error> {
-
+        warn_!("Do not use the Simple authenticator in production");
         Ok(SimpleAuthenticator {
                salt: salt.to_vec(),
                users: Self::users_from_csv(csv)?,
@@ -112,16 +113,29 @@ impl SimpleAuthenticator {
         Self::hex_dump(self.hash_password_digest(password).as_ref())
     }
 
-    /// Verify that some user with the provided password exists in the CSV database, and the password is correct
-    pub fn verify(&self, user: &str, password: &str) -> Result<(), Error> {
-        match self.users.get(user) {
-            None => Err(Error::AuthenticationFailure),
+    /// Verify that some user with the provided password exists in the CSV database, and the password is correct.
+    /// Returns the payload to be included in a refresh token if successful
+    pub fn verify(&self, username: &str, password: &str, refresh_payload: bool) -> Result<AuthenticationResult, Error> {
+        match self.users.get(username) {
+            None => Err(Error::Auth(super::Error::AuthenticationFailure)),
             Some(user) => {
                 let actual_password_digest = self.hash_password_digest(password);
                 if !verify_slices_are_equal(actual_password_digest.as_ref(), &*user).is_ok() {
-                    Err(Error::AuthenticationFailure)
+                    Err(Error::Auth(super::Error::AuthenticationFailure))
                 } else {
-                    Ok(())
+                    let payload = if refresh_payload {
+                        let mut map = JsonMap::with_capacity(2);
+                        map.insert("user".to_string(), From::from(username));
+                        map.insert("password".to_string(), From::from(password));
+                        Some(JsonValue::Object(map))
+                    } else {
+                        None
+                    };
+
+                    Ok(AuthenticationResult {
+                           subject: username.to_string(),
+                           payload: payload,
+                       })
                 }
             }
         }
@@ -146,12 +160,34 @@ impl SimpleAuthenticator {
 }
 
 impl super::Authenticator<Basic> for SimpleAuthenticator {
-    fn authenticate(&self, authorization: &super::Authorization<Basic>) -> Result<(), Error> {
+    fn authenticate(&self,
+                    authorization: &super::Authorization<Basic>,
+                    refresh_payload: bool)
+                    -> Result<AuthenticationResult, Error> {
+        warn_!("Do not use the Simple authenticator in production");
         let username = authorization.username();
         let password = authorization
             .password()
             .unwrap_or_else(|| "".to_string());
-        self.verify(&username, &password)
+        self.verify(&username, &password, refresh_payload)
+    }
+
+    fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+        warn_!("Do not use the Simple authenticator in production");
+        match *payload {
+            JsonValue::Object(ref map) => {
+                let user = map.get("user")
+                    .ok_or_else(|| super::Error::AuthenticationFailure)?
+                    .as_str()
+                    .ok_or_else(|| super::Error::AuthenticationFailure)?;
+                let password = map.get("password")
+                    .ok_or_else(|| super::Error::AuthenticationFailure)?
+                    .as_str()
+                    .ok_or_else(|| super::Error::AuthenticationFailure)?;
+                self.verify(user, password, false)
+            }
+            _ => Err(super::Error::AuthenticationFailure)?,
+        }
     }
 }
 
@@ -201,6 +237,7 @@ impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfigurati
 
 #[cfg(test)]
 mod tests {
+    use auth::Authenticator;
     use super::*;
 
     fn make_authenticator() -> SimpleAuthenticator {
@@ -237,15 +274,28 @@ mod tests {
     }
 
     #[test]
-    fn smoke_test() {
+    fn authentication_with_username_and_password() {
         let authenticator = make_authenticator();
         let expected_keys = vec!["foobar".to_string(), "mei".to_string()];
         let mut actual_keys: Vec<String> = authenticator.users.keys().cloned().collect();
         actual_keys.sort();
         assert_eq!(expected_keys, actual_keys);
 
-        not_err!(authenticator.verify("foobar", "password"));
-        not_err!(authenticator.verify("mei", "冻住，不许走!"));
+        not_err!(authenticator.verify("foobar", "password", false));
+
+        let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
+        assert!(result.payload.is_none()); // refresh payload is not provided when not requested
+    }
+
+    #[test]
+    fn authentication_with_refresh_payload() {
+        let authenticator = make_authenticator();
+
+        let result = not_err!(authenticator.verify("foobar", "password", true));
+        assert!(result.payload.is_some()); // refresh payload is provided when requested
+
+        let result = not_err!(authenticator.authenticate_refresh_token(result.payload.as_ref().unwrap()));
+        assert!(result.payload.is_none());
     }
 
     #[test]

@@ -80,15 +80,17 @@ fn token_getter(origin: Option<cors::Origin>,
 
     auth_param.verify(&authorization)?;
     authenticator
-        .prepare_response(&configuration.issuer, Some(authorization))
-        .and_then(|authorization| {
-                      let token = Token::<PrivateClaim>::with_configuration(&configuration,
-                                                                            &authorization.username(),
-                                                                            &auth_param.service,
-                                                                            Default::default())?;
-                      let token = token.encode(configuration.secret.for_signing()?)?;
-                      Ok(cors_options.respond(token, origin)?)
-                  })
+        .prepare_authentication_response(&authorization, auth_param.offline_token.unwrap_or(false))
+        .and_then(|result| {
+            let token = Token::<PrivateClaim>::with_configuration(&configuration,
+                                                                  &result.subject,
+                                                                  &auth_param.service,
+                                                                  Default::default())?;
+            let signing_key = configuration.secret.for_signing()?;
+            let token = token.encode(&signing_key)?;
+
+            Ok(cors_options.respond(token, origin)?)
+        })
 }
 
 /// Access token retrieval via refresh token route
@@ -105,26 +107,16 @@ fn refresh_token(origin: Option<cors::Origin>,
                  -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
 
     auth_param.verify(&authorization)?;
-    Err(::Error::GenericError("oh no".to_string()))
-    // authenticator
-    //     .prepare_response(&configuration.issuer, authorization)
-    //     .and_then(|authorization| {
-    //                   let token = Token::<PrivateClaim>::with_configuration(&configuration,
-    //                                                                         &authorization.username(),
-    //                                                                         &auth_param.service,
-    //                                                                         Default::default())?;
-    //                   let token = token.encode(configuration.secret.for_signing()?)?;
-    //                   Ok(cors_options.respond(token, origin)?)
-    //               })
+    Err(::Error::UnsupportedOperation)
 }
 
 /// Route to catch missing Authorization
 #[allow(unmounted_route)]
 // mounted via `::launch()`
-#[get("/?<auth_param>", rank = 3)]
+#[get("/?<_auth_param>", rank = 3)]
 #[allow(needless_pass_by_value)]
-fn bad_request(auth_param: AuthParam) -> Result<(), ::Error> {
-    auth::missing_authorization(&auth_param.service)
+fn bad_request(_auth_param: AuthParam, configuration: State<Configuration>) -> Result<(), ::Error> {
+    auth::missing_authorization(&configuration.issuer)
 }
 
 /// Return routes provided by rowdy
@@ -218,7 +210,7 @@ mod tests {
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
-        let actual_token = not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"),
+        let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
                                                         jwt::jwa::SignatureAlgorithm::HS512));
 
         let registered = not_err!(actual_token.registered_claims());
@@ -276,7 +268,7 @@ mod tests {
         assert_eq!(response.status(), Status::Unauthorized);
 
         let www_header: Vec<_> = response.header_values("WWW-Authenticate").collect();
-        assert_eq!(www_header, vec!["Basic realm=https://www.example.com"]);
+        assert_eq!(www_header, vec!["Basic realm=https://www.acme.com"]);
     }
 
     #[test]

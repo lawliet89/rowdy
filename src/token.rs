@@ -289,7 +289,7 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
 
     /// Consumes self and encode the embedded JWT with signature.
     /// If the JWT is already encoded, this returns an error
-    pub fn encode(mut self, secret: jws::Secret) -> Result<Self, Error> {
+    pub fn encode(mut self, secret: &jws::Secret) -> Result<Self, Error> {
         match self.token {
             jwt::jws::Compact::Encoded(_) => Err(Error::TokenAlreadyEncoded),
             jwt @ jwt::jws::Compact::Decoded { .. } => {
@@ -301,7 +301,7 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
 
     /// Consumes self and decode the embedded JWT with signature verification
     /// If the JWT is already decoded, this returns an error
-    pub fn decode(mut self, secret: jws::Secret, algorithm: jwa::SignatureAlgorithm) -> Result<Self, Error> {
+    pub fn decode(mut self, secret: &jws::Secret, algorithm: jwa::SignatureAlgorithm) -> Result<Self, Error> {
         match self.token {
             jwt @ jwt::jws::Compact::Encoded(_) => {
                 self.token = jwt.into_decoded(secret, algorithm)?;
@@ -312,7 +312,7 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
     }
 
     fn serialize_and_respond(self) -> Result<String, Error> {
-        if let jwt::jws::Compact::Decoded { .. } = self.token {
+        if self.is_decoded() {
             Err(Error::TokenNotEncoded)?
         }
         let serialized = serde_json::to_string(&self)?;
@@ -327,7 +327,7 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
         }
     }
 
-    /// Returns whether the wrapped token is encoded
+    /// Returns whether the wrapped token is encoded and signed
     pub fn is_encoded(&self) -> bool {
         !self.is_decoded()
     }
@@ -377,9 +377,12 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
         }
     }
 
-    /// Convenience mthod to extract the encoded token
+    /// Convenience method to extract the encoded token
     pub fn encoded_token(&self) -> Result<String, ::Error> {
-        Ok(self.token.encoded().map_err(Error::JWTError)?)
+        Ok(self.token
+               .encoded()
+               .map_err(Error::JWTError)?
+               .to_string())
     }
 }
 
@@ -555,10 +558,10 @@ mod tests {
     #[test]
     fn encoding_and_decoding_round_trip() {
         let token = make_token();
-        let token = not_err!(token.encode(jwt::jws::Secret::bytes_from_str("secret")));
+        let token = not_err!(token.encode(&jwt::jws::Secret::bytes_from_str("secret")));
         assert!(token.is_encoded());
 
-        let token = not_err!(token.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+        let token = not_err!(token.decode(&jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
         let private = not_err!(token.private_claims());
 
         assert_eq!(*private, Default::default());
@@ -568,9 +571,9 @@ mod tests {
     #[should_panic(expected = "TokenAlreadyEncoded")]
     fn panics_when_encoding_encoded() {
         let token = make_token();
-        let token = not_err!(token.encode(jwt::jws::Secret::bytes_from_str("secret")));
+        let token = not_err!(token.encode(&jwt::jws::Secret::bytes_from_str("secret")));
         token
-            .encode(jwt::jws::Secret::bytes_from_str("secret"))
+            .encode(&jwt::jws::Secret::bytes_from_str("secret"))
             .unwrap();
     }
 
@@ -579,7 +582,7 @@ mod tests {
     fn panics_when_decoding_decoded() {
         let token = make_token();
         token
-            .decode(jwt::jws::Secret::bytes_from_str("secret"),
+            .decode(&jwt::jws::Secret::bytes_from_str("secret"),
                     Default::default())
             .unwrap();
     }
@@ -587,12 +590,12 @@ mod tests {
     #[test]
     fn token_serialization_smoke_test() {
         let expected_token = make_token();
-        let token = not_err!(expected_token.clone().encode(jwt::jws::Secret::bytes_from_str("secret")));
+        let token = not_err!(expected_token.clone().encode(&jwt::jws::Secret::bytes_from_str("secret")));
         let serialized = not_err!(token.serialize_and_respond());
 
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&serialized));
         let actual_token =
-            not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+            not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
         assert_eq!(expected_token, actual_token);
     }
 
@@ -601,14 +604,14 @@ mod tests {
         use rocket::response::Responder;
 
         let expected_token = make_token();
-        let token = not_err!(expected_token.clone().encode(jwt::jws::Secret::bytes_from_str("secret")));
+        let token = not_err!(expected_token.clone().encode(&jwt::jws::Secret::bytes_from_str("secret")));
         let mut response = not_err!(token.respond());
 
         assert_eq!(response.status(), Status::Ok);
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&body_str));
         let actual_token =
-            not_err!(deserialized.decode(jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+            not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
         assert_eq!(expected_token, actual_token);
     }
 

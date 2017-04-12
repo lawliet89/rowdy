@@ -1,6 +1,7 @@
 //! Authentication module, including traits for identity provider and `Responder`s for authentication.
 use std::error;
 use std::fmt;
+use std::ops::Deref;
 
 use hyper;
 use hyper::header;
@@ -10,6 +11,10 @@ use rocket::request::{self, Request, FromRequest};
 use rocket::response;
 use rocket::Outcome;
 use serde::{Serialize, Deserialize};
+
+mod noop;
+pub use self::noop::NoOp;
+pub use self::noop::NoOpConfiguration;
 
 #[cfg(feature = "simple_authenticator")]
 mod simple;
@@ -22,6 +27,8 @@ pub use self::simple::SimpleAuthenticatorConfiguration;
 mod ldap;
 #[cfg(feature="ldap_authenticator")]
 pub use self::ldap::LdapAuthenticator;
+
+use JsonValue;
 
 /// Re-exported [`hyper::header::Scheme`]
 pub type Scheme = hyper::header::Scheme<Err = hyper::error::Error>;
@@ -183,6 +190,14 @@ impl Authorization<String> {
     }
 }
 
+impl<S: header::Scheme + 'static> Deref for Authorization<S> {
+    type Target = header::Authorization<S>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// Authenticator trait to be implemented by identity provider (idp) adapters to provide authentication.
 /// Each idp may support all the [schemes](https://hyper.rs/hyper/v0.10.5/hyper/header/trait.Scheme.html)
 /// supported, or just one.
@@ -192,110 +207,65 @@ impl Authorization<String> {
 /// See example below.
 ///
 /// # Examples
-/// Consider the following mock authenticator that authenticates only the following:
 ///
-/// - Basic: User `mei` with password `冻住，不许走!`
-/// - Bearer: Token `这样可以挡住他们。`
-/// - String: `哦，对不起啦。`
+/// # No-op authenticator
+/// You can refer to the [source code](../../src/rowdy/auth/noop.rs.html) for the `NoOp` authenticator for a simple
+/// implementation.
 ///
-/// After defining the authenticator, the example will show how it can be used in a route.
+/// ## Simple Authenticator
 ///
-/// ```
-/// #![feature(plugin, custom_derive)]
-/// #![plugin(rocket_codegen)]
-/// extern crate hyper;
-/// extern crate rocket;
-/// extern crate rowdy;
-///
-/// use rocket::{State, Rocket};
-/// use rocket::http::{self, Status};
-/// use rocket::http::Method::Get;
-/// use rocket::testing::MockRequest;
-/// use rowdy::auth::*;
-/// pub struct MockAuthenticator {}
-///
-/// impl Authenticator<Basic> for MockAuthenticator {
-///     fn authenticate(&self, authorization: &Authorization<Basic>) -> Result<(), Error> {
-///         let username = authorization.username();
-///         let password = authorization.password().unwrap_or_else(|| "".to_string());
-///
-///         if username == "mei" && password == "冻住，不许走!" {
-///             Ok(())
-///         } else {
-///             Err(Error::AuthenticationFailure)
-///         }
-///     }
-/// }
-///
-/// impl Authenticator<Bearer> for MockAuthenticator {
-///     fn authenticate(&self, authorization: &Authorization<Bearer>) -> Result<(), Error> {
-///         let token = authorization.token();
-///
-///         if token == "这样可以挡住他们。" {
-///             Ok(())
-///         } else {
-///             Err(Error::AuthenticationFailure)
-///         }
-///     }
-/// }
-///
-/// impl Authenticator<String> for MockAuthenticator {
-///     fn authenticate(&self, authorization: &Authorization<String>) -> Result<(), Error> {
-///         let string = authorization.string();
-///
-///         if string == "哦，对不起啦。" {
-///             Ok(())
-///         } else {
-///             Err(Error::AuthenticationFailure)
-///         }
-///     }
-/// }
-/// #[get("/")]
-/// #[allow(unmounted_route)]
-/// fn auth_basic(authorization: Option<Authorization<Basic>>,
-///               authenticator: State<Box<Authenticator<Basic>>>)
-///               -> Result<&str, rowdy::Error> {
-///
-///     authenticator.prepare_response("https://www.acme.com", authorization)
-///         .and_then(|_| Ok("Hello world"))
-/// }
-///
-/// fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
-///     // Ignite rocket
-///     rocket::ignite().mount("/", routes![auth_basic]).manage(authenticator)
-/// }
-///
-/// # #[allow(deprecated)]
-/// # fn main() {
-/// let rocket = ignite_basic(Box::new(MockAuthenticator {}));
-/// let auth_header = hyper::header::Authorization(Basic {
-///                                                     username: "mei".to_owned(),
-///                                                     password: Some("冻住，不许走!".to_string()),
-///                                                 });
-/// let auth_header = http::Header::new("Authorization",
-///                                     hyper::header::HeaderFormatter(&auth_header).to_string());
-/// // Make and dispatch request
-/// let mut req = MockRequest::new(Get, "/").header(auth_header);
-/// let response = req.dispatch_with(&rocket);
-///
-/// assert_eq!(response.status(), Status::Ok);
-/// # }
+/// Refer to the `MockAuthenticator`[../../src/rowdy/auth/mod.rs.html] implemented in the test code for this module.
 /// ```
 pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
-    /// Verify the credentials provided in the headers with the authenticator. Not usually called by users.
-    /// Use `prepare_response` instead.
-    fn authenticate(&self, authorization: &Authorization<S>) -> Result<(), Error>;
+    /// Verify the credentials provided in the headers with the authenticator for the initial issuing of Access Tokens.
+    /// If the Authenticator supports re-issuing of access tokens subsequently using refresh tokens, and it is requested
+    /// for, the function should return a `JsonValue` containing the payload to include with the refresh token.
+    ///
+    /// Users should not user `authenticate` directly and use `prepare_authentication_response` instead.
+    fn authenticate(&self,
+                    authorization: &Authorization<S>,
+                    refresh_payload: bool)
+                    -> Result<AuthenticationResult, ::Error>;
 
-    /// Prepare a response by first verifying credentials. If validation fails, will return an `Err` with the response
-    /// to be sent. Otherwise, the unwrapped credentials will be returned in an `Ok`.
-    fn prepare_response(&self,
-                        realm: &str,
-                        authorization: Option<Authorization<S>>)
-                        -> Result<Authorization<S>, ::Error> {
-        match authorization {
-            None => missing_authorization(realm)?,
-            Some(credentials) => Ok(self.authenticate(&credentials).map(|()| credentials)?),
+    /// Verify the credentials provided with the refresh token payload, if supported by the authenticator.
+    /// A default implementation that returns an `Err(::Error::UnsupportedOperation)` is provided.
+    ///
+    /// Users should not user `authenticate` directly and use `prepare_refresh_response` instead.
+    fn authenticate_refresh_token(&self, _payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+        Err(::Error::UnsupportedOperation)
+    }
+
+    /// Prepare a response to an authentication request
+    /// by first verifying credentials. If validation fails, will return an `Err` with the response
+    /// to be sent. Otherwise, the unwrapped authentication result will be returned in an `Ok`.
+    /// This function will also check that the authenticator behaves correctly by checking that it does not
+    /// return a refresh token payload when it is not requested for
+    fn prepare_authentication_response(&self,
+                                       authorization: &Authorization<S>,
+                                       request_refresh_token: bool)
+                                       -> Result<AuthenticationResult, ::Error> {
+        let result = self.authenticate(authorization, request_refresh_token)?;
+        if !request_refresh_token && result.payload.is_some() {
+            Err(Error::GenericError("Misbehaving authenticator: refresh token payload was \
+                                    returned when it was not requested for"
+                                            .to_string()))?;
         }
+        Ok(result)
+    }
+
+    /// Prepare a response to a refresh request
+    /// by first verifying the refresh payload. If validation fails, will return an `Err` with the response
+    /// to be sent. Otherwise, the unwrapped authentication result will be returned in an `Ok`.
+    /// This function will also check that the authenticator behaves correctly by checking that it does not
+    /// return a refresh token payload
+    fn prepare_refresh_response(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+        let result = self.authenticate_refresh_token(payload)?;
+        if result.payload.is_some() {
+            Err(Error::GenericError("Misbehaving authenticator: refresh token payload was \
+                                    returned for a refresh operation"
+                                            .to_string()))?;
+        }
+        Ok(result)
     }
 }
 
@@ -316,26 +286,13 @@ pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>
     fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error>;
 }
 
-/// A "no-op" authenticator that lets everything through
-#[derive(Debug)]
-pub struct NoOp {}
-
-impl<S: header::Scheme + 'static> Authenticator<S> for NoOp {
-    fn authenticate(&self, _authorization: &Authorization<S>) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-/// Configuration for the `no-op` authenticator. Nothing to configure.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct NoOpConfiguration {}
-
-impl<S: header::Scheme + 'static> AuthenticatorConfiguration<S> for NoOpConfiguration {
-    type Authenticator = NoOp;
-
-    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
-        Ok(Self::Authenticator {})
-    }
+/// Result from a successful authentication operation
+#[derive(Clone, PartialEq, Debug)]
+pub struct AuthenticationResult {
+    /// The subject of the authentication
+    pub subject: String,
+    /// The payload to be included in a Refresh token, if any
+    pub payload: Option<JsonValue>,
 }
 
 #[cfg(test)]
@@ -348,6 +305,7 @@ pub mod tests {
     use rocket::request::{self, Request, FromRequest};
     use rocket::testing::MockRequest;
 
+    use {JsonMap, Error};
     use super::*;
 
     /// Mock authenticator that authenticates only the following:
@@ -357,42 +315,129 @@ pub mod tests {
     /// - String: 哦，对不起啦。
     pub struct MockAuthenticator {}
 
+    /// Payload for the `MockAuthenticator` Refresh Token
+    #[derive(Serialize, Deserialize, Debug)]
+    struct RefreshTokenPayload {
+        header: String,
+    }
+
+    impl MockAuthenticator {
+        /// Convert a header to string
+        #[allow(deprecated)]
+        fn format<S: header::Scheme + 'static>(authorization: &header::Authorization<S>) -> String {
+            HeaderFormatter(authorization).to_string()
+        }
+
+        /// Generate a refresh token payload from the header
+        fn serialize_refresh_token_payload<S: header::Scheme + 'static>(authorization: &header::Authorization<S>)
+                                                                        -> JsonValue {
+            let string = From::from(Self::format(authorization));
+            let mut map = JsonMap::with_capacity(1);
+            map.insert("header".to_string(), string);
+            JsonValue::Object(map)
+        }
+
+        /// From a refresh token payload, get the header back
+        ///
+        /// # Panics
+        /// Panics if the refresh token payload is not in the right shape, or if the content is invalid
+        fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(payload: &JsonValue)
+                                                                          -> header::Authorization<S> {
+            match *payload {
+                JsonValue::Object(ref map) => {
+                    let header = map["header"].as_str().unwrap(); // will panic if the shape is incorrect
+                    let header = header.as_bytes().to_vec();
+                    header::Authorization::parse_header(&[header]).unwrap()
+                }
+                _ => panic!("Refresh token payload was not a map"),
+            }
+        }
+    }
+
     impl Authenticator<Basic> for MockAuthenticator {
-        fn authenticate(&self, authorization: &Authorization<Basic>) -> Result<(), Error> {
+        fn authenticate(&self,
+                        authorization: &Authorization<Basic>,
+                        refresh_payload: bool)
+                        -> Result<AuthenticationResult, Error> {
             let username = authorization.username();
             let password = authorization
                 .password()
                 .unwrap_or_else(|| "".to_string());
 
             if username == "mei" && password == "冻住，不许走!" {
-                Ok(())
+                let payload = if refresh_payload {
+                    Some(Self::serialize_refresh_token_payload(authorization))
+                } else {
+                    None
+                };
+                Ok(AuthenticationResult {
+                       subject: username,
+                       payload: payload,
+                   })
             } else {
-                Err(Error::AuthenticationFailure)
+                Err(super::Error::AuthenticationFailure)?
             }
+        }
+
+        fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<Basic> = Self::deserialize_refresh_token_payload(payload);
+            self.authenticate(&Authorization(header), false)
         }
     }
 
     impl Authenticator<Bearer> for MockAuthenticator {
-        fn authenticate(&self, authorization: &Authorization<Bearer>) -> Result<(), Error> {
+        fn authenticate(&self,
+                        authorization: &Authorization<Bearer>,
+                        refresh_payload: bool)
+                        -> Result<AuthenticationResult, Error> {
             let token = authorization.token();
 
             if token == "这样可以挡住他们。" {
-                Ok(())
+                let payload = if refresh_payload {
+                    Some(Self::serialize_refresh_token_payload(authorization))
+                } else {
+                    None
+                };
+                Ok(AuthenticationResult {
+                       subject: "这样可以挡住他们。".to_string(),
+                       payload: payload,
+                   })
             } else {
-                Err(Error::AuthenticationFailure)
+                Err(super::Error::AuthenticationFailure)?
             }
+        }
+
+        fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<Bearer> = Self::deserialize_refresh_token_payload(payload);
+            self.authenticate(&Authorization(header), false)
         }
     }
 
     impl Authenticator<String> for MockAuthenticator {
-        fn authenticate(&self, authorization: &Authorization<String>) -> Result<(), Error> {
+        fn authenticate(&self,
+                        authorization: &Authorization<String>,
+                        refresh_payload: bool)
+                        -> Result<AuthenticationResult, Error> {
             let string = authorization.string();
 
             if string == "哦，对不起啦。" {
-                Ok(())
+                let payload = if refresh_payload {
+                    Some(Self::serialize_refresh_token_payload(authorization))
+                } else {
+                    None
+                };
+                Ok(AuthenticationResult {
+                       subject: "哦，对不起啦。".to_string(),
+                       payload: payload,
+                   })
             } else {
-                Err(Error::AuthenticationFailure)
+                Err(super::Error::AuthenticationFailure)?
             }
+        }
+
+        fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<String> = Self::deserialize_refresh_token_payload(payload);
+            self.authenticate(&Authorization(header), false)
         }
     }
 
@@ -410,7 +455,8 @@ pub mod tests {
         }
     }
 
-    fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
+    /// Ignite a Rocket with a Basic authenticator
+    pub fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
         // Ignite rocket
         rocket::ignite()
             .mount("/", routes![auth_basic])
@@ -423,13 +469,15 @@ pub mod tests {
     fn auth_basic(authorization: Option<Authorization<Basic>>,
                   authenticator: State<Box<Authenticator<Basic>>>)
                   -> Result<(), ::Error> {
-
+        let authorization = authorization
+            .ok_or_else(|| missing_authorization::<()>("https://www.acme.com").unwrap_err())?;
         authenticator
-            .prepare_response("https://www.acme.com", authorization)
+            .prepare_authentication_response(&authorization, true)
             .and_then(|_| Ok(()))
     }
 
-    fn ignite_bearer(authenticator: Box<Authenticator<Bearer>>) -> Rocket {
+    /// Ignite a Rocket with a Bearer authenticator
+    pub fn ignite_bearer(authenticator: Box<Authenticator<Bearer>>) -> Rocket {
         // Ignite rocket
         rocket::ignite()
             .mount("/", routes![auth_bearer])
@@ -442,13 +490,15 @@ pub mod tests {
     fn auth_bearer(authorization: Option<Authorization<Bearer>>,
                    authenticator: State<Box<Authenticator<Bearer>>>)
                    -> Result<(), ::Error> {
-
+        let authorization = authorization
+            .ok_or_else(|| missing_authorization::<()>("https://www.acme.com").unwrap_err())?;
         authenticator
-            .prepare_response("https://www.acme.com", authorization)
+            .prepare_authentication_response(&authorization, true)
             .and_then(|_| Ok(()))
     }
 
-    fn ignite_string(authenticator: Box<Authenticator<String>>) -> Rocket {
+    /// Ignite a Rocket with a String authenticator
+    pub fn ignite_string(authenticator: Box<Authenticator<String>>) -> Rocket {
         // Ignite rocket
         rocket::ignite()
             .mount("/", routes![auth_string])
@@ -461,9 +511,10 @@ pub mod tests {
     fn auth_string(authorization: Option<Authorization<String>>,
                    authenticator: State<Box<Authenticator<String>>>)
                    -> Result<(), ::Error> {
-
+        let authorization = authorization
+            .ok_or_else(|| missing_authorization::<()>("https://www.acme.com").unwrap_err())?;
         authenticator
-            .prepare_response("https://www.acme.com", authorization)
+            .prepare_authentication_response(&authorization, true)
             .and_then(|_| Ok(()))
     }
 
@@ -645,59 +696,5 @@ pub mod tests {
 
         let www_header: Vec<_> = response.header_values("WWW-Authenticate").collect();
         assert_eq!(www_header, vec!["Basic realm=https://www.acme.com"]);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn noop_basic_auth_get_test() {
-        let rocket = ignite_basic(Box::new(NoOp {}));
-
-        // Make headers
-        let auth_header = hyper::header::Authorization(Basic {
-                                                           username: "anything".to_owned(),
-                                                           password: Some("let me in".to_string()),
-                                                       });
-        let auth_header = http::Header::new("Authorization",
-                                            hyper::header::HeaderFormatter(&auth_header).to_string());
-        // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
-
-        // Assert
-        assert_eq!(response.status(), Status::Ok);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn noop_bearer_auth_get_test() {
-        let rocket = ignite_bearer(Box::new(NoOp {}));
-
-        // Make headers
-        let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
-        let auth_header = http::Header::new("Authorization",
-                                            hyper::header::HeaderFormatter(&auth_header).to_string());
-        // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
-
-        // Assert
-        assert_eq!(response.status(), Status::Ok);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn noop_string_auth_get_test() {
-        let rocket = ignite_string(Box::new(NoOp {}));
-
-        // Make headers
-        let auth_header = hyper::header::Authorization("anything goes".to_string());
-        let auth_header = http::Header::new("Authorization",
-                                            hyper::header::HeaderFormatter(&auth_header).to_string());
-        // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
-
-        // Assert
-        assert_eq!(response.status(), Status::Ok);
     }
 }
