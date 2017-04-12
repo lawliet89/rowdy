@@ -199,7 +199,6 @@ impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfigurati
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -118,13 +118,38 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
             Some(authorization) => {
                 let bytes: Vec<u8> = authorization.as_bytes().to_vec();
                 match header::Authorization::parse_header(&[bytes]) {
-                    Err(e) => Outcome::Failure((Status::BadRequest, From::from(e))),
+                    Err(_) => Outcome::Forward(()),
                     Ok(parsed) => Outcome::Success(Authorization(parsed)),
                 }
 
             }
             None => Outcome::Forward(()),
         }
+    }
+}
+
+impl<S: header::Scheme + 'static> Authorization<S> {
+    /// Convenience function to check if the Authorization is `Basic`
+    pub fn is_basic(&self) -> bool {
+        if let Some("Basic") = S::scheme() {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Convenience function to check if the Authorization is `Bearer`
+    pub fn is_bearer(&self) -> bool {
+        if let Some("Bearer") = S::scheme() {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Convenience function to check if the Authorization is `None`
+    pub fn is_string(&self) -> bool {
+        S::scheme().is_none()
     }
 }
 
@@ -268,11 +293,17 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
                         authorization: Option<Authorization<S>>)
                         -> Result<Authorization<S>, ::Error> {
         match authorization {
-            None => Err(Error::MissingAuthorization { realm: realm.to_string() })?,
+            None => missing_authorization(realm)?,
             Some(credentials) => Ok(self.authenticate(&credentials).map(|()| credentials)?),
         }
     }
 }
+
+/// Convenience function to respond with a missing authorization error
+pub fn missing_authorization<T>(realm: &str) -> Result<T, ::Error> {
+    Err(Error::MissingAuthorization { realm: realm.to_string() })?
+}
+
 /// Configuration for the associated type `Authenticator`. [`rowdy::Configuration`] expects its `authenticator` field
 /// to implement this trait. Before launching, `rowdy` will attempt to make an `Authenticator` based off the
 /// configuration by calling the `make_authenticator` method.

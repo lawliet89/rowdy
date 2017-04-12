@@ -1,6 +1,7 @@
 //! Routes mounted into Rocket
 use std::ops::Deref;
 
+use hyper;
 use rocket::{self, State, Route};
 use rocket::http::Method::*;
 
@@ -37,7 +38,20 @@ struct AuthParam {
     offline_token: Option<bool>,
 }
 
-/// CORS pre-flight route for token retrieval
+impl AuthParam {
+    /// Verify the params are correct for the authentication type
+    fn verify<S: hyper::header::Scheme + 'static>(&self,
+                                                  authorization: &auth::Authorization<S>)
+                                                  -> Result<(), ::Error> {
+        if authorization.is_bearer() && self.offline_token.is_some() {
+            Err(::Error::BadRequest("Offline token cannot be requested for when authenticating with a refresh token"
+                                        .to_string()))?
+        }
+        Ok(())
+    }
+}
+
+/// CORS pre-flight route for access token retrieval via initial authentication and refresh token
 #[allow(unmounted_route)]
 // mounted via `::launch()`
 #[options("/?<_auth_param>")]
@@ -51,21 +65,22 @@ fn token_getter_options(origin: Option<cors::Origin>,
     options.preflight(origin, &method, Some(&headers))
 }
 
-/// Token retrieval route
+/// Access token retrieval via initial authentication route
 #[allow(unmounted_route)]
 // mounted via `::launch()`
-#[get("/?<auth_param>")]
+#[get("/?<auth_param>", rank = 1)]
 #[allow(needless_pass_by_value)]
 fn token_getter(origin: Option<cors::Origin>,
-                authorization: Option<auth::Authorization<auth::Basic>>,
+                authorization: auth::Authorization<auth::Basic>,
                 auth_param: AuthParam,
                 configuration: State<Configuration>,
                 cors_options: State<TokenGetterCorsOptions>,
                 authenticator: State<Box<auth::BasicAuthenticator>>)
                 -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
 
+    auth_param.verify(&authorization)?;
     authenticator
-        .prepare_response(&configuration.issuer, authorization)
+        .prepare_response(&configuration.issuer, Some(authorization))
         .and_then(|authorization| {
                       let token = Token::<PrivateClaim>::with_configuration(&configuration,
                                                                             &authorization.username(),
@@ -76,9 +91,48 @@ fn token_getter(origin: Option<cors::Origin>,
                   })
 }
 
+/// Access token retrieval via refresh token route
+#[allow(unmounted_route)]
+// mounted via `::launch()`
+#[get("/?<auth_param>", rank = 2)]
+#[allow(needless_pass_by_value)]
+fn refresh_token(origin: Option<cors::Origin>,
+                 authorization: auth::Authorization<auth::Bearer>,
+                 auth_param: AuthParam,
+                 configuration: State<Configuration>,
+                 cors_options: State<TokenGetterCorsOptions>,
+                 authenticator: State<Box<auth::BasicAuthenticator>>)
+                 -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
+
+    auth_param.verify(&authorization)?;
+    Err(::Error::GenericError("oh no".to_string()))
+    // authenticator
+    //     .prepare_response(&configuration.issuer, authorization)
+    //     .and_then(|authorization| {
+    //                   let token = Token::<PrivateClaim>::with_configuration(&configuration,
+    //                                                                         &authorization.username(),
+    //                                                                         &auth_param.service,
+    //                                                                         Default::default())?;
+    //                   let token = token.encode(configuration.secret.for_signing()?)?;
+    //                   Ok(cors_options.respond(token, origin)?)
+    //               })
+}
+
+/// Route to catch missing Authorization
+#[allow(unmounted_route)]
+// mounted via `::launch()`
+#[get("/?<auth_param>", rank = 3)]
+#[allow(needless_pass_by_value)]
+fn bad_request(auth_param: AuthParam) -> Result<(), ::Error> {
+    auth::missing_authorization(&auth_param.service)
+}
+
 /// Return routes provided by rowdy
 pub fn routes() -> Vec<Route> {
-    routes![token_getter, token_getter_options]
+    routes![token_getter,
+            token_getter_options,
+            refresh_token,
+            bad_request]
 }
 
 #[cfg(test)]
@@ -222,7 +276,7 @@ mod tests {
         assert_eq!(response.status(), Status::Unauthorized);
 
         let www_header: Vec<_> = response.header_values("WWW-Authenticate").collect();
-        assert_eq!(www_header, vec!["Basic realm=https://www.acme.com"]);
+        assert_eq!(www_header, vec!["Basic realm=https://www.example.com"]);
     }
 
     #[test]

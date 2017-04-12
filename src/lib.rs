@@ -73,6 +73,8 @@ use serde::de;
 pub enum Error {
     /// A generic/unknown error
     GenericError(String),
+    /// A bad request resulting from bad request parameters/headers
+    BadRequest(String),
     /// Authentication error
     Auth(auth::Error),
     /// CORS error
@@ -96,7 +98,8 @@ impl error::Error for Error {
             Error::CORS(ref e) => e.description(),
             Error::Token(ref e) => e.description(),
             Error::IOError(ref e) => e.description(),
-            Error::GenericError(ref e) => e,
+            Error::GenericError(ref e) |
+            Error::BadRequest(ref e) => e,
         }
     }
 
@@ -106,7 +109,8 @@ impl error::Error for Error {
             Error::CORS(ref e) => Some(e as &error::Error),
             Error::Token(ref e) => Some(e as &error::Error),
             Error::IOError(ref e) => Some(e as &error::Error),
-            Error::GenericError(_) => Some(self as &error::Error),
+            Error::GenericError(_) |
+            Error::BadRequest(_) => Some(self as &error::Error),
         }
     }
 }
@@ -119,6 +123,7 @@ impl fmt::Display for Error {
             Error::Token(ref e) => fmt::Display::fmt(e, f),
             Error::IOError(ref e) => fmt::Display::fmt(e, f),
             Error::GenericError(ref e) => fmt::Display::fmt(e, f),
+            Error::BadRequest(ref e) => fmt::Display::fmt(e, f),
         }
     }
 }
@@ -129,6 +134,10 @@ impl<'r> Responder<'r> for Error {
             Error::Auth(e) => e.respond(),
             Error::CORS(e) => e.respond(),
             Error::Token(e) => e.respond(),
+            Error::BadRequest(e) => {
+                error_!("{}", e);
+                Err(Status::BadRequest)
+            }
             e => {
                 error_!("{}", e);
                 Err(Status::InternalServerError)
