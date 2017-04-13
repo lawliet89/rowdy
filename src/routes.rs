@@ -85,9 +85,18 @@ fn token_getter(origin: Option<cors::Origin>,
             let token = Token::<PrivateClaim>::with_configuration(&configuration,
                                                                   &result.subject,
                                                                   &auth_param.service,
-                                                                  Default::default())?;
+                                                                  Default::default(),
+                                                                  result.payload.as_ref())?;
             let signing_key = configuration.secret.for_signing()?;
             let token = token.encode(&signing_key)?;
+
+            let token = if configuration.refresh_token_enabled() && token.has_refresh_token() {
+                let refresh_token_key = &configuration.refresh_token().key;
+                token
+                    .encrypt_refresh_token(&signing_key, refresh_token_key)?
+            } else {
+                token
+            };
 
             Ok(cors_options.respond(token, origin)?)
         })
@@ -141,7 +150,7 @@ mod tests {
     use serde_json;
 
     use super::*;
-    use token::Secret;
+    use token::{Secret, RefreshTokenConfiguration};
 
     fn ignite() -> Rocket {
         // Ignite rocket
@@ -154,6 +163,12 @@ mod tests {
             signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
             secret: Secret::String("secret".to_string()),
             expiry_duration: Duration::from_secs(120),
+            refresh_token: Some(RefreshTokenConfiguration {
+                                    cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+                                    enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
+                                    key: jwt::jwk::JWK::new_octect_key(&[0; 256 / 8], Default::default()),
+                                    expiry_duration: Duration::from_secs(86400),
+                                }),
         };
         let configuration = ::Configuration {
             token: token_configuration,
