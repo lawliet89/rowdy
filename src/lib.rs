@@ -1,16 +1,156 @@
-//! # rowdy
-//!
 //! `rowdy` is a JSON Web token based authentication server based off Docker Registry's
 //! [authentication protocol](https://docs.docker.com/registry/spec/auth/).
 //!
-//! ## Features
+//! # Features
 //!
 //! - `clippy_lints`: Enable clippy lints during builds
 //! - `simple_authenticator`: A simple CSV based authenticator
 //! - `ldap_authenticator`: An LDAP based authenticator
 //!
 //! By default, the `simple_authenticator` feature is turned on.
-
+//!
+//! # `rowdy` Authentication Flow
+//!
+//! The authentication flow is inspired by [Docker Registry](https://docs.docker.com/registry/spec/auth/)
+//! authentication specification.
+//!
+//! ## JSON Web Tokens
+//!
+//! Authentication makes use of two types of [JSON Web Tokens (JWT)](https://jwt.io/): Access and Refresh tokens.
+//!
+//! ### Access Token
+//!
+//! The access token is a short lived JWT that allows users to access resources within the scope that they are allowed
+//! to. The access token itself contains enough information for services to verify the user and their permissions
+//! in a stateless manner.
+//!
+//! ### Refresh Token
+//!
+//! The refresh token allows users to retrieve a new access token without needing to re-authenticate. As such, the
+//! refresh token is longer lived, but can be revoked.
+//!
+//! ## Authentication Flow
+//!
+//! 1. Client attempts to access a resource on a protected service.
+//! 1. Service responds with a `401 Unauthorized` authentication challenge with information on how to authenticate
+//! provided in the `WWW-Authenticate` response header.
+//! 1. Using the information from the previous step, the client authenticates with the authentication server. The client
+//! will receive, among other information, opaque access and refresh tokens.
+//! 1. The client retries the original request with the Bearer token embedded in the request’s Authorization header.
+//! 1. The service authorizes the client by validating the Bearer token and the claim set embedded within it and
+//! proceeds as usual.
+//!
+//! ### Authentication Challenge
+//!
+//! Services will challenge users who do not provide a valid token via the HTTP response `401 Unauthorized`. Details for
+//! authentication is provided in the `WWW-Authenticate` header.
+//!
+//! ```text
+//! Www-Authenticate: Bearer realm="https://www.auth.com",service="https://www.example.com",scope="all"
+//! ```
+//!
+//! The `realm` field indicates the authentcation server endpoint which clients should proceed to authenticate against.
+//!
+//! The `service` field indicates the `service` value that clients should use when attempting to authenticate at
+//! `realm`.
+//!
+//! The `scope` field indicates the `scope` value that clients should use when attempting to authenticate at `realm`.
+//!
+//! ### Retrieving an Access Token (and optionally Refresh Token) from the Authentication Server
+//!
+//! A HTTP `GET` request should be made to the `realm` endpoint provided above. The endpoint will support the following
+//! query paremeters:
+//!
+//! - `service`: The service that the client is authenticating for. This should be the same as the `service` value in
+//! the previous step
+//! - `scope`: The scope that the client wishes to authenticate for. This should be the same as the `scope` value in the
+//! previous step.
+//! - `offline_token`: Set to `true` if a refresh token is also required. Defaults to `false`.
+//!
+//! When authenticating for the first time, clients should send the user's username and passwords in the form of
+//! `Basic` authentication. If the client already has a prior refresh token and would like to obtain a new access token,
+//! the client should send the refresh token in the form of `Bearer` authentication.
+//!
+//! If successful, the authentcation server will return a `200 OK` response with a JSON body containing the following
+//! fields:
+//!
+//! - `token`: An opaque Access (`Bearer`) token that clients should supply to subsequent requests in the
+//! `Authorization` header.
+//! - `expires_in`: The duration in seconds since the token was issued that it will remain valid.
+//! - `issued_at`: RFC3339-serialized UTC standard time at which a given token was issued.
+//! - `refresh_token`: An opaque `Refresh` token which can be used to get additional access tokens for the same subject
+//! with different scopes. This token should be kept secure by the client and only sent to the authorization server
+//! which issues access tokens. This field will only be set when `offline_token=true` is provided in the request.
+//!
+//! If this fails, the server will return with the appropriate `4xx` response.
+//!
+//! ### Using the Access Token
+//!
+//! Once the client has a token, it will try the request again with the token placed in the HTTP Authorization header
+//! like so:
+//!
+//! ```text
+//! Authorization: Bearer <token>
+//! ```
+//!
+//! ### Using the Refresh Token to Retrieve a New Access Token
+//!
+//! When the client's Access token expires, and it has previously asked for a Refresh Token, the client can make a `GET`
+//! request to the same endpoint that the client used to retrieve the access token (the `realm` URL in an authentication
+//! challenge).
+//!
+//! The steps are described in the section "Retrieving an Access Token" above. The process is the same as the initial
+//! authentication except that instead of using `Basic` authentication, the client should instead send the refresh token
+//! retrieved prior as `Bearer` authentication.
+//!
+//! ### Example
+//!
+//! This example uses `curl` to make request to the some (hypothetical) protected endpoint. It requires
+//! [`jq`](https://stedolan.github.io/jq/) to parse JSON.
+//!
+//! ```bash
+//! PROTECTED_RESOURCE="https://www.example.com/protected/resource/"
+//!
+//! # Save the response headers of our first request to the endpoint to get the Www-Authenticate header
+//! RESPONSE_HEADER=$(tempfile);
+//! curl --dump-header "${RESPONSE_HEADER}" "${PROTECTED_RESOURCE}"
+//!
+//! # Extract the realm, the service, and the scope from the Www-Authenticate header
+//! WWWAUTH=$(cat "${RESPONSE_HEADER}" | grep "Www-Authenticate")
+//! REALM=$(echo "${WWWAUTH}" | grep -o '\(realm\)="[^"]*"' | cut -d '"' -f 2)
+//! SERVICE=$(echo "${WWWAUTH}" | grep -o '\(service\)="[^"]*"' | cut -d '"' -f 2)
+//! SCOPE=$(echo "${WWWAUTH}" | grep -o '\(scope\)="[^"]*"' | cut -d '"' -f 2)
+//!
+//! # Build the URL to query the auth server
+//! AUTH_URL="${REALM}?service=${SERVICE}&scope=${SCOPE}&offline_token=true"
+//!
+//! # Query the auth server to get a token -- replace the username and password
+//! # below with the value from 1password
+//! TOKEN=$(curl -s --user "mozart:password" "${AUTH_URL}")
+//!
+//! # Get the access token from the JSON string: {"token": "...."}
+//! ACCESS_TOKEN=$(echo ${TOKEN} | jq .token | tr -d '"')
+//!
+//! # Query the resource again, but this time with a bearer token
+//! curl -v -H "Authorization: Bearer ${ACCESS_TOKEN}" "${PROTECTED_RESOURCE}"
+//!
+//! # Get the refresh token
+//! REFRESH_TOKEN=$(echo "${TOKEN}" | jq .refresh_token | tr -d '"')
+//!
+//! # Get a new access token
+//! NEW_TOKEN=$(curl --header "Authorization: Bearer ${REFRESH_TOKEN}" "${AUTH_URL}")
+//!
+//! # Parse the new access token
+//! NEW_ACCESS_TOKEN=$(echo "${TOKEN}" | jq .token | tr -d '"')
+//!
+//! # Query the resource again, but this time with a new access token
+//! curl -v -H "Authorization: Bearer ${NEW_ACCESS_TOKEN}" "${PROTECTED_RESOURCE}"
+//! ```
+//!
+//! ## Scope
+//!
+//! Not in use at the moment. Just use `all`.
+//!
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
 #![cfg_attr(feature="clippy_lints", plugin(clippy))]
