@@ -3,10 +3,12 @@
 //! This module provides the `Token` struct which encapsulates a JSON Web Token or `JWT`.
 //! Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
 //! to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
+use std::collections::HashSet;
 use std::borrow::Borrow;
 use std::error;
 use std::fmt;
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{self, Cursor, Read};
 use std::ops::Deref;
 use std::str::FromStr;
 use std::time::Duration;
@@ -19,7 +21,7 @@ use serde::{Serialize, Deserialize};
 use serde_json;
 use uuid::{self, Uuid};
 
-use JsonValue;
+use {ByteSequence, JsonValue};
 
 /// Token errors
 #[derive(Debug)]
@@ -44,7 +46,15 @@ pub enum Error {
     RefreshTokenNotEncrypted,
     /// Raised when the service requested is not in the list of intended audiences
     InvalidService,
+    /// Raised when the issuer is invalid
+    InvalidIssuer,
+    /// Raised when the audience is invalid
+    InvalidAudience,
 
+    /// Generic Error
+    GenericError(String),
+    /// IO Error when reading keys from files
+    IOError(io::Error),
     /// Errors during token encoding/decoding
     JWTError(jwt::errors::Error),
     /// Errors during token serialization
@@ -52,7 +62,9 @@ pub enum Error {
 }
 
 impl_from_error!(jwt::errors::Error, Error::JWTError);
+impl_from_error!(io::Error, Error::IOError);
 impl_from_error!(serde_json::Error, Error::TokenSerializationError);
+impl_from_error!(String, Error::GenericError);
 
 impl error::Error for Error {
     fn description(&self) -> &str {
@@ -67,14 +79,19 @@ impl error::Error for Error {
             Error::RefreshTokenNotDecrypted => "Refresh token is not decrypted and cannot be used in this context",
             Error::RefreshTokenNotEncrypted => "Refresh token is not encrypted and cannot be used in this context",
             Error::InvalidService => "Service requested is not in the list of intended audiences",
+            Error::InvalidIssuer => "The token has an invalid issuer",
+            Error::InvalidAudience => "The token has invalid audience",
             Error::JWTError(ref e) => e.description(),
+            Error::IOError(ref e) => e.description(),
             Error::TokenSerializationError(ref e) => e.description(),
+            Error::GenericError(ref e) => e,
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
             Error::JWTError(ref e) => Some(e as &error::Error),
+            Error::IOError(ref e) => Some(e as &error::Error),
             Error::TokenSerializationError(ref e) => Some(e as &error::Error),
             _ => Some(self as &error::Error),
         }
@@ -85,7 +102,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::JWTError(ref e) => fmt::Display::fmt(e, f),
+            Error::IOError(ref e) => fmt::Display::fmt(e, f),
             Error::TokenSerializationError(ref e) => fmt::Display::fmt(e, f),
+            Error::GenericError(ref e) => fmt::Display::fmt(e, f),
             _ => write!(f, "{}", error::Error::description(self)),
         }
     }
@@ -95,7 +114,7 @@ impl<'r> Responder<'r> for Error {
     fn respond(self) -> Result<Response<'r>, Status> {
         error_!("Token Error: {:?}", self);
         match self {
-            Error::InvalidService => Err(Status::Forbidden),
+            Error::InvalidService | Error::InvalidIssuer | Error::InvalidAudience => Err(Status::Forbidden),
             _ => Err(Status::InternalServerError),
         }
     }
@@ -116,27 +135,27 @@ fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Hea
 fn make_registered_claims(subject: &str,
                           now: DateTime<UTC>,
                           expiry_duration: Duration,
-                          issuer: &str,
+                          issuer: &jwt::StringOrUri,
                           audience: &jwt::SingleOrMultiple<jwt::StringOrUri>)
                           -> Result<jwt::RegisteredClaims, ::Error> {
     let expiry_duration = chrono::Duration::from_std(expiry_duration)
         .map_err(|e| e.to_string())?;
 
     Ok(jwt::RegisteredClaims {
-           issuer: Some(FromStr::from_str(issuer).map_err(Error::JWTError)?),
+           issuer: Some(issuer.clone()),
            subject: Some(FromStr::from_str(subject).map_err(Error::JWTError)?),
            audience: Some(audience.clone()),
            issued_at: Some(now.into()),
            not_before: Some(now.into()),
            expiry: Some((now + expiry_duration).into()),
-           id: Some(make_uuid(issuer).urn().to_string()),
+           id: Some(make_uuid(&issuer.to_string()).urn().to_string()),
        })
 }
 
 /// Make a new JWS
 #[allow(too_many_arguments)] // Internal function
 fn make_token<P: Serialize + Deserialize + 'static>(subject: &str,
-                                                    issuer: &str,
+                                                    issuer: &jwt::StringOrUri,
                                                     audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
                                                     expiry_duration: Duration,
                                                     private_claims: P,
@@ -151,6 +170,36 @@ fn make_token<P: Serialize + Deserialize + 'static>(subject: &str,
                                  private: private_claims,
                                  registered: registered_claims,
                              }))
+}
+
+/// Verify that the service requested for is allowed in the configuration
+fn verify_service(config: &Configuration, service: &str) -> Result<(), Error> {
+    if !config.audience.contains(&FromStr::from_str(service)?) {
+        Err(Error::InvalidService)
+    } else {
+        Ok(())
+    }
+}
+
+/// Verify that the issuer is expected from the configuration
+fn verify_issuer(config: &Configuration, issuer: &jwt::StringOrUri) -> Result<(), Error> {
+    if *issuer == config.issuer {
+        Ok(())
+    } else {
+        Err(Error::InvalidIssuer)
+    }
+}
+
+/// Verify that the requested audience is a strict subset of the audience configured
+fn verify_audience(config: &Configuration, audience: &jwt::SingleOrMultiple<jwt::StringOrUri>) -> Result<(), Error> {
+    let allowed_audience: HashSet<jwt::StringOrUri> = config.audience.iter().cloned().collect();
+    let audience: HashSet<jwt::StringOrUri> = audience.iter().cloned().collect();
+
+    if audience.is_subset(&allowed_audience) {
+        Ok(())
+    } else {
+        Err(Error::InvalidAudience)
+    }
 }
 
 /// Token configuration. Usually deserialized as part of [`rowdy::Configuration`] from JSON for use.
@@ -202,7 +251,7 @@ pub struct Configuration {
     /// The issuer of the token. Usually the URI of the authentication server.
     /// The issuer URI will also be used in the UUID generation of the tokens, and is also the `realm` for
     /// authentication purposes.
-    pub issuer: String,
+    pub issuer: jwt::StringOrUri,
     /// Origins that are allowed to issue CORS request. This is needed for browser
     /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
     ///
@@ -215,7 +264,7 @@ pub struct Configuration {
     /// Defaults to `none`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_algorithm: Option<jwa::SignatureAlgorithm>,
-    /// Secrets for use in signing and encrypting a JWT.
+    /// Secrets for use in signing a JWT.
     /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
     /// Defaults to `None`.
     ///
@@ -248,6 +297,23 @@ impl Configuration {
     pub fn refresh_token(&self) -> &RefreshTokenConfiguration {
         self.refresh_token.as_ref().unwrap()
     }
+
+    /// Prepare the keys for use with various cryptographic operations
+    pub fn keys(&self) -> Result<Keys, Error> {
+        let (encryption, decryption) = if self.refresh_token_enabled() {
+            let key = &self.refresh_token().key;
+            (Some(key.for_encryption()?), Some(key.for_decryption()?))
+        } else {
+            (None, None)
+        };
+
+        Ok(Keys {
+               signing: self.secret.for_signing()?,
+               signature_verification: self.secret.for_verification()?,
+               encryption: encryption,
+               decryption: decryption,
+           })
+    }
 }
 
 /// Configuration for Refresh Tokens
@@ -270,7 +336,7 @@ pub struct RefreshTokenConfiguration {
     pub enc_algorithm: jwa::ContentEncryptionAlgorithm,
 
     /// Key used in determining the CEK, or directly encrypt the content depending on the `cek_algorithm`
-    pub key: jwk::JWK<jwt::Empty>,
+    pub key: Secret,
 
     /// Expiry duration of refresh tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
     #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
@@ -281,28 +347,46 @@ pub struct RefreshTokenConfiguration {
 #[derive(Default, Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PrivateClaim {}
 
-/// Convenient typedef for the type of the Refresh Token Payload
+/// Convenient typedef for the type of the Refresh Token Payload. This is a signed JWS which contains a JWT Claims set.
 pub type RefreshTokenPayload = jwt::JWT<JsonValue, jwt::Empty>;
 
-/// Convenient typedef for the type of the encrypted JWE wrapping `RefreshTokenPayload`
-type RefreshTokenJWE = jwt::jwe::Compact<RefreshTokenPayload, jwt::Empty>;
+/// Convenient typedef for the type of the encrypted JWE wrapping `RefreshTokenPayload`. This is a JWE which contains
+/// a JWS that contains a JWT Claims set.
+pub type RefreshTokenJWE = jwt::jwe::Compact<RefreshTokenPayload, jwt::Empty>;
 
-/// A newtype struct wrapping an encrypted JWE containing the `RefreshTokenPayload`.
+/// A Refresh Token containing the payload (called refresh payload) used by an authenticator to issue new access
+/// tokens without needing the user to re-authenticate.
+///
+/// Internally, this is a newtype struct wrapping an encrypted JWE containing the `RefreshTokenPayload`. In other
+/// words, this is an encrypted token (JWE) containing a payload. The payload is a signed token (JWS) which contains
+/// a set of values (JWT Claims Set).
+///
+/// Usually, the semantics and inner workings of the refresh token is, and should be, opaque to any
+/// user. Thus, some of the methods to manipulate the inner details of the refresh tokens are not public.
+///
+/// This struct is serialized and deserialized to a string, which is the
+/// [Compact serialization of a JWE](https://tools.ietf.org/html/rfc7516#section-3.1).
+///
+/// Before you can serialize the struct, you will need to call `encrypt` to first sign the embedded JWS, and then
+/// encrypt it. If you do not do so, `serde` will refuse to serialize.
+///
+/// Conversely, only an encrypted token can be deserialized. `serde` will refuse to deserialize a decrypted token
+/// similarly. You will need to call `decrypt` to decrypt the deserialized token.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct RefreshToken(RefreshTokenJWE);
 
 impl RefreshToken {
     #[allow(too_many_arguments)] // Internal function
-    fn new(subject: &str,
-           issuer: &str,
-           audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
-           expiry_duration: Duration,
-           payload: &JsonValue,
-           signature_algorithm: Option<jwa::SignatureAlgorithm>,
-           cek_algorithm: jwa::KeyManagementAlgorithm,
-           enc_algorithm: jwa::ContentEncryptionAlgorithm,
-           now: DateTime<UTC>)
-           -> Result<Self, ::Error> {
+    fn new_decrypted(subject: &str,
+                     issuer: &jwt::StringOrUri,
+                     audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
+                     expiry_duration: Duration,
+                     payload: &JsonValue,
+                     signature_algorithm: Option<jwa::SignatureAlgorithm>,
+                     cek_algorithm: jwa::KeyManagementAlgorithm,
+                     enc_algorithm: jwa::ContentEncryptionAlgorithm,
+                     now: DateTime<UTC>)
+                     -> Result<Self, ::Error> {
 
         // First, make a token
         let token = make_token(subject,
@@ -324,7 +408,12 @@ impl RefreshToken {
         Ok(RefreshToken(jwe))
     }
 
-    /// Unwrap and consumes self
+    /// Create a new decrypted struct based on the Base64 encoded token string
+    pub fn new_encrypted(token: &str) -> Self {
+        RefreshToken(jwt::JWE::new_encrypted(token))
+    }
+
+    /// Unwrap and consumes self, producing the wrapped JWE. You generally should not, and do not need to call this.
     pub fn unwrap(self) -> RefreshTokenJWE {
         self.0
     }
@@ -396,12 +485,57 @@ impl RefreshToken {
         Ok(&self.claims_set()?.private)
     }
 
-    /// Validate the times of the refresh token
-    pub fn validate(&self, options: Option<jwt::TemporalValidationOptions>) -> Result<(), Error> {
-        self.claims_set()?
+    /// Validate the times and claims of the refresh token
+    pub fn validate(&self,
+                    service: &str,
+                    config: &Configuration,
+                    options: Option<jwt::TemporalValidationOptions>)
+                    -> Result<(), Error> {
+        use std::str::FromStr;
+
+        let options = options.or_else(|| {
+                                          Some(jwt::TemporalValidationOptions {
+                                                   issued_at_required: true,
+                                                   not_before_required: true,
+                                                   expiry_required: true,
+                                                   ..Default::default()
+                                               })
+                                      });
+
+        let claims_set = self.claims_set()?;
+        let issuer = claims_set
             .registered
-            .validate_times(options)
-            .map_err(|e| Error::JWTError(jwt::errors::Error::ValidationError(e)))
+            .issuer
+            .as_ref()
+            .ok_or_else(|| Error::InvalidIssuer)?;
+        let audience = claims_set
+            .registered
+            .audience
+            .as_ref()
+            .ok_or_else(|| Error::InvalidAudience)?;
+
+        verify_service(config, service)
+            .and_then(|_| if audience.contains(&FromStr::from_str(service)?) {
+                          Ok(())
+                      } else {
+                          Err(Error::InvalidAudience)
+                      })
+            .and_then(|_| verify_audience(config, audience))
+            .and_then(|_| verify_issuer(config, issuer))
+            .and_then(|_| {
+                          claims_set
+                              .registered
+                              .validate_times(options)
+                              .map_err(|e| Error::JWTError(jwt::errors::Error::ValidationError(e)))
+                      })
+    }
+
+    /// Convenience function to convert a decrypted payload to string
+    pub fn to_string(&self) -> Result<String, Error> {
+        Ok(self.0
+               .encrypted()
+               .map_err(|_| Error::RefreshTokenNotEncrypted)?
+               .to_string())
     }
 }
 
@@ -448,14 +582,6 @@ impl<T> Clone for Token<T>
 }
 
 impl<T: Serialize + Deserialize + 'static> Token<T> {
-    fn verify_service(config: &Configuration, service: &str) -> Result<(), Error> {
-        if !config.audience.contains(&FromStr::from_str(service)?) {
-            Err(Error::InvalidService)
-        } else {
-            Ok(())
-        }
-    }
-
     /// Internal token creation that allows for us to override the time `now`. For testing
     fn with_configuration_and_time(config: &Configuration,
                                    subject: &str,
@@ -465,7 +591,7 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
                                    now: DateTime<UTC>)
                                    -> Result<Self, ::Error> {
 
-        Self::verify_service(config, service)?;
+        verify_service(config, service)?;
 
         let access_token = make_token(subject,
                                       &config.issuer,
@@ -479,15 +605,15 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
             Some(ref refresh_token_config) => {
                 match refresh_token_payload {
                     Some(payload) => {
-                        Some(RefreshToken::new(subject,
-                                               &config.issuer,
-                                               &config.audience,
-                                               refresh_token_config.expiry_duration,
-                                               payload,
-                                               config.signature_algorithm,
-                                               refresh_token_config.cek_algorithm,
-                                               refresh_token_config.enc_algorithm,
-                                               now)?)
+                        Some(RefreshToken::new_decrypted(subject,
+                                                         &config.issuer,
+                                                         &config.audience,
+                                                         refresh_token_config.expiry_duration,
+                                                         payload,
+                                                         config.signature_algorithm,
+                                                         refresh_token_config.cek_algorithm,
+                                                         refresh_token_config.enc_algorithm,
+                                                         now)?)
                     }
                     None => None,
                 }
@@ -756,7 +882,12 @@ pub enum Secret {
     /// No secret -- used when no signature or encryption is required.
     None,
     /// Secret for HMAC signing
-    String(String),
+    ByteSequence(ByteSequence),
+    /// Path to a file containing the byte sequence for HMAC signing or encryption key
+    Bytes {
+        /// Path to the file containing the byte sequence for a HMAC signing or encryption key
+        path: String,
+    },
     /// DER RSA Key pair.
     /// See [`jwt::jws::Secret`] for more details.
     RSAKeyPair {
@@ -775,26 +906,68 @@ impl Default for Secret {
 
 impl Secret {
     /// Create a [`jws::Secret`] for the purpose of signing
-    pub fn for_signing(&self) -> Result<jws::Secret, Error> {
+    pub(super) fn for_signing(&self) -> Result<jws::Secret, Error> {
         match *self {
             Secret::None => Ok(jws::Secret::None),
-            Secret::String(ref secret) => Ok(jws::Secret::bytes_from_str(secret)),
+            Secret::ByteSequence(ref bytes) => Ok(jws::Secret::Bytes(bytes.as_bytes())),
+            Secret::Bytes { ref path } => Ok(jws::Secret::Bytes(Self::read_file_to_bytes(path)?)),
             Secret::RSAKeyPair { ref rsa_private, .. } => Ok(jws::Secret::rsa_keypair_from_file(rsa_private)?),
         }
     }
 
     /// Create a [`jws::Secret`] for the purpose of verifying signatures
-    pub fn for_verification(&self) -> Result<jws::Secret, Error> {
+    pub(super) fn for_verification(&self) -> Result<jws::Secret, Error> {
         match *self {
             Secret::None => Ok(jws::Secret::None),
-            Secret::String(ref secret) => Ok(jws::Secret::bytes_from_str(secret)),
+            Secret::ByteSequence(ref bytes) => Ok(jws::Secret::Bytes(bytes.as_bytes())),
+            Secret::Bytes { ref path } => Ok(jws::Secret::Bytes(Self::read_file_to_bytes(path)?)),
             Secret::RSAKeyPair { ref rsa_public, .. } => Ok(jws::Secret::public_key_from_file(rsa_public)?),
         }
     }
+
+    /// Create a JWK for the purpose of encryption
+    pub(super) fn for_encryption(&self) -> Result<jwk::JWK<jwt::Empty>, Error> {
+        match *self {
+            Secret::None => Err(Error::GenericError("A key is required for encryption".to_string())),
+            Secret::ByteSequence(ref bytes) => Ok(jwk::JWK::new_octect_key(&bytes.as_bytes(), Default::default())),
+            Secret::Bytes { ref path } => {
+                Ok(jwk::JWK::new_octect_key(&Self::read_file_to_bytes(path)?, Default::default()))
+            }
+            Secret::RSAKeyPair { .. } => Err(Error::GenericError("Not supported yet".to_string())),
+        }
+    }
+
+    /// Create a JWK for the purpose of decryption
+    pub(super) fn for_decryption(&self) -> Result<jwk::JWK<jwt::Empty>, Error> {
+        // For now
+        self.for_encryption()
+    }
+
+    fn read_file_to_bytes(path: &str) -> Result<Vec<u8>, Error> {
+        let mut file = File::open(path)?;
+        let mut bytes = Vec::<u8>::new();
+        file.read_to_end(&mut bytes)?;
+        Ok(bytes)
+    }
+}
+
+/// Keys prepared in a form directly usable for cryptographic operations. This prevents us from having to
+/// repeatedly read keys from the file system. Users should prepare the keys from `Configuration` using
+/// `Configuration::keys()` and then use this struct to retrieve keys from instead of the functions from `Secret`.
+pub struct Keys {
+    /// Key used to signed tokens
+    pub signing: jws::Secret,
+    /// Key used to verify token signatures
+    pub signature_verification: jws::Secret,
+    /// Key used to encrypt tokens. Used if Refresh tokens are enabled.
+    pub encryption: Option<jwk::JWK<jwt::Empty>>,
+    /// Key used to decrypt tokens. Used if Refresh tokens are enabled.
+    pub decryption: Option<jwk::JWK<jwt::Empty>>,
 }
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     use std::time::Duration;
 
     use chrono::{DateTime, NaiveDateTime, UTC};
@@ -819,6 +992,32 @@ mod tests {
         }
     }
 
+    fn make_config(refresh_token: bool) -> Configuration {
+        let refresh_token = if refresh_token {
+            Some(RefreshTokenConfiguration {
+                     cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+                     enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
+                     key: Secret::ByteSequence(ByteSequence::Bytes(vec![0; 256/8])),
+                     expiry_duration: Duration::from_secs(86400),
+                 })
+        } else {
+            None
+        };
+
+        let allowed_origins = ["https://www.example.com"];
+        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
+
+        Configuration {
+            issuer: FromStr::from_str("https://www.acme.com").unwrap(),
+            allowed_origins: allowed_origins,
+            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
+            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
+            secret: Secret::ByteSequence(ByteSequence::String("secret".to_string())),
+            expiry_duration: Duration::from_secs(120),
+            refresh_token: refresh_token,
+        }
+    }
+
     fn refresh_token_payload() -> JsonValue {
         let mut map = JsonMap::with_capacity(1);
         map.insert("test".to_string(), From::from("foobar"));
@@ -826,15 +1025,16 @@ mod tests {
     }
 
     fn make_refresh_token() -> RefreshToken {
-        RefreshToken::new("foobar",
-                          "foobar",
-                          &jwt::SingleOrMultiple::Single(FromStr::from_str("test").unwrap()),
-                          Duration::from_secs(120),
-                          &refresh_token_payload(),
-                          Some(Default::default()),
-                          jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                          jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-                          UTC::now())
+        RefreshToken::new_decrypted("foobar",
+                                    &FromStr::from_str("https://www.acme.com").unwrap(),
+                                    &jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com")
+                                                                       .unwrap()),
+                                    Duration::from_secs(120),
+                                    &refresh_token_payload(),
+                                    Some(Default::default()),
+                                    jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+                                    jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
+                                    UTC::now())
                 .unwrap()
     }
 
@@ -990,7 +1190,7 @@ mod tests {
         let none = Secret::None;
         assert_matches_non_debug!(not_err!(none.for_signing()), jwt::jws::Secret::None);
 
-        let string = Secret::String("secret".to_string());
+        let string = Secret::ByteSequence(ByteSequence::String("secret".to_string()));
         assert_matches_non_debug!(not_err!(string.for_signing()), jwt::jws::Secret::Bytes(_));
 
         let rsa = Secret::RSAKeyPair {
@@ -1005,7 +1205,7 @@ mod tests {
         let none = Secret::None;
         assert_matches_non_debug!(not_err!(none.for_verification()), jwt::jws::Secret::None);
 
-        let string = Secret::String("secret".to_string());
+        let string = Secret::ByteSequence(ByteSequence::String("secret".to_string()));
         assert_matches_non_debug!(not_err!(string.for_verification()), jwt::jws::Secret::Bytes(_));
 
         let rsa = Secret::RSAKeyPair {
@@ -1017,17 +1217,7 @@ mod tests {
 
     #[test]
     fn token_created_with_refresh_token_disabled() {
-        let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = Configuration {
-            issuer: "https://www.acme.com".to_string(),
-            allowed_origins: allowed_origins,
-            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
-            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
-            secret: Secret::String("secret".to_string()),
-            expiry_duration: Duration::from_secs(120),
-            refresh_token: None,
-        };
+        let configuration = make_config(false);
 
         let mut map = JsonMap::with_capacity(1);
         map.insert("test".to_string(), From::from("foobar"));
@@ -1067,22 +1257,7 @@ mod tests {
 
     #[test]
     fn token_created_with_no_refresh_token_payload() {
-        let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = Configuration {
-            issuer: "https://www.acme.com".to_string(),
-            allowed_origins: allowed_origins,
-            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
-            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
-            secret: Secret::String("secret".to_string()),
-            expiry_duration: Duration::from_secs(120),
-            refresh_token: Some(RefreshTokenConfiguration {
-                                    cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                                    enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-                                    key: jwt::jwk::JWK::new_octect_key(&[0; 256 / 8], Default::default()),
-                                    expiry_duration: Duration::from_secs(80640),
-                                }),
-        };
+        let configuration = make_config(true);
 
         let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
@@ -1118,22 +1293,7 @@ mod tests {
 
     #[test]
     fn token_created_with_refresh_token() {
-        let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = Configuration {
-            issuer: "https://www.acme.com".to_string(),
-            allowed_origins: allowed_origins,
-            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
-            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
-            secret: Secret::String("secret".to_string()),
-            expiry_duration: Duration::from_secs(120),
-            refresh_token: Some(RefreshTokenConfiguration {
-                                    cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                                    enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-                                    key: jwt::jwk::JWK::new_octect_key(&[0; 256 / 8], Default::default()),
-                                    expiry_duration: Duration::from_secs(80640),
-                                }),
-        };
+        let configuration = make_config(true);
 
         let mut map = JsonMap::with_capacity(1);
         map.insert("test".to_string(), From::from("foobar"));
@@ -1176,17 +1336,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "InvalidService")]
     fn validates_service_correctly() {
-        let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
-        let configuration = Configuration {
-            issuer: "https://www.acme.com".to_string(),
-            allowed_origins: allowed_origins,
-            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
-            signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
-            secret: Secret::String("secret".to_string()),
-            expiry_duration: Duration::from_secs(120),
-            refresh_token: None,
-        };
+        let configuration = make_config(true);
 
         let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
         Token::<TestClaims>::with_configuration_and_time(&configuration,
@@ -1196,5 +1346,179 @@ mod tests {
                                                          None,
                                                          now)
                 .unwrap();
+    }
+
+    #[test]
+    fn refresh_token_validates_correctly() {
+        let configuration = make_config(true);
+        let refresh_token = make_refresh_token();
+        not_err!(refresh_token.validate("https://www.example.com/", &configuration, None));
+    }
+
+    /// Token does not have an issuer field
+    #[test]
+    #[should_panic(expected = "InvalidIssuer")]
+    fn refresh_token_validates_missing_issuer() {
+        let configuration = make_config(true);
+
+        let refresh_token = make_refresh_token();
+        let mut jwe = refresh_token.unwrap();
+        {
+            let mut jws = jwe.payload_mut().unwrap();
+            let mut claims_set = jws.payload_mut().unwrap();
+            claims_set.registered.issuer = None;
+        }
+        let refresh_token = RefreshToken(jwe);
+
+        refresh_token
+            .validate("https://www.example.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// Token does not have an audience field
+    #[test]
+    #[should_panic(expected = "InvalidAudience")]
+    fn refresh_token_validates_missing_audience() {
+        let configuration = make_config(true);
+
+        let refresh_token = make_refresh_token();
+        let mut jwe = refresh_token.unwrap();
+        {
+            let mut jws = jwe.payload_mut().unwrap();
+            let mut claims_set = jws.payload_mut().unwrap();
+            claims_set.registered.audience = None;
+        }
+        let refresh_token = RefreshToken(jwe);
+
+        refresh_token
+            .validate("https://www.example.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// An invalid service was requested for
+    #[test]
+    #[should_panic(expected = "InvalidService")]
+    fn refresh_token_validates_invalid_service() {
+        let configuration = make_config(true);
+        let refresh_token = make_refresh_token();
+        refresh_token
+            .validate("https://www.invalid.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// Configuration has the right audience request configured, but the token does not indicate that it is for the
+    /// audience requested
+    #[test]
+    #[should_panic(expected = "InvalidAudience")]
+    fn refresh_token_validates_mismatch_service_and_audience() {
+        let mut configuration = make_config(true);
+        configuration.audience = jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.invalid.com/").unwrap());
+        let refresh_token = make_refresh_token();
+        refresh_token
+            .validate("https://www.invalid.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// Token's audience is not a subset of the connfigured audience
+    #[test]
+    #[should_panic(expected = "InvalidAudience")]
+    fn refresh_token_validates_invalid_audience() {
+        let configuration = make_config(true);
+
+        let refresh_token = make_refresh_token();
+        let mut jwe = refresh_token.unwrap();
+        {
+            let mut jws = jwe.payload_mut().unwrap();
+            let mut claims_set = jws.payload_mut().unwrap();
+            claims_set.registered.audience =
+                Some(jwt::SingleOrMultiple::Multiple(vec![FromStr::from_str("https://www.invalid.com/").unwrap(),
+                                                          FromStr::from_str("https://www.example.com/").unwrap(),
+                                                         ]));
+        }
+        let refresh_token = RefreshToken(jwe);
+
+        refresh_token
+            .validate("https://www.example.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// Token's issuer is not expected
+    #[test]
+    #[should_panic(expected = "InvalidIssuer")]
+    fn refresh_token_validates_invalid_issuer() {
+        let configuration = make_config(true);
+
+        let refresh_token = make_refresh_token();
+        let mut jwe = refresh_token.unwrap();
+        {
+            let mut jws = jwe.payload_mut().unwrap();
+            let mut claims_set = jws.payload_mut().unwrap();
+            claims_set.registered.issuer = Some(FromStr::from_str("https://www.invalid.com/").unwrap());
+        }
+        let refresh_token = RefreshToken(jwe);
+
+        refresh_token
+            .validate("https://www.example.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// Issued at time is required
+    #[test]
+    #[should_panic(expected = "MissingRequired(\"iat\")")]
+    fn refresh_token_validates_missing_issued_at() {
+        let configuration = make_config(true);
+
+        let refresh_token = make_refresh_token();
+        let mut jwe = refresh_token.unwrap();
+        {
+            let mut jws = jwe.payload_mut().unwrap();
+            let mut claims_set = jws.payload_mut().unwrap();
+            claims_set.registered.issued_at = None;
+        }
+        let refresh_token = RefreshToken(jwe);
+
+        refresh_token
+            .validate("https://www.example.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// Not before time is required
+    #[test]
+    #[should_panic(expected = "MissingRequired(\"nbf\")")]
+    fn refresh_token_validates_missing_not_before() {
+        let configuration = make_config(true);
+
+        let refresh_token = make_refresh_token();
+        let mut jwe = refresh_token.unwrap();
+        {
+            let mut jws = jwe.payload_mut().unwrap();
+            let mut claims_set = jws.payload_mut().unwrap();
+            claims_set.registered.not_before = None;
+        }
+        let refresh_token = RefreshToken(jwe);
+
+        refresh_token
+            .validate("https://www.example.com/", &configuration, None)
+            .unwrap();
+    }
+
+    /// Expiry time is required
+    #[test]
+    #[should_panic(expected = "MissingRequired(\"exp\")")]
+    fn refresh_token_validates_missing_expiry() {
+        let configuration = make_config(true);
+
+        let refresh_token = make_refresh_token();
+        let mut jwe = refresh_token.unwrap();
+        {
+            let mut jws = jwe.payload_mut().unwrap();
+            let mut claims_set = jws.payload_mut().unwrap();
+            claims_set.registered.expiry = None;
+        }
+        let refresh_token = RefreshToken(jwe);
+
+        refresh_token
+            .validate("https://www.example.com/", &configuration, None)
+            .unwrap();
     }
 }

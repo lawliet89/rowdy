@@ -16,5 +16,11 @@
     },
     "expiry_duration": 86400
   },
-  "basic_authenticator": {}
+  "basic_authenticator": {},
+  "refresh_token": {
+    "cek_algorithm": "A256GCMKW",
+    "enc_algorithm": "A256",
+    "key": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "expiry_duration": 864000
+  }
 }

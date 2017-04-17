@@ -22,7 +22,7 @@ simple_authenticator = ["csv", "ring"]
 ldap_authenticator = ["openldap", "strfmt"]
 
 [dependencies]
-biscuit = { git = "https://github.com/lawliet89/biscuit", rev = "4cc9862eff02049c35bdeecc2553dafa7950a0c3" }
+biscuit = { git = "https://github.com/lawliet89/biscuit", rev = "1ea12e8bf2294de7b8ab14e0eeedcdd66707617b" }
 chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
 log = "0.3"

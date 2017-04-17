@@ -7,7 +7,7 @@ use rocket::http::Method::*;
 
 use auth;
 use cors;
-use token::{Token, PrivateClaim, Configuration};
+use token::{Token, PrivateClaim, Configuration, RefreshToken, Keys};
 
 /// A wrapper around `cors::Options` for options specific to the token retrival route
 pub struct TokenGetterCorsOptions(cors::Options);
@@ -39,7 +39,8 @@ struct AuthParam {
 }
 
 impl AuthParam {
-    /// Verify the params are correct for the authentication type
+    /// Verify the params are correct for the authentication type, that is if the authorization is a bearer token,
+    /// then an offline token cannot be requested.
     fn verify<S: hyper::header::Scheme + 'static>(&self,
                                                   authorization: &auth::Authorization<S>)
                                                   -> Result<(), ::Error> {
@@ -75,6 +76,7 @@ fn token_getter(origin: Option<cors::Origin>,
                 auth_param: AuthParam,
                 configuration: State<Configuration>,
                 cors_options: State<TokenGetterCorsOptions>,
+                keys: State<Keys>,
                 authenticator: State<Box<auth::BasicAuthenticator>>)
                 -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
 
@@ -87,13 +89,15 @@ fn token_getter(origin: Option<cors::Origin>,
                                                                   &auth_param.service,
                                                                   Default::default(),
                                                                   result.payload.as_ref())?;
-            let signing_key = configuration.secret.for_signing()?;
-            let token = token.encode(&signing_key)?;
+            let signing_key = &keys.signing;
+            let token = token.encode(signing_key)?;
 
             let token = if configuration.refresh_token_enabled() && token.has_refresh_token() {
-                let refresh_token_key = &configuration.refresh_token().key;
+                let refresh_token_key = keys.encryption
+                    .as_ref()
+                    .expect("Refresh token was enabled but encryption key is missing");
                 token
-                    .encrypt_refresh_token(&signing_key, refresh_token_key)?
+                    .encrypt_refresh_token(signing_key, refresh_token_key)?
             } else {
                 token
             };
@@ -112,11 +116,40 @@ fn refresh_token(origin: Option<cors::Origin>,
                  auth_param: AuthParam,
                  configuration: State<Configuration>,
                  cors_options: State<TokenGetterCorsOptions>,
+                 keys: State<Keys>,
                  authenticator: State<Box<auth::BasicAuthenticator>>)
                  -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
 
+    if !configuration.refresh_token_enabled() {
+        return Err(::Error::BadRequest("Refresh token is not enabled".to_string()));
+    }
+    let refresh_token_configuration = configuration.refresh_token();
+
     auth_param.verify(&authorization)?;
-    Err(::Error::UnsupportedOperation)
+    let refresh_token = RefreshToken::new_encrypted(&authorization.token());
+    let refresh_token = refresh_token
+        .decrypt(&keys.signature_verification,
+                 keys.decryption
+                     .as_ref()
+                     .expect("Refresh token was enabled but decryption key is missing"),
+                 configuration.signature_algorithm.unwrap_or_default(),
+                 refresh_token_configuration.cek_algorithm,
+                 refresh_token_configuration.enc_algorithm)?;
+
+    refresh_token
+        .validate(&auth_param.service, &configuration, None)?;
+
+    authenticator
+        .prepare_refresh_response(refresh_token.payload()?)
+        .and_then(|result| {
+            let token = Token::<PrivateClaim>::with_configuration(&configuration,
+                                                                  &result.subject,
+                                                                  &auth_param.service,
+                                                                  Default::default(),
+                                                                  None)?;
+            let token = token.encode(&keys.signing)?;
+            Ok(cors_options.respond(token, origin)?)
+        })
 }
 
 /// Route to catch missing Authorization
@@ -125,7 +158,7 @@ fn refresh_token(origin: Option<cors::Origin>,
 #[get("/?<_auth_param>", rank = 3)]
 #[allow(needless_pass_by_value)]
 fn bad_request(_auth_param: AuthParam, configuration: State<Configuration>) -> Result<(), ::Error> {
-    auth::missing_authorization(&configuration.issuer)
+    auth::missing_authorization(&configuration.issuer.to_string())
 }
 
 /// Return routes provided by rowdy
@@ -149,6 +182,7 @@ mod tests {
     use rocket::testing::MockRequest;
     use serde_json;
 
+    use ByteSequence;
     use super::*;
     use token::{Secret, RefreshTokenConfiguration};
 
@@ -157,16 +191,16 @@ mod tests {
         let allowed_origins = ["https://www.example.com"];
         let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
         let token_configuration = Configuration {
-            issuer: "https://www.acme.com".to_string(),
+            issuer: FromStr::from_str("https://www.acme.com").unwrap(),
             allowed_origins: allowed_origins,
             audience: jwt::SingleOrMultiple::Single(not_err!(FromStr::from_str("https://www.example.com"))),
             signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
-            secret: Secret::String("secret".to_string()),
+            secret: Secret::ByteSequence(ByteSequence::String("secret".to_string())),
             expiry_duration: Duration::from_secs(120),
             refresh_token: Some(RefreshTokenConfiguration {
                                     cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
                                     enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-                                    key: jwt::jwk::JWK::new_octect_key(&[0; 256 / 8], Default::default()),
+                                    key: Secret::ByteSequence(ByteSequence::Bytes(vec![0; 256/8])),
                                     expiry_duration: Duration::from_secs(86400),
                                 }),
         };
@@ -228,8 +262,9 @@ mod tests {
         let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
                                                         jwt::jwa::SignatureAlgorithm::HS512));
 
-        let registered = not_err!(actual_token.registered_claims());
+        assert!(actual_token.refresh_token.is_none());
 
+        let registered = not_err!(actual_token.registered_claims());
         assert_eq!(Some(FromStr::from_str("https://www.acme.com").unwrap()),
                    registered.issuer);
         assert_eq!(Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())),
@@ -283,7 +318,7 @@ mod tests {
         assert_eq!(response.status(), Status::Unauthorized);
 
         let www_header: Vec<_> = response.header_values("WWW-Authenticate").collect();
-        assert_eq!(www_header, vec!["Basic realm=https://www.acme.com"]);
+        assert_eq!(www_header, vec!["Basic realm=https://www.acme.com/"]);
     }
 
     #[test]
@@ -308,5 +343,91 @@ mod tests {
 
         // Assert
         assert_eq!(response.status(), Status::Forbidden);
+    }
+
+    /// Tests that we can request a refresh token and then get a new access token with the issued refresh token
+    #[test]
+    #[allow(deprecated)]
+    fn token_getter_with_refresh_token_round_trip() {
+        let rocket = ignite();
+
+        // Initial authentication request
+        // Make headers
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
+        let auth_header = hyper::header::Authorization(auth::Basic {
+                                                           username: "mei".to_owned(),
+                                                           password: Some("冻住，不许走!".to_string()),
+                                                       });
+        let auth_header = Header::new("Authorization",
+                                      hyper::header::HeaderFormatter(&auth_header).to_string());
+        // Make and dispatch request
+        let mut req = MockRequest::new(Get,
+                                       "/?service=https://www.example.com&scope=all&offline_token=true")
+                .header(origin_header)
+                .header(auth_header);
+        let mut response = req.dispatch_with(&rocket);
+
+        // Assert
+        assert_eq!(response.status(), Status::Ok);
+        let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+
+        let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
+        let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
+                                                        jwt::jwa::SignatureAlgorithm::HS512));
+
+        let refresh_token = actual_token.refresh_token.unwrap();
+
+        // Use refresh token to authenticate
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
+        let auth_header = hyper::header::Authorization(auth::Bearer { token: refresh_token.to_string().unwrap() });
+        let auth_header = Header::new("Authorization",
+                                      hyper::header::HeaderFormatter(&auth_header).to_string());
+        // Make and dispatch request
+        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
+            .header(origin_header)
+            .header(auth_header);
+        let mut response = req.dispatch_with(&rocket);
+
+        // Assert
+        assert_eq!(response.status(), Status::Ok);
+        let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+
+        let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
+        let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
+                                                        jwt::jwa::SignatureAlgorithm::HS512));
+        assert!(actual_token.refresh_token.is_none());
+
+        let registered = not_err!(actual_token.registered_claims());
+        assert_eq!(Some(FromStr::from_str("https://www.acme.com").unwrap()),
+                   registered.issuer);
+        assert_eq!(Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())),
+                   registered.audience);
+
+        // TODO: Test private claims
+
+        let header = not_err!(actual_token.header());
+        assert_eq!(header.registered.algorithm,
+                   jwt::jwa::SignatureAlgorithm::HS512);
+    }
+
+    /// Requesting for a refresh token when using a refresh token to authenticate should result in Bad Request
+    #[test]
+    #[allow(deprecated)]
+    fn token_refresh_with_offline_token_should_return_bad_request() {
+        let rocket = ignite();
+
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str("https://www.example.com")));
+        let auth_header = hyper::header::Authorization(auth::Bearer { token: "foobar".to_string() });
+        let auth_header = Header::new("Authorization",
+                                      hyper::header::HeaderFormatter(&auth_header).to_string());
+        // Make and dispatch request
+        let mut req = MockRequest::new(Get,
+                                       "/?service=https://www.example.com&scope=all&offline_token=true")
+                .header(origin_header)
+                .header(auth_header);
+        let response = req.dispatch_with(&rocket);
+
+        // Assert
+        assert_eq!(response.status(), Status::BadRequest);
     }
 }

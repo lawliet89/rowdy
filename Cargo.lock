@@ -28,7 +28,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "biscuit"
 version = "0.0.2"
-source = "git+https://github.com/lawliet89/biscuit?rev=4cc9862eff02049c35bdeecc2553dafa7950a0c3#4cc9862eff02049c35bdeecc2553dafa7950a0c3"
+source = "git+https://github.com/lawliet89/biscuit?rev=1ea12e8bf2294de7b8ab14e0eeedcdd66707617b#1ea12e8bf2294de7b8ab14e0eeedcdd66707617b"
 dependencies = [
  "chrono 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "data-encoding 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -437,7 +437,7 @@ name = "rowdy"
 version = "0.1.0"
 dependencies = [
  "ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "biscuit 0.0.2 (git+https://github.com/lawliet89/biscuit?rev=4cc9862eff02049c35bdeecc2553dafa7950a0c3)",
+ "biscuit 0.0.2 (git+https://github.com/lawliet89/biscuit?rev=1ea12e8bf2294de7b8ab14e0eeedcdd66707617b)",
  "chrono 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.122 (registry+https://github.com/rust-lang/crates.io-index)",
  "csv 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -719,7 +719,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [metadata]
 "checksum aho-corasick 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "500909c4f87a9e52355b26626d890833e9e1d53ac566db76c36faa984b889699"
 "checksum ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
-"checksum biscuit 0.0.2 (git+https://github.com/lawliet89/biscuit?rev=4cc9862eff02049c35bdeecc2553dafa7950a0c3)" = "<none>"
+"checksum biscuit 0.0.2 (git+https://github.com/lawliet89/biscuit?rev=1ea12e8bf2294de7b8ab14e0eeedcdd66707617b)" = "<none>"
 "checksum byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c40977b0ee6b9885c9013cd41d9feffdd22deb3bb4dc3a71d901cc7a77de18c8"
 "checksum cargo_metadata 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "34fdab49a2904acb112c83b62f0118de3de3ce28e52a9188dec2858e43878f25"
 "checksum chrono 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "158b0bd7d75cbb6bf9c25967a48a2e9f77da95876b858eadfabaa99cd069de6e"

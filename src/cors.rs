@@ -337,19 +337,16 @@ impl AllowedOrigins {
     /// Returns a tuple where the first element is the struct `AllowedOrigins`, and the second element
     /// is a map of strings which failed to parse into URLs and their associated parse errors.
     pub fn new_from_str_list(urls: &[&str]) -> (Self, HashMap<String, ParseError>) {
-        let urls: HashMap<String, Result<Url, ParseError>> = urls.iter()
+        let (ok_set, error_map): (Vec<_>, Vec<_>) = urls.iter()
             .map(|s| (s.to_string(), Url::from_str(s)))
+            .partition(|&(_, ref r)| r.is_ok());
+
+        let error_map = error_map
+            .into_iter()
+            .map(|(s, r)| (s.to_string(), r.unwrap_err()))
             .collect();
 
-        let error_map = urls.iter()
-            .filter(|&(_, r)| r.is_err())
-            .map(|(s, r)| (s.to_string(), r.clone().unwrap_err()))
-            .collect();
-
-        let ok_set = urls.iter()
-            .filter(|&(_, r)| r.is_ok())
-            .map(|(_, r)| r.clone().unwrap())
-            .collect();
+        let ok_set = ok_set.into_iter().map(|(_, r)| r.unwrap()).collect();
 
         (AllowedOrigins::Some(ok_set), error_map)
     }

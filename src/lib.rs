@@ -15,7 +15,7 @@
 #![plugin(rocket_codegen)]
 #![cfg_attr(feature="clippy_lints", plugin(clippy))]
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
 extern crate biscuit as jwt;
@@ -287,10 +287,14 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
         let basic_authenticator = self.basic_authenticator.make_authenticator()?;
         let basic_authenticator: Box<auth::BasicAuthenticator> = Box::new(basic_authenticator);
 
+        // Prepare the keys
+        let keys = self.token.keys()?;
+
         Ok(rocket::ignite()
                .manage(self.token)
                .manage(token_getter_cors_options)
-               .manage(basic_authenticator))
+               .manage(basic_authenticator)
+               .manage(keys))
     }
 }
 
