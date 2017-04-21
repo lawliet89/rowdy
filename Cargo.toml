@@ -32,7 +32,7 @@ serde = "0.9"
 serde_derive = "0.9"
 serde_json = "0.9"
 unicase="1.4"
-uuid = { version = "0.4", features = ["use_std", "v5", "serde"] }
+uuid = { version = "0.4", features = ["use_std", "serde"] }
 
 # Optional dependencies that are activated by the various features
 clippy = { version = "=0.0.125", optional = true }

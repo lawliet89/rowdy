@@ -19,7 +19,7 @@ use rocket::http::{ContentType, Status};
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Deserialize};
 use serde_json;
-use uuid::{self, Uuid};
+use uuid::Uuid;
 
 use {ByteSequence, JsonValue};
 
@@ -65,6 +65,12 @@ impl_from_error!(jwt::errors::Error, Error::JWTError);
 impl_from_error!(io::Error, Error::IOError);
 impl_from_error!(serde_json::Error, Error::TokenSerializationError);
 impl_from_error!(String, Error::GenericError);
+
+impl<'a> From<&'a str> for Error {
+    fn from(s: &'a str) -> Error {
+        Error::GenericError(s.to_string())
+    }
+}
 
 impl error::Error for Error {
     fn description(&self) -> &str {
@@ -120,8 +126,15 @@ impl<'r> Responder<'r> for Error {
     }
 }
 
-fn make_uuid(uri: &str) -> Uuid {
-    Uuid::new_v5(&uuid::NAMESPACE_URL, uri)
+fn make_uuid() -> Result<Uuid, Error> {
+    use std::error::Error;
+
+    let mut bytes = vec![0; 16];
+    jwa::rng()
+        .fill(&mut bytes)
+        .map_err(|_| "Unable to generate UUID")?;
+    Ok(Uuid::from_bytes(&bytes)
+           .map_err(|e| e.description().to_string())?)
 }
 
 fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Header<jwt::Empty> {
@@ -148,12 +161,12 @@ fn make_registered_claims(subject: &str,
            issued_at: Some(now.into()),
            not_before: Some(now.into()),
            expiry: Some((now + expiry_duration).into()),
-           id: Some(make_uuid(&issuer.to_string()).urn().to_string()),
+           id: Some(make_uuid()?.urn().to_string()),
        })
 }
 
 /// Make a new JWS
-#[allow(too_many_arguments)] // Internal function
+#[cfg_attr(feature = "clippy_lints", allow(too_many_arguments))] // Internal function
 fn make_token<P: Serialize + Deserialize + 'static>(subject: &str,
                                                     issuer: &jwt::StringOrUri,
                                                     audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
@@ -376,7 +389,7 @@ pub type RefreshTokenJWE = jwt::jwe::Compact<RefreshTokenPayload, jwt::Empty>;
 pub struct RefreshToken(RefreshTokenJWE);
 
 impl RefreshToken {
-    #[allow(too_many_arguments)] // Internal function
+    #[cfg_attr(feature = "clippy_lints", allow(too_many_arguments))] // Internal function
     fn new_decrypted(subject: &str,
                      issuer: &jwt::StringOrUri,
                      audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,

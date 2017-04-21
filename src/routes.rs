@@ -1,4 +1,9 @@
 //! Routes mounted into Rocket
+
+// mounted via `::launch()`
+#![allow(unmounted_route)]
+
+#![cfg_attr(feature = "clippy_lints", allow(needless_pass_by_value))]
 use std::ops::Deref;
 
 use hyper;
@@ -53,10 +58,7 @@ impl AuthParam {
 }
 
 /// CORS pre-flight route for access token retrieval via initial authentication and refresh token
-#[allow(unmounted_route)]
-// mounted via `::launch()`
 #[options("/?<_auth_param>")]
-#[allow(needless_pass_by_value)]
 fn token_getter_options(origin: Option<cors::Origin>,
                         method: cors::AccessControlRequestMethod,
                         headers: cors::AccessControlRequestHeaders,
@@ -67,10 +69,7 @@ fn token_getter_options(origin: Option<cors::Origin>,
 }
 
 /// Access token retrieval via initial authentication route
-#[allow(unmounted_route)]
-// mounted via `::launch()`
 #[get("/?<auth_param>", rank = 1)]
-#[allow(needless_pass_by_value)]
 fn token_getter(origin: Option<cors::Origin>,
                 authorization: auth::Authorization<auth::Basic>,
                 auth_param: AuthParam,
@@ -107,10 +106,7 @@ fn token_getter(origin: Option<cors::Origin>,
 }
 
 /// Access token retrieval via refresh token route
-#[allow(unmounted_route)]
-// mounted via `::launch()`
 #[get("/?<auth_param>", rank = 2)]
-#[allow(needless_pass_by_value)]
 fn refresh_token(origin: Option<cors::Origin>,
                  authorization: auth::Authorization<auth::Bearer>,
                  auth_param: AuthParam,
@@ -153,18 +149,12 @@ fn refresh_token(origin: Option<cors::Origin>,
 }
 
 /// Route to catch missing Authorization
-#[allow(unmounted_route)]
-// mounted via `::launch()`
 #[get("/?<_auth_param>", rank = 3)]
-#[allow(needless_pass_by_value)]
 fn bad_request(_auth_param: AuthParam, configuration: State<Configuration>) -> Result<(), ::Error> {
     auth::missing_authorization(&configuration.issuer.to_string())
 }
 
 /// A simple "Ping Pong" route to check the health of the server
-#[allow(unmounted_route)]
-// mounted via `::launch()`
-#[allow(needless_pass_by_value)]
 #[get("/ping")]
 fn ping() -> &'static str {
     "Pong"

@@ -728,7 +728,7 @@ X-Ping, accept-language"#;
     }
 
     #[get("/any")]
-    #[allow(needless_pass_by_value)]
+    #[cfg_attr(feature = "clippy_lints", allow(needless_pass_by_value))]
     fn any() -> Response<&'static str> {
         Response::any("Hello, world!")
     }
