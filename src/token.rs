@@ -121,6 +121,19 @@ impl<'r> Responder<'r> for Error {
         error_!("Token Error: {:?}", self);
         match self {
             Error::InvalidService | Error::InvalidIssuer | Error::InvalidAudience => Err(Status::Forbidden),
+            Error::JWTError(ref e) => {
+                use jwt::errors::Error::*;
+
+                let status = match *e {
+                    ValidationError(_) |
+                    JsonError(_) |
+                    DecodeBase64(_) |
+                    Utf8(_) |
+                    UnspecifiedCryptographicError => Status::Unauthorized,
+                    _ => Status::InternalServerError,
+                };
+                Err(status)
+            }
             _ => Err(Status::InternalServerError),
         }
     }
