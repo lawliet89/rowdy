@@ -65,7 +65,8 @@
 //! the previous step
 //! - `scope`: The scope that the client wishes to authenticate for. This should be the same as the `scope` value in the
 //! previous step.
-//! - `offline_token`: Set to `true` if a refresh token is also required. Defaults to `false`.
+//! - `offline_token`: Set to `true` if a refresh token is also required. Defaults to `false`. Cannot be set to `true`
+//! when using a refresh token to retrieve a new access token.
 //!
 //! When authenticating for the first time, clients should send the user's username and passwords in the form of
 //! `Basic` authentication. If the client already has a prior refresh token and would like to obtain a new access token,
@@ -101,7 +102,8 @@
 //!
 //! The steps are described in the section "Retrieving an Access Token" above. The process is the same as the initial
 //! authentication except that instead of using `Basic` authentication, the client should instead send the refresh token
-//! retrieved prior as `Bearer` authentication.
+//! retrieved prior as `Bearer` authentication. Also, `offline_token` cannot be requested for when requesting for
+//! a new access token using a refresh token. (HTTP 401 will be returned if this happens.)
 //!
 //! ### Example
 //!
