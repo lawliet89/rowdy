@@ -161,12 +161,22 @@ fn bad_request(_auth_param: AuthParam, configuration: State<Configuration>) -> R
     auth::missing_authorization(&configuration.issuer.to_string())
 }
 
+/// A simple "Ping Pong" route to check the health of the server
+#[allow(unmounted_route)]
+// mounted via `::launch()`
+#[allow(needless_pass_by_value)]
+#[get("/ping")]
+fn ping() -> &'static str {
+    "Pong"
+}
+
 /// Return routes provided by rowdy
 pub fn routes() -> Vec<Route> {
     routes![token_getter,
             token_getter_options,
             refresh_token,
-            bad_request]
+            bad_request,
+            ping]
 }
 
 #[cfg(test)]
@@ -211,6 +221,17 @@ mod tests {
 
         let rocket = not_err!(configuration.ignite());
         rocket.mount("/", routes())
+    }
+
+    #[test]
+    fn ping_pong() {
+        let rocket = ignite();
+
+        let mut req = MockRequest::new(Get, "/ping");
+        let mut response = req.dispatch_with(&rocket);
+        let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+
+        assert_eq!("Pong", body_str);
     }
 
     #[test]
