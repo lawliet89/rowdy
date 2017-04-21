@@ -9,7 +9,7 @@ A [Rocket](https://rocket.rs/) based JSON Web Token authentication server.
 Rocket requires nightly Rust. You should probably install Rust with [rustup](https://www.rustup.rs/), then override the code directory to use nightly instead of stable. See
 [installation instructions](https://rocket.rs/guide/getting-started/#installing-rust).
 
-In particular, `rowdy` is currently targetted for `nightly-2017-04-10`.
+In particular, `rowdy` is currently targetted for `nightly-2017-04-16`.
 
 If you would like to use the `ldap_authenticator` feature, you will need the following libraries installed to
 build the required crates:

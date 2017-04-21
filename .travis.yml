@@ -1,7 +1,7 @@
 sudo: false
 language: rust
 rust:
-  - nightly-2017-04-10
+  - nightly-2017-04-16
   - nightly
 matrix:
   allow_failures:
@@ -20,9 +20,9 @@ script:
   - |
     travis-cargo build -- --all-features --all --locked &&
     travis-cargo test -- --all-features --all &&
-    travis-cargo --only nightly-2017-04-10 doc -- --no-deps --all-features --all
+    travis-cargo --only nightly-2017-04-16 doc -- --no-deps --all-features --all
 after_success:
-  - travis-cargo --only nightly-2017-04-10 doc-upload
+  - travis-cargo --only nightly-2017-04-16 doc-upload
 env:
   global:
     - TRAVIS_CARGO_NIGHTLY_FEATURE=""
