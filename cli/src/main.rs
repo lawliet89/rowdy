@@ -93,7 +93,7 @@ fn read_config<B>(path: &str) -> Result<rowdy::Configuration<B>, String>
 }
 
 pub fn deserialize_json<T>(json: &str) -> Result<T, String>
-    where T: serde::Deserialize
+    where T: serde::de::DeserializeOwned
 {
     serde_json::from_str(json).map_err(|e| format!("{:?}", e))
 }

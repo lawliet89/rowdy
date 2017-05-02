@@ -18,7 +18,7 @@ pub use self::noop::NoOp;
 pub use self::noop::NoOpConfiguration;
 
 #[cfg(feature = "simple_authenticator")]
-mod simple;
+pub mod simple;
 #[cfg(feature = "simple_authenticator")]
 pub use self::simple::SimpleAuthenticator;
 #[cfg(feature = "simple_authenticator")]

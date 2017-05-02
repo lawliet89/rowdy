@@ -12,12 +12,12 @@ doc = false
 [dependencies]
 docopt = "0.7"
 log = "0.3"
-rocket = "0.2.2"
-rocket_codegen = "0.2.2"
+rocket = "= 0.2.6"
+rocket_codegen = "= 0.2.6"
 rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
 rustc-serialize = "0.3"
-serde = "0.9"
-serde_json = "0.9"
+serde = "1.0"
+serde_json = "1.0"
 
 [dev-dependencies]
 rocket = { version = "*", features = ["testing"] }
