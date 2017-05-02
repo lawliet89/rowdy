@@ -10,8 +10,8 @@ pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Erro
 }
 
 /// From a `u64`, deserialize into a `Duration` with the `u64` in seconds
-pub fn deserialize<D>(deserializer: D) -> Result<Duration, D::Error>
-    where D: Deserializer
+pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where D: Deserializer<'de>
 {
     let duration = u64::deserialize(deserializer)?;
     Ok(Duration::from_secs(duration))

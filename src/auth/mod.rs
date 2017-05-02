@@ -10,7 +10,8 @@ use rocket::http::Status;
 use rocket::request::{self, Request, FromRequest};
 use rocket::response;
 use rocket::Outcome;
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 mod noop;
 pub use self::noop::NoOp;
@@ -278,7 +279,7 @@ pub fn missing_authorization<T>(realm: &str) -> Result<T, ::Error> {
 /// to implement this trait. Before launching, `rowdy` will attempt to make an `Authenticator` based off the
 /// configuration by calling the `make_authenticator` method.
 pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>
-    : Send + Sync + Serialize + Deserialize + 'static {
+    : Send + Sync + Serialize + DeserializeOwned + 'static {
     /// The `Authenticator` type this configuration is associated with
     type Authenticator: Authenticator<S>;
 

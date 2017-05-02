@@ -175,6 +175,8 @@ extern crate unicase;
 extern crate uuid;
 
 #[cfg(feature = "simple_authenticator")]
+extern crate argon2rs;
+#[cfg(feature = "simple_authenticator")]
 extern crate csv;
 #[cfg(feature = "simple_authenticator")]
 extern crate ring;
@@ -324,12 +326,12 @@ impl Serialize for Url {
     }
 }
 
-impl Deserialize for Url {
+impl<'de> Deserialize<'de> for Url {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
+        where D: Deserializer<'de>
     {
         struct UrlVisitor;
-        impl de::Visitor for UrlVisitor {
+        impl<'de> de::Visitor<'de> for UrlVisitor {
             type Value = Url;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -412,7 +414,7 @@ impl ByteSequence {
 /// # }
 /// ```
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Configuration<B: auth::AuthenticatorConfiguration<auth::Basic>> {
+pub struct Configuration<B> {
     /// Token configuration. See the type documentation for deserialization examples
     pub token: token::Configuration,
     /// The configuration for the authenticator that will handle HTTP Basic Authentication.
@@ -512,8 +514,10 @@ mod tests {
         let test = TestUrl { url: not_err!(Url::from_str("https://www.example.com/")) };
 
         assert_tokens(&test,
-                      &[Token::StructStart("TestUrl", 1),
-                        Token::StructSep,
+                      &[Token::Struct {
+                            name: "TestUrl",
+                            len: 1,
+                        },
                         Token::Str("url"),
                         Token::Str("https://www.example.com/"),
                         Token::StructEnd]);

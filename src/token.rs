@@ -17,7 +17,8 @@ use chrono::{self, DateTime, UTC};
 use jwt::{self, jws, jwa, jwk};
 use rocket::http::{ContentType, Status};
 use rocket::response::{Response, Responder};
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json;
 use uuid::Uuid;
 
@@ -141,6 +142,7 @@ impl<'r> Responder<'r> for Error {
 
 fn make_uuid() -> Result<Uuid, Error> {
     use std::error::Error;
+    use jwt::jwa::SecureRandom;
 
     let mut bytes = vec![0; 16];
     jwa::rng()
@@ -180,14 +182,14 @@ fn make_registered_claims(subject: &str,
 
 /// Make a new JWS
 #[cfg_attr(feature = "clippy_lints", allow(too_many_arguments))] // Internal function
-fn make_token<P: Serialize + Deserialize + 'static>(subject: &str,
-                                                    issuer: &jwt::StringOrUri,
-                                                    audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
-                                                    expiry_duration: Duration,
-                                                    private_claims: P,
-                                                    signature_algorithm: Option<jwa::SignatureAlgorithm>,
-                                                    now: DateTime<UTC>)
-                                                    -> Result<jwt::JWT<P, jwt::Empty>, ::Error> {
+fn make_token<P: Serialize + DeserializeOwned + 'static>(subject: &str,
+                                                         issuer: &jwt::StringOrUri,
+                                                         audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
+                                                         expiry_duration: Duration,
+                                                         private_claims: P,
+                                                         signature_algorithm: Option<jwa::SignatureAlgorithm>,
+                                                         now: DateTime<UTC>)
+                                                         -> Result<jwt::JWT<P, jwt::Empty>, ::Error> {
     let header = make_header(signature_algorithm);
     let registered_claims = make_registered_claims(subject, now, expiry_duration, issuer, audience)?;
 
@@ -581,7 +583,7 @@ impl From<RefreshTokenJWE> for RefreshToken {
 /// Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
 /// to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Token<T: Serialize + Deserialize + 'static> {
+pub struct Token<T> {
     /// Tne encapsulated JWT.
     pub token: jwt::JWT<T, jwt::Empty>,
     /// The duration from `issued_at` where the token will expire
@@ -595,7 +597,7 @@ pub struct Token<T: Serialize + Deserialize + 'static> {
 }
 
 impl<T> Clone for Token<T>
-    where T: Serialize + Deserialize + Clone
+    where T: Serialize + DeserializeOwned + Clone
 {
     fn clone(&self) -> Self {
         Token {
@@ -607,7 +609,7 @@ impl<T> Clone for Token<T>
     }
 }
 
-impl<T: Serialize + Deserialize + 'static> Token<T> {
+impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     /// Internal token creation that allows for us to override the time `now`. For testing
     fn with_configuration_and_time(config: &Configuration,
                                    subject: &str,
@@ -810,7 +812,7 @@ impl<T: Serialize + Deserialize + 'static> Token<T> {
     }
 }
 
-impl<'r, T: Serialize + Deserialize> Responder<'r> for Token<T> {
+impl<'r, T: Serialize + DeserializeOwned + 'static> Responder<'r> for Token<T> {
     fn respond(self) -> Result<Response<'r>, Status> {
         match self.serialize_and_respond() {
             Ok(serialized) => {
