@@ -13,7 +13,6 @@ RUN set -x \
                                           git \
                                           file \
                                           libssl-dev \
-                                          libldap-dev \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain ${RUST_VERSION} \
     && apt-get remove -y --auto-remove curl \
     && apt-get clean \

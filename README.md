@@ -11,14 +11,6 @@ Rocket requires nightly Rust. You should probably install Rust with [rustup](htt
 
 In particular, `rowdy` is currently targetted for `nightly-2017-05-03`.
 
-If you would like to use the `ldap_authenticator` feature, you will need the following libraries installed to
-build the required crates:
-
-- `liblber`
-- `libldap`
-
-On Ubuntu, for example, you can install them with `sudo apt install libldap-dev`
-
 ## Testing
 
 To separate the dependencies of the `library` part of the crate from the `binary` part, the crate is set up
