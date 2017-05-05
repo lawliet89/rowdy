@@ -19,7 +19,11 @@ pub struct TokenGetterCorsOptions(cors::Options);
 impl_deref!(TokenGetterCorsOptions, cors::Options);
 
 const TOKEN_GETTER_METHODS: &[rocket::http::Method] = &[Get];
-const TOKEN_GETTER_HEADERS: &'static [&'static str] = &["Authorization"];
+const TOKEN_GETTER_HEADERS: &[&str] = &["Authorization",
+                                        "Accept",
+                                        "Accept-Language",
+                                        "Content-Language",
+                                        "Content-Type"];
 
 impl TokenGetterCorsOptions {
     pub fn new(config: &Configuration) -> Self {

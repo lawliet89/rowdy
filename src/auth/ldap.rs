@@ -21,7 +21,7 @@ impl From<FmtError> for Error {
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct User {
     dn: String,
-    attributes: HashMap<String, Vec<String>>
+    attributes: HashMap<String, Vec<String>>,
 }
 
 impl From<SearchEntry> for User {
