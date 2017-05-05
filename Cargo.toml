@@ -19,7 +19,7 @@ clippy_lints = ["clippy"]
 # A simple file based authenticator
 simple_authenticator = ["argon2rs", "csv", "ring"]
 # LDAP based authenticator
-ldap_authenticator = ["openldap", "strfmt"]
+ldap_authenticator = ["ldap3", "strfmt"]
 
 [dependencies]
 biscuit = { git = "https://github.com/lawliet89/biscuit", rev = "1c82e8b3abddc57be93a6179fd36186883ba9d59" }
@@ -38,7 +38,7 @@ uuid = { version = "0.4", features = ["use_std", "serde"] }
 argon2rs = { version = "0.2.5", optional = true }
 clippy = { version = "=0.0.130", optional = true }
 csv = { version = "0.15", optional = true }
-openldap = { version = "1.2.1", optional = true }
+ldap3 = { version = "0.4.0", optional = true }
 ring = { version = "0.8", optional = true } # rust-jwt has this as its dependency
 strfmt = { version = "0.1.5", optional = true }
 

@@ -1,24 +1,14 @@
 //! LDAP Authentication module
 use std::collections::HashMap;
-use std::ptr;
 
-use openldap::{RustLDAP, LDAPResponse};
-use openldap::codes::results;
-use openldap::errors::LDAPError;
-use openldap::codes::options;
-use openldap::codes::scopes;
+use ldap3::{LdapConn, Scope, SearchEntry};
 use strfmt::{FmtError, strfmt};
 use serde_json::value;
 
 use {Error, JsonValue, JsonMap};
 use super::{Basic, AuthenticationResult};
 
-/// Error mapping for `LDAPError`
-impl From<LDAPError> for Error {
-    fn from(ldap_error: LDAPError) -> Error {
-        Error::GenericError(ldap_error.to_string())
-    }
-}
+const LDAP_SUCCESS: u8 = 0;
 
 /// Error mapping for `FmtError`
 impl From<FmtError> for Error {
@@ -27,8 +17,21 @@ impl From<FmtError> for Error {
     }
 }
 
-/// Typedef of a "User" from `openldap`
-type User = HashMap<String, Vec<String>>;
+/// A "User" returned from LDAP. This is the same as `ldap3::SearchEntry`, but with additional traits implemented
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+pub struct User {
+    dn: String,
+    attributes: HashMap<String, Vec<String>>
+}
+
+impl From<SearchEntry> for User {
+    fn from(entry: SearchEntry) -> Self {
+        Self {
+            dn: entry.dn,
+            attributes: entry.attrs,
+        }
+    }
+}
 
 /// LDAP based authenticator
 ///
@@ -62,54 +65,54 @@ pub struct LdapAuthenticator {
 
 impl LdapAuthenticator {
     /// Connects to the LDAP server
-    fn connect(&self) -> Result<RustLDAP, Error> {
-        let connection = RustLDAP::new(&self.address)?;
-        if !connection.set_option(options::LDAP_OPT_PROTOCOL_VERSION, &3) {
-            Err(Error::GenericError("Unable to set LDAP version".to_string()))?;
-        }
+    fn connect(&self) -> Result<LdapConn, Error> {
+        let connection = LdapConn::new(&self.address)?;
         Ok(connection)
     }
 
     /// Bind the "searcher" user
-    fn searcher_bind(&self, connection: &RustLDAP) -> Result<(), Error> {
+    fn searcher_bind(&self, connection: &LdapConn) -> Result<(), Error> {
         self.bind(connection, &self.bind_dn, &self.bind_password)
     }
 
     /// Bind the connection to some dn
-    fn bind(&self, connection: &RustLDAP, dn: &str, password: &str) -> Result<(), Error> {
-        let result = connection.simple_bind(dn, password)?;
-        if result == results::LDAP_SUCCESS {
+    fn bind(&self, connection: &LdapConn, dn: &str, password: &str) -> Result<(), Error> {
+        let (result, _) = connection.simple_bind(dn, password)?;
+        if result.rc == LDAP_SUCCESS {
             Ok(())
         } else {
-            Err(Error::GenericError(format!("Binding failed with reason code: {}", result)))
+            Err(Error::GenericError(format!("Binding failed with reason code: {}", result.rc)))
         }
     }
 
     /// Search for the specified account in the directory
-    fn search(&self, connection: &RustLDAP, account: &str) -> Result<LDAPResponse, Error> {
+    fn search(&self, connection: &LdapConn, account: &str) -> Result<Vec<SearchEntry>, Error> {
         let account: HashMap<String, String> = [("account".to_string(), account.to_string())]
             .iter()
             .cloned()
             .collect();
         let search_base = strfmt(&self.search_base, &account)?;
         let search_filter = match self.search_filter {
-            None => None,
-            Some(ref search_filter) => Some(strfmt(search_filter, &account)?),
+            None => "".to_string(),
+            Some(ref search_filter) => strfmt(search_filter, &account)?,
         };
 
+        // This specifies what to get back from the LDAP server
         let search_attrs_vec = vec!["cn", "dn"];
-        let results = connection
-            .ldap_search(&search_base,
-                         scopes::LDAP_SCOPE_SUBTREE,
-                         search_filter.as_ref().map(|s| &**s),
-                         Some(search_attrs_vec),
-                         false,
-                         None,
-                         None,
-                         ptr::null_mut(),
-                         -1)?;
+        let (results, status, _) = connection
+            .search(&search_base,
+                    Scope::Subtree,
+                    &search_filter,
+                    search_attrs_vec)?;
 
-        Ok(results)
+        if status.rc != LDAP_SUCCESS {
+            Err(Error::GenericError(format!("Search failed with reason code: {}", status.rc)))?;
+        }
+
+        Ok(results
+               .into_iter()
+               .map(SearchEntry::construct)
+               .collect())
     }
 
     /// Serialize a user as payload for a refresh token
@@ -136,7 +139,7 @@ impl LdapAuthenticator {
 
     /// Build an `AuthenticationResult` for a `User`
     fn build_authentication_result(user: User, refresh_payload: bool) -> Result<AuthenticationResult, Error> {
-        let user_dn = user["dn"][0].clone();
+        let user_dn = user.dn.clone();
         let payload = if refresh_payload {
             Some(Self::serialize_refresh_token_payload(user)?)
         } else {
@@ -154,16 +157,16 @@ impl LdapAuthenticator {
             // First, we search for the user
             let connection = self.connect()?;
             self.searcher_bind(&connection)?;
-            let user = self.search(&connection, username)
+            let mut user = self.search(&connection, username)
                 .map_err(|_e| super::Error::AuthenticationFailure)?;
             if user.len() != 1 {
                 Err(super::Error::AuthenticationFailure)?;
             }
 
-            user[0].clone()
+            user.pop().unwrap() // safe to unwrap
         };
 
-        let user_dn = user["dn"][0].clone();
+        let user_dn = user.dn.clone();
 
         {
             // Attempt a bind with the user's DN and password
@@ -172,7 +175,7 @@ impl LdapAuthenticator {
                 .map_err(|_e| super::Error::AuthenticationFailure)?;
         }
 
-        Self::build_authentication_result(user, refresh_payload)
+        Self::build_authentication_result(From::from(user), refresh_payload)
     }
 }
 

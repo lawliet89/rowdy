@@ -181,7 +181,7 @@ extern crate csv;
 #[cfg(feature = "simple_authenticator")]
 extern crate ring;
 #[cfg(feature = "ldap_authenticator")]
-extern crate openldap;
+extern crate ldap3;
 #[cfg(feature = "ldap_authenticator")]
 extern crate strfmt;
 
