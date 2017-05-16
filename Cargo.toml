@@ -22,7 +22,7 @@ simple_authenticator = ["argon2rs", "csv", "ring"]
 ldap_authenticator = ["ldap3", "strfmt"]
 
 [dependencies]
-biscuit = { git = "https://github.com/lawliet89/biscuit", rev = "1c82e8b3abddc57be93a6179fd36186883ba9d59" }
+biscuit = "0.0.4"
 chrono = { version = "0.3", features = ["serde"] }
 hyper = "0.10"
 log = "0.3"
@@ -39,7 +39,7 @@ argon2rs = { version = "0.2.5", optional = true }
 clippy = { version = "=0.0.130", optional = true }
 csv = { version = "0.15", optional = true }
 ldap3 = { version = "0.4.0", optional = true }
-ring = { version = "0.8", optional = true } # rust-jwt has this as its dependency
+ring = { version = "0.9", optional = true } # rust-jwt has this as its dependency
 strfmt = { version = "0.1.5", optional = true }
 
 [dependencies.rocket_contrib]
