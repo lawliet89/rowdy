@@ -1,8 +1,9 @@
-FROM debian:jessie
+FROM japaric/x86_64-unknown-linux-musl:v0.1.10 as builder
 MAINTAINER Yong Wen Chua <me@yongwen.xyz>
+ENV PATH "/root/.cargo/bin:${PATH}"
 
 ARG RUST_VERSION=nightly-2017-05-03
-
+ARG ARCHITECTURE=x86_64-unknown-linux-musl
 RUN set -x \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -15,12 +16,22 @@ RUN set -x \
                                           libssl-dev \
                                           pkg-config \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain ${RUST_VERSION} \
+    && rustup target add "${ARCHITECTURE}" \
     && apt-get remove -y --auto-remove curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-ENV PATH "/root/.cargo/bin:${PATH}"
 WORKDIR /app/src
+COPY Cargo.toml Cargo.lock ./
+COPY cli/Cargo.toml ./cli/Cargo.toml
+RUN cargo fetch --locked -v
 
-COPY . ./
-RUN cargo build --release --all --locked --all-features
+COPY ./ ./
+RUN cargo build --release --package rowdy-cli --target "${ARCHITECTURE}" -v --frozen
+
+# Runtime Image
+
+FROM alpine:3.5
+ARG ARCHITECTURE=x86_64-unknown-linux-musl
+WORKDIR /app
+COPY --from=builder /app/src/target/${ARCHITECTURE}/release/rowdy-cli .
