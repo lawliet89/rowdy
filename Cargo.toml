@@ -1,7 +1,7 @@
 [package]
 name = "rowdy"
 version = "0.0.1"
-license = "Apache 2.0"
+license = "Apache-2.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 build = "build.rs"
 description = "`rowdy` is a Rocket based JSON Web token based authentication server."
