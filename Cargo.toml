@@ -1,8 +1,18 @@
 [package]
 name = "rowdy"
-version = "0.1.0"
+version = "0.0.1"
+license = "Apache 2.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 build = "build.rs"
+description = "`rowdy` is a Rocket based JSON Web token based authentication server."
+homepage = "https://github.com/lawliet89/rowdy"
+repository = "https://github.com/lawliet89/rowdy"
+documentation = "https://docs.rs/rowdy/"
+keywords = ["jwt", "rocket", "token", "authentication"]
+categories = ["authentication", "web-programming"]
+
+[badges]
+travis-ci = { repository = "lawliet89/rowdy" }
 
 [lib]
 name = "rowdy"

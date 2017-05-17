@@ -1,8 +1,16 @@
 # rowdy
 
-[Documentation](https://lawliet89.github.io/rowdy/)
+[![Build Status](https://travis-ci.org/lawliet89/rowdy.svg)](https://travis-ci.org/lawliet89/rowdy)
+[![Dependency Status](https://dependencyci.com/github/lawliet89/rowdy/badge)](https://dependencyci.com/github/lawliet89/rowdy)
+[![Crates.io](https://img.shields.io/crates/v/rowdy.svg)](https://crates.io/crates/rowdy)
+[![Repository](https://img.shields.io/github/tag/lawliet89/rowdy.svg)](https://github.com/lawliet89/rowdy)
+[![Documentation](https://docs.rs/rowdy/badge.svg)](https://docs.rs/rowdy)
 
-A [Rocket](https://rocket.rs/) based JSON Web Token authentication server.
+Documentation: [Stable](https://docs.rs/rowdy) | [Master](https://lawliet89.github.io/rowdy/)
+
+`rowdy` is a [Rocket](https://rocket.rs/)  based JSON Web token based authentication server
+based off Docker Registry's [authentication protocol](https://docs.docker.com/registry/spec/auth/).
+
 
 ## Requirements
 
@@ -42,7 +50,6 @@ services:
 networks:
   nginx:
     external: true
-
 ```
 
 Then, you can simply start the containers with `docker-compose up --build -d`.

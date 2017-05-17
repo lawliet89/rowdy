@@ -1,6 +1,6 @@
 [package]
 name = "rowdy-cli"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 
 [[bin]]
