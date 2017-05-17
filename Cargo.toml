@@ -53,13 +53,13 @@ ring = { version = "0.9", optional = true } # rust-jwt has this as its dependenc
 strfmt = { version = "0.1.5", optional = true }
 
 [dependencies.rocket_contrib]
-version = "*"
+version = "= 0.2.6"
 default-features = false
 features = ["json", "uuid"]
 
 [dev-dependencies]
 serde_test = "1.0"
-rocket = { version = "*", features = ["testing"] }
+rocket = { version = "= 0.2.6", features = ["testing"] }
 
 [build-dependencies]
 ansi_term = "0.9"
