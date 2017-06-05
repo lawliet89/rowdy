@@ -188,13 +188,8 @@ extern crate argon2rs;
 extern crate csv;
 #[cfg(feature = "simple_authenticator")]
 extern crate ring;
-#[cfg(feature = "simple_authenticator")]
-#[macro_use]
-extern crate lazy_static;
 #[cfg(feature = "ldap_authenticator")]
 extern crate ldap3;
-#[cfg(feature = "ldap_authenticator")]
-extern crate regex;
 #[cfg(feature = "ldap_authenticator")]
 extern crate strfmt;
 
