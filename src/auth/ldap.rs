@@ -56,9 +56,11 @@ pub struct LdapAuthenticator {
     pub bind_dn: String,
     /// The password that we will use to bind to LDAP to search for users
     pub bind_password: String,
-    /// Base to use when searching for user. `{account}` is expanded to the user's account
+    /// Base to use when searching for user. `{account}` is expanded to the user's account.
+    /// Search filters _MUST_ be escaped according to RFC 4515.
     pub search_base: String,
-    /// Filter to use when searching for user. `{account}` is expanded to the user's account
+    /// Filter to use when searching for user. `{account}` is expanded to the user's account.
+    /// Search filters _MUST_ be escaped according to RFC 4515.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search_filter: Option<String>,
 }
@@ -87,7 +89,8 @@ impl LdapAuthenticator {
 
     /// Search for the specified account in the directory
     fn search(&self, connection: &LdapConn, account: &str) -> Result<Vec<SearchEntry>, Error> {
-        let account: HashMap<String, String> = [("account".to_string(), account.to_string())]
+        let account = Self::escape_filter(account);
+        let account: HashMap<String, String> = [("account".to_string(), account)]
             .iter()
             .cloned()
             .collect();
@@ -173,6 +176,17 @@ impl LdapAuthenticator {
         }
 
         Self::build_authentication_result(From::from(user), refresh_payload)
+    }
+
+    /// Escape search filters according to RFC 4515. Since all strings in Rust are valid unicode,
+    /// invalid unicode escaping is not done
+    pub fn escape_filter(filter: &str) -> String {
+        filter
+            .replace("\\", "\\5c")
+            .replace("*", "\\2a")
+            .replace("(", "\\28")
+            .replace(")", "\\29")
+            .replace("\x00", "\\00")
     }
 }
 
