@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 
 use ldap3::{LdapConn, Scope, SearchEntry};
+use regex::Regex;
 use strfmt::{FmtError, strfmt};
 use serde_json::value;
 
@@ -46,6 +47,7 @@ impl From<SearchEntry> for User {
 ///     bind_password: "password".to_string(),
 ///     search_base: "dc=example,dc=com".to_string(),
 ///     search_filter: Some("(uid={account})".to_string()),
+///     active_directory: false,
 /// };
 /// ```
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
@@ -61,6 +63,10 @@ pub struct LdapAuthenticator {
     /// Filter to use when searching for user. `{account}` is expanded to the user's account
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search_filter: Option<String>,
+    /// Specifies if the LDAP server is Active Directory Service Interfaces. This affects some
+    /// behaviour that are specific to Active directory
+    #[serde(default)]
+    pub active_directory: bool,
 }
 
 impl LdapAuthenticator {
@@ -87,7 +93,8 @@ impl LdapAuthenticator {
 
     /// Search for the specified account in the directory
     fn search(&self, connection: &LdapConn, account: &str) -> Result<Vec<SearchEntry>, Error> {
-        let account: HashMap<String, String> = [("account".to_string(), account.to_string())]
+        let account = Self::escape_rdns(account, self.active_directory);
+        let account: HashMap<String, String> = [("account".to_string(), account)]
             .iter()
             .cloned()
             .collect();
@@ -174,6 +181,23 @@ impl LdapAuthenticator {
 
         Self::build_authentication_result(From::from(user), refresh_payload)
     }
+
+    /// Escape the component strings or RDNs in a DN according to the rules on
+    /// http://www.rlmueller.net/CharactersEscaped.htm.
+    ///
+    /// If Active directory is used, the character `/` must additionally be escaped.
+    pub fn escape_rdns(component: &str, active_directory: bool) -> String {
+        lazy_static! {
+            static ref ESCAPE: Regex = Regex::new(r#"([,\\#+<>;"=]|(^[ ]+)|([ ]+$))"#).unwrap();
+            static ref AD_ESCAPE: Regex = Regex::new(r#"([,\\#+<>;"=/]|(^[ ]+)|([ ]+$))"#).unwrap();
+        }
+
+        if active_directory {
+            AD_ESCAPE.replace_all(component, "\\$1").into_owned()
+        } else {
+            ESCAPE.replace_all(component, "\\$1").into_owned()
+        }
+    }
 }
 
 impl super::Authenticator<Basic> for LdapAuthenticator {
@@ -222,6 +246,7 @@ mod tests {
             bind_password: "password".to_string(),
             search_base: "dc=example,dc=com".to_string(),
             search_filter: Some("(uid={account})".to_string()),
+            active_directory: false,
         }
     }
 
@@ -254,5 +279,21 @@ mod tests {
     fn authentication_invalid_password() {
         let authenticator = make_authenticator();
         authenticator.verify("einstein", "FTL", false).unwrap();
+    }
+
+    #[test]
+    fn rdns_escaping() {
+        assert_eq!(LdapAuthenticator::escape_rdns("Last, First", false),
+                   r#"Last\, First"#);
+        assert_eq!(LdapAuthenticator::escape_rdns("Windows 2000/XP", false),
+                   r#"Windows 2000/XP"#);
+        assert_eq!(LdapAuthenticator::escape_rdns("Windows 2000/XP", true),
+                   r#"Windows 2000\/XP"#);
+        assert_eq!(LdapAuthenticator::escape_rdns("Sales\\Engr", false),
+                   r#"Sales\\Engr"#);
+        assert_eq!(LdapAuthenticator::escape_rdns("E#Test", false),
+                   r#"E\#Test"#);
+        assert_eq!(LdapAuthenticator::escape_rdns(" Preceding and Trailing Space ", false),
+                   r#"\ Preceding and Trailing Space\ "#);
     }
 }
