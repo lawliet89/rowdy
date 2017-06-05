@@ -109,10 +109,7 @@ impl LdapAuthenticator {
             Err(Error::GenericError(format!("Search failed with reason code: {}", status.rc)))?;
         }
 
-        Ok(results
-               .into_iter()
-               .map(SearchEntry::construct)
-               .collect())
+        Ok(results.into_iter().map(SearchEntry::construct).collect())
     }
 
     /// Serialize a user as payload for a refresh token
@@ -185,9 +182,7 @@ impl super::Authenticator<Basic> for LdapAuthenticator {
                     refresh_payload: bool)
                     -> Result<AuthenticationResult, Error> {
         let username = authorization.username();
-        let password = authorization
-            .password()
-            .unwrap_or_else(|| "".to_string());
+        let password = authorization.password().unwrap_or_else(|| "".to_string());
         self.verify(&username, &password, refresh_payload)
     }
 

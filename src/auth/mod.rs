@@ -361,9 +361,7 @@ pub mod tests {
                         refresh_payload: bool)
                         -> Result<AuthenticationResult, Error> {
             let username = authorization.username();
-            let password = authorization
-                .password()
-                .unwrap_or_else(|| "".to_string());
+            let password = authorization.password().unwrap_or_else(|| "".to_string());
 
             if username == "mei" && password == "冻住，不许走!" {
                 let payload = if refresh_payload {

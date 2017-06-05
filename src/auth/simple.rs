@@ -145,9 +145,7 @@ impl super::Authenticator<Basic> for SimpleAuthenticator {
                     -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the Simple authenticator in production");
         let username = authorization.username();
-        let password = authorization
-            .password()
-            .unwrap_or_else(|| "".to_string());
+        let password = authorization.password().unwrap_or_else(|| "".to_string());
         self.verify(&username, &password, refresh_payload)
     }
 

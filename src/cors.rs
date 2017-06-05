@@ -210,9 +210,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestMethod {
     type Error = Error;
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Error> {
-        match request
-                  .headers()
-                  .get_one("Access-Control-Request-Method") {
+        match request.headers().get_one("Access-Control-Request-Method") {
             Some(request_method) => {
                 match Self::from_str(request_method) {
                     Ok(request_method) => Outcome::Success(request_method),
@@ -252,9 +250,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AccessControlRequestHeaders {
     type Error = Error;
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Error> {
-        match request
-                  .headers()
-                  .get_one("Access-Control-Request-Headers") {
+        match request.headers().get_one("Access-Control-Request-Headers") {
             Some(request_headers) => {
                 match Self::from_str(request_headers) {
                     Ok(request_headers) => Outcome::Success(request_headers),
@@ -481,10 +477,7 @@ impl<'r, R: Responder<'r>> Response<R> {
     /// Consumes the CORS, set expose_headers to
     /// passed headers and returns changed CORS
     pub fn exposed_headers(mut self, headers: &[&str]) -> Self {
-        self.expose_headers = headers
-            .into_iter()
-            .map(|s| s.to_string().into())
-            .collect();
+        self.expose_headers = headers.into_iter().map(|s| s.to_string().into()).collect();
         self
     }
 
@@ -518,10 +511,7 @@ impl<'r, R: Responder<'r>> Response<R> {
     /// Consumes the CORS, set allow_headers to
     /// passed headers and returns changed CORS
     fn headers(mut self, headers: &[&str]) -> Self {
-        self.allow_headers = headers
-            .into_iter()
-            .map(|s| s.to_string().into())
-            .collect();
+        self.allow_headers = headers.into_iter().map(|s| s.to_string().into()).collect();
         self
     }
 
@@ -577,10 +567,7 @@ impl<'r, R: Responder<'r>> Responder<'r> for Response<R> {
 
 
         if !self.allow_methods.is_empty() {
-            let methods: Vec<_> = self.allow_methods
-                .into_iter()
-                .map(|m| m.as_str())
-                .collect();
+            let methods: Vec<_> = self.allow_methods.into_iter().map(|m| m.as_str()).collect();
             let methods = methods.join(", ");
 
             response.set_raw_header("Access-Control-Allow-Methods", methods);

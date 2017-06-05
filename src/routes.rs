@@ -99,8 +99,7 @@ fn token_getter(origin: Option<cors::Origin>,
                 let refresh_token_key = keys.encryption
                     .as_ref()
                     .expect("Refresh token was enabled but encryption key is missing");
-                token
-                    .encrypt_refresh_token(signing_key, refresh_token_key)?
+                token.encrypt_refresh_token(signing_key, refresh_token_key)?
             } else {
                 token
             };

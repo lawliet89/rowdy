@@ -772,10 +772,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
 
     /// Convenience method to extract the encoded token
     pub fn encoded_token(&self) -> Result<String, ::Error> {
-        Ok(self.token
-               .encoded()
-               .map_err(Error::JWTError)?
-               .to_string())
+        Ok(self.token.encoded().map_err(Error::JWTError)?.to_string())
     }
 
     /// Convenience method to obtain a reference to the refresh token
@@ -1164,9 +1161,7 @@ mod tests {
 
         let token = make_token(true);
         let token = not_err!(token.encrypt_refresh_token(&signing_secret, &key));
-        token
-            .encrypt_refresh_token(&signing_secret, &key)
-            .unwrap();
+        token.encrypt_refresh_token(&signing_secret, &key).unwrap();
     }
 
     #[test]

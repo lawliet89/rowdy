@@ -523,11 +523,11 @@ mod tests {
 
         assert_tokens(&test,
                       &[Token::Struct {
-                            name: "TestUrl",
-                            len: 1,
-                        },
-                        Token::Str("url"),
-                        Token::Str("https://www.example.com/"),
-                        Token::StructEnd]);
+                           name: "TestUrl",
+                           len: 1,
+                       },
+                       Token::Str("url"),
+                       Token::Str("https://www.example.com/"),
+                       Token::StructEnd]);
     }
 }
