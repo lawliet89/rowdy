@@ -1,6 +1,6 @@
 [package]
 name = "rowdy"
-version = "0.0.2"
+version = "0.0.3"
 license = "Apache-2.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 build = "build.rs"
@@ -67,3 +67,6 @@ version_check = "0.1"
 
 [workspace]
 members = ["cli"]
+
+[package.metadata.docs.rs]
+all-features = true
