@@ -156,7 +156,7 @@ impl LdapAuthenticator {
     /// Build an `AuthenticationResult` for a `User`
     fn build_authentication_result<T: AsRef<str>>(user: User,
                                                   include_attributes: &[T],
-                                                  // TODO: namespace
+                                                  attributes_namespace: Option<&str>,
                                                   include_refresh_payload: bool)
                                                   -> Result<AuthenticationResult, Error> {
         let user_dn = user.dn.clone();
@@ -184,6 +184,16 @@ impl LdapAuthenticator {
                  })
             .collect();
 
+        let private_claims = match attributes_namespace {
+            None => JsonValue::Object(map),
+            Some(namespace) => {
+                let outer_map: JsonMap<_, _> = vec![(namespace.to_string(), JsonValue::Object(map))]
+                    .into_iter()
+                    .collect();
+                JsonValue::Object(outer_map)
+            }
+        };
+
         let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(&user)?)
         } else {
@@ -192,7 +202,7 @@ impl LdapAuthenticator {
 
         Ok(AuthenticationResult {
                subject: user_dn,
-               private_claims: JsonValue::Object(map),
+               private_claims,
                refresh_payload,
            })
     }
@@ -227,6 +237,7 @@ impl LdapAuthenticator {
 
         Self::build_authentication_result(From::from(user),
                                           self.include_attributes.as_slice(),
+                                          self.attributes_namespace.as_ref().map(String::as_ref),
                                           include_refresh_payload)
     }
 
@@ -255,7 +266,10 @@ impl super::Authenticator<Basic> for LdapAuthenticator {
     // TODO: Implement retrieving updated information from LDAP server
     fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
         let user = Self::deserialize_refresh_token_payload(refresh_payload.clone())?;
-        Self::build_authentication_result(user, self.include_attributes.as_slice(), false)
+        Self::build_authentication_result(user,
+                                          self.include_attributes.as_slice(),
+                                          self.attributes_namespace.as_ref().map(String::as_ref),
+                                          false)
     }
 }
 
@@ -289,7 +303,7 @@ mod tests {
             search_base: "dc=example,dc=com".to_string(),
             search_filter: Some("(uid={account})".to_string()),
             include_attributes: vec!["cn".to_string()],
-            attributes_namespace: Some("user".to_string()),
+            attributes_namespace: None,
         }
     }
 
@@ -330,6 +344,7 @@ mod tests {
     fn attributes_are_included_correctly() {
         let result = not_err!(LdapAuthenticator::build_authentication_result(make_user(),
                                                                              vec!["cn", "groups"].as_slice(),
+                                                                             None,
                                                                              false));
         let expected_attributes: JsonMap<_, _> = vec![("cn".to_string(), vec!["John Doe".to_string()]),
                                                       ("groups".to_string(),
@@ -338,23 +353,45 @@ mod tests {
                 .map(|(key, value)| (key, value::to_value(value).unwrap()))
                 .collect();
 
-        assert_eq!(JsonValue::Object(expected_attributes), result.private_claims);
+        assert_eq!(JsonValue::Object(expected_attributes),
+                   result.private_claims);
     }
 
     #[test]
-    fn attributes_are_namespaced_correctly() {}
+    fn attributes_are_namespaced_correctly() {
+        let result = not_err!(LdapAuthenticator::build_authentication_result(make_user(),
+                                                                             vec!["cn", "groups"].as_slice(),
+                                                                             Some("namespace"),
+                                                                             false));
+        let expected_attributes: JsonMap<_, _> = vec![("cn".to_string(), vec!["John Doe".to_string()]),
+                                                      ("groups".to_string(),
+                                                       vec!["admins".to_string(), "user".to_string()])]
+                .into_iter()
+                .map(|(key, value)| (key, value::to_value(value).unwrap()))
+                .collect();
+
+        let namespaced_attributes: JsonMap<_, _> = vec![("namespace".to_string(),
+                                                         JsonValue::Object(expected_attributes))]
+                .into_iter()
+                .collect();
+
+        assert_eq!(JsonValue::Object(namespaced_attributes),
+                   result.private_claims);
+    }
 
     #[test]
     fn missing_attributes_are_ignored() {
         let result = not_err!(LdapAuthenticator::build_authentication_result(make_user(),
                                                                              vec!["cn", "not_exist"].as_slice(),
+                                                                             None,
                                                                              false));
         let expected_attributes: JsonMap<_, _> = vec![("cn".to_string(), vec!["John Doe".to_string()])]
-                .into_iter()
-                .map(|(key, value)| (key, value::to_value(value).unwrap()))
-                .collect();
+            .into_iter()
+            .map(|(key, value)| (key, value::to_value(value).unwrap()))
+            .collect();
 
-        assert_eq!(JsonValue::Object(expected_attributes), result.private_claims);
+        assert_eq!(JsonValue::Object(expected_attributes),
+                   result.private_claims);
     }
 
     #[test]
