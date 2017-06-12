@@ -56,7 +56,8 @@ impl Authenticator<Basic> for NoOp {
         };
         Ok(AuthenticationResult {
                subject: authorization.username(),
-               refresh_payload: refresh_payload,
+               private_claims: JsonValue::Object(JsonMap::new()),
+               refresh_payload,
            })
     }
 
@@ -80,7 +81,8 @@ impl Authenticator<Bearer> for NoOp {
         };
         Ok(AuthenticationResult {
                subject: authorization.token(),
-               refresh_payload: refresh_payload,
+               private_claims: JsonValue::Object(JsonMap::new()),
+               refresh_payload,
            })
     }
 
@@ -104,7 +106,8 @@ impl Authenticator<String> for NoOp {
         };
         Ok(AuthenticationResult {
                subject: authorization.string(),
-               refresh_payload: refresh_payload,
+               private_claims: JsonValue::Object(JsonMap::new()),
+               refresh_payload,
            })
     }
 

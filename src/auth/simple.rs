@@ -126,7 +126,8 @@ impl SimpleAuthenticator {
 
                     Ok(AuthenticationResult {
                            subject: username.to_string(),
-                           refresh_payload: refresh_payload,
+                           private_claims: JsonValue::Object(JsonMap::new()),
+                           refresh_payload,
                        })
                 }
             }
