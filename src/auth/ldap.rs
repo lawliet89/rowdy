@@ -117,7 +117,9 @@ impl LdapAuthenticator {
         };
 
         // This specifies what to get back from the LDAP server
-        let search_attrs_vec = vec!["cn", "dn"];
+        let mut search_attrs_vec = vec!["cn", "dn"];
+        search_attrs_vec.extend(self.include_attributes.iter().map(String::as_str));
+
         let (results, status, _) = connection
             .search(&search_base,
                     Scope::Subtree,
