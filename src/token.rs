@@ -371,9 +371,8 @@ pub struct RefreshTokenConfiguration {
     pub expiry_duration: Duration,
 }
 
-/// Private claims that will be included in the JWT embedded. Currently, an empty shell.
-#[derive(Default, Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub struct PrivateClaim {}
+/// Private claims that will be included in the JWT.
+pub type PrivateClaim = JsonValue;
 
 /// Convenient typedef for the type of the Refresh Token Payload. This is a signed JWS which contains a JWT Claims set.
 pub type RefreshTokenPayload = jwt::JWT<JsonValue, jwt::Empty>;

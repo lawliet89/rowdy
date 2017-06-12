@@ -90,7 +90,7 @@ fn token_getter(origin: Option<cors::Origin>,
             let token = Token::<PrivateClaim>::with_configuration(&configuration,
                                                                   &result.subject,
                                                                   &auth_param.service,
-                                                                  Default::default(),
+                                                                  result.private_claims.clone(),
                                                                   result.refresh_payload.as_ref())?;
             let signing_key = &keys.signing;
             let token = token.encode(signing_key)?;
@@ -144,7 +144,7 @@ fn refresh_token(origin: Option<cors::Origin>,
             let token = Token::<PrivateClaim>::with_configuration(&configuration,
                                                                   &result.subject,
                                                                   &auth_param.service,
-                                                                  Default::default(),
+                                                                  result.private_claims.clone(),
                                                                   None)?;
             let token = token.encode(&keys.signing)?;
             Ok(cors_options.respond(token, origin)?)

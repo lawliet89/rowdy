@@ -292,6 +292,8 @@ pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>
 pub struct AuthenticationResult {
     /// The subject of the authentication
     pub subject: String,
+    /// Additional private claims to be included in the authentication token, if any
+    pub private_claims: JsonValue,
     /// The payload to be included in a Refresh token, if any
     pub refresh_payload: Option<JsonValue>,
 }
@@ -371,7 +373,8 @@ pub mod tests {
                 };
                 Ok(AuthenticationResult {
                        subject: username,
-                       refresh_payload: refresh_payload,
+                       private_claims: JsonValue::Object(JsonMap::new()),
+                       refresh_payload,
                    })
             } else {
                 Err(super::Error::AuthenticationFailure)?
@@ -399,7 +402,8 @@ pub mod tests {
                 };
                 Ok(AuthenticationResult {
                        subject: "这样可以挡住他们。".to_string(),
-                       refresh_payload: refresh_payload,
+                       private_claims: JsonValue::Object(JsonMap::new()),
+                       refresh_payload,
                    })
             } else {
                 Err(super::Error::AuthenticationFailure)?
@@ -427,7 +431,8 @@ pub mod tests {
                 };
                 Ok(AuthenticationResult {
                        subject: "哦，对不起啦。".to_string(),
-                       refresh_payload: refresh_payload,
+                       private_claims: JsonValue::Object(JsonMap::new()),
+                       refresh_payload,
                    })
             } else {
                 Err(super::Error::AuthenticationFailure)?
