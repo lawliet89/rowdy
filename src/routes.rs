@@ -91,7 +91,7 @@ fn token_getter(origin: Option<cors::Origin>,
                                                                   &result.subject,
                                                                   &auth_param.service,
                                                                   Default::default(),
-                                                                  result.payload.as_ref())?;
+                                                                  result.refresh_payload.as_ref())?;
             let signing_key = &keys.signing;
             let token = token.encode(signing_key)?;
 

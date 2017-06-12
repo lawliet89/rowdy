@@ -12,13 +12,6 @@ macro_rules! is_err {
     })
 }
 
-macro_rules! is_none {
-    ($e:expr) => ({
-        let e = $e;
-        assert!(e.is_none(), "{} was expected to be None, but was {:?}", stringify!($e), e);
-    })
-}
-
 macro_rules! not_none {
     ($e:expr) => (match $e {
         Some(e) => e,

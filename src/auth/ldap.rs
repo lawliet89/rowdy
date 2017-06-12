@@ -90,10 +90,7 @@ impl LdapAuthenticator {
     /// Search for the specified account in the directory
     fn search(&self, connection: &LdapConn, account: &str) -> Result<Vec<SearchEntry>, Error> {
         let account = Self::escape_filter(account);
-        let account: HashMap<String, String> = [("account".to_string(), account)]
-            .iter()
-            .cloned()
-            .collect();
+        let account: HashMap<String, String> = [("account".to_string(), account)].iter().cloned().collect();
         let search_base = strfmt(&self.search_base, &account)?;
         let search_filter = match self.search_filter {
             None => "".to_string(),
@@ -125,8 +122,8 @@ impl LdapAuthenticator {
     }
 
     /// Deserialize a user from a refresh token payload
-    fn deserialize_refresh_token_payload(payload: JsonValue) -> Result<User, Error> {
-        match payload {
+    fn deserialize_refresh_token_payload(refresh_payload: JsonValue) -> Result<User, Error> {
+        match refresh_payload {
             JsonValue::Object(ref map) => {
                 let user = map.get("user")
                     .ok_or_else(|| Error::Auth(super::Error::AuthenticationFailure))?;
@@ -138,21 +135,25 @@ impl LdapAuthenticator {
     }
 
     /// Build an `AuthenticationResult` for a `User`
-    fn build_authentication_result(user: User, refresh_payload: bool) -> Result<AuthenticationResult, Error> {
+    fn build_authentication_result(user: User, include_refresh_payload: bool) -> Result<AuthenticationResult, Error> {
         let user_dn = user.dn.clone();
-        let payload = if refresh_payload {
+        let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(user)?)
         } else {
             None
         };
         Ok(AuthenticationResult {
                subject: user_dn,
-               payload: payload,
+               refresh_payload: refresh_payload,
            })
     }
 
     /// Authenticate the user with the username/password
-    pub fn verify(&self, username: &str, password: &str, refresh_payload: bool) -> Result<AuthenticationResult, Error> {
+    pub fn verify(&self,
+                  username: &str,
+                  password: &str,
+                  include_refresh_payload: bool)
+                  -> Result<AuthenticationResult, Error> {
         let user = {
             // First, we search for the user
             let connection = self.connect()?;
@@ -175,7 +176,7 @@ impl LdapAuthenticator {
                 .map_err(|_e| super::Error::AuthenticationFailure)?;
         }
 
-        Self::build_authentication_result(From::from(user), refresh_payload)
+        Self::build_authentication_result(From::from(user), include_refresh_payload)
     }
 
     /// Escape search filters according to RFC 4515. Since all strings in Rust are valid unicode,
@@ -193,16 +194,16 @@ impl LdapAuthenticator {
 impl super::Authenticator<Basic> for LdapAuthenticator {
     fn authenticate(&self,
                     authorization: &super::Authorization<Basic>,
-                    refresh_payload: bool)
+                    include_refresh_payload: bool)
                     -> Result<AuthenticationResult, Error> {
         let username = authorization.username();
         let password = authorization.password().unwrap_or_else(|| "".to_string());
-        self.verify(&username, &password, refresh_payload)
+        self.verify(&username, &password, include_refresh_payload)
     }
 
     // TODO: Implement retrieving updated information from LDAP server
-    fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-        let user = Self::deserialize_refresh_token_payload(payload.clone())?;
+    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+        let user = Self::deserialize_refresh_token_payload(refresh_payload.clone())?;
         Self::build_authentication_result(user, false)
     }
 }
@@ -243,13 +244,14 @@ mod tests {
     fn authentication() {
         let authenticator = make_authenticator();
         let result = not_err!(authenticator.verify("euler", "password", false));
-        assert!(result.payload.is_none());
+        assert!(result.refresh_payload.is_none());
 
         let result = not_err!(authenticator.verify("euler", "password", true));
-        assert!(result.payload.is_some());
+        assert!(result.refresh_payload.is_some());
 
-        let refresh_result = not_err!(authenticator.authenticate_refresh_token(result.payload.as_ref().unwrap()));
-        assert!(refresh_result.payload.is_none());
+        let refresh_result = not_err!(authenticator
+                                          .authenticate_refresh_token(result.refresh_payload.as_ref().unwrap()));
+        assert!(refresh_result.refresh_payload.is_none());
 
         assert_eq!(result.subject, refresh_result.subject);
     }
