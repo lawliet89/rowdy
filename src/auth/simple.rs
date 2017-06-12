@@ -103,7 +103,11 @@ impl SimpleAuthenticator {
 
     /// Verify that some user with the provided password exists in the CSV database, and the password is correct.
     /// Returns the payload to be included in a refresh token if successful
-    pub fn verify(&self, username: &str, password: &str, refresh_payload: bool) -> Result<AuthenticationResult, Error> {
+    pub fn verify(&self,
+                  username: &str,
+                  password: &str,
+                  include_refresh_payload: bool)
+                  -> Result<AuthenticationResult, Error> {
         match self.users.get(username) {
             None => Err(Error::Auth(super::Error::AuthenticationFailure)),
             Some(&(ref hash, ref salt)) => {
@@ -111,7 +115,7 @@ impl SimpleAuthenticator {
                 if !verify_slices_are_equal(actual_password_digest.as_ref(), &*hash).is_ok() {
                     Err(Error::Auth(super::Error::AuthenticationFailure))
                 } else {
-                    let payload = if refresh_payload {
+                    let refresh_payload = if include_refresh_payload {
                         let mut map = JsonMap::with_capacity(2);
                         map.insert("user".to_string(), From::from(username));
                         map.insert("password".to_string(), From::from(password));
@@ -122,7 +126,7 @@ impl SimpleAuthenticator {
 
                     Ok(AuthenticationResult {
                            subject: username.to_string(),
-                           payload: payload,
+                           refresh_payload: refresh_payload,
                        })
                 }
             }
@@ -141,17 +145,17 @@ impl SimpleAuthenticator {
 impl super::Authenticator<Basic> for SimpleAuthenticator {
     fn authenticate(&self,
                     authorization: &super::Authorization<Basic>,
-                    refresh_payload: bool)
+                    include_refresh_payload: bool)
                     -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the Simple authenticator in production");
         let username = authorization.username();
         let password = authorization.password().unwrap_or_else(|| "".to_string());
-        self.verify(&username, &password, refresh_payload)
+        self.verify(&username, &password, include_refresh_payload)
     }
 
-    fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the Simple authenticator in production");
-        match *payload {
+        match *refresh_payload {
             JsonValue::Object(ref map) => {
                 let user = map.get("user")
                     .ok_or_else(|| super::Error::AuthenticationFailure)?
@@ -305,7 +309,7 @@ mod tests {
         not_err!(authenticator.verify("foobar", "password", false));
 
         let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
-        assert!(result.payload.is_none()); // refresh payload is not provided when not requested
+        assert!(result.refresh_payload.is_none()); // refresh refresh_payload is not provided when not requested
     }
 
     #[test]
@@ -319,7 +323,7 @@ mod tests {
         not_err!(authenticator.verify("foobar", "password", false));
 
         let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
-        assert!(result.payload.is_none()); // refresh payload is not provided when not requested
+        assert!(result.refresh_payload.is_none()); // refresh refresh_payload is not provided when not requested
     }
 
     #[test]
@@ -327,10 +331,10 @@ mod tests {
         let authenticator = make_authenticator();
 
         let result = not_err!(authenticator.verify("foobar", "password", true));
-        assert!(result.payload.is_some()); // refresh payload is provided when requested
+        assert!(result.refresh_payload.is_some()); // refresh refresh_payload is provided when requested
 
-        let result = not_err!(authenticator.authenticate_refresh_token(result.payload.as_ref().unwrap()));
-        assert!(result.payload.is_none());
+        let result = not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap()));
+        assert!(result.refresh_payload.is_none());
     }
 
     #[test]

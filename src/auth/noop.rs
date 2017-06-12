@@ -24,9 +24,9 @@ impl NoOp {
     }
 
     /// From a refresh token payload, retrieve the headr
-    fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(payload: &JsonValue)
+    fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(refresh_payload: &JsonValue)
                                                                       -> Result<header::Authorization<S>, Error> {
-        match *payload {
+        match *refresh_payload {
             JsonValue::Object(ref map) => {
                 let header = map.get("header")
                     .ok_or_else(|| Error::Auth(super::Error::AuthenticationFailure))?
@@ -46,23 +46,23 @@ impl NoOp {
 impl Authenticator<Basic> for NoOp {
     fn authenticate(&self,
                     authorization: &Authorization<Basic>,
-                    refresh_payload: bool)
+                    include_refresh_payload: bool)
                     -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let payload = if refresh_payload {
+        let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(authorization))
         } else {
             None
         };
         Ok(AuthenticationResult {
                subject: authorization.username(),
-               payload: payload,
+               refresh_payload: refresh_payload,
            })
     }
 
-    fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let header: header::Authorization<Basic> = Self::deserialize_refresh_token_payload(payload)?;
+        let header: header::Authorization<Basic> = Self::deserialize_refresh_token_payload(refresh_payload)?;
         self.authenticate(&Authorization(header), false)
     }
 }
@@ -70,23 +70,23 @@ impl Authenticator<Basic> for NoOp {
 impl Authenticator<Bearer> for NoOp {
     fn authenticate(&self,
                     authorization: &Authorization<Bearer>,
-                    refresh_payload: bool)
+                    include_refresh_payload: bool)
                     -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let payload = if refresh_payload {
+        let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(authorization))
         } else {
             None
         };
         Ok(AuthenticationResult {
                subject: authorization.token(),
-               payload: payload,
+               refresh_payload: refresh_payload,
            })
     }
 
-    fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let header: header::Authorization<Bearer> = Self::deserialize_refresh_token_payload(payload)?;
+        let header: header::Authorization<Bearer> = Self::deserialize_refresh_token_payload(refresh_payload)?;
         self.authenticate(&Authorization(header), false)
     }
 }
@@ -94,23 +94,23 @@ impl Authenticator<Bearer> for NoOp {
 impl Authenticator<String> for NoOp {
     fn authenticate(&self,
                     authorization: &Authorization<String>,
-                    refresh_payload: bool)
+                    include_refresh_payload: bool)
                     -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let payload = if refresh_payload {
+        let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(authorization))
         } else {
             None
         };
         Ok(AuthenticationResult {
                subject: authorization.string(),
-               payload: payload,
+               refresh_payload: refresh_payload,
            })
     }
 
-    fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let header: header::Authorization<String> = Self::deserialize_refresh_token_payload(payload)?;
+        let header: header::Authorization<String> = Self::deserialize_refresh_token_payload(refresh_payload)?;
         self.authenticate(&Authorization(header), false)
     }
 }
@@ -150,17 +150,17 @@ pub mod tests {
                                                            password: Some("let me in".to_string()),
                                                        });
         let result = not_err!(authenticator.authenticate(&Authorization(auth_header), false));
-        assert!(result.payload.is_none());
+        assert!(result.refresh_payload.is_none());
 
         // Bearer
         let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
         let result = not_err!(authenticator.authenticate(&Authorization(auth_header), false));
-        assert!(result.payload.is_none());
+        assert!(result.refresh_payload.is_none());
 
         // String
         let auth_header = hyper::header::Authorization("anything goes".to_string());
         let result = not_err!(authenticator.authenticate(&Authorization(auth_header), false));
-        assert!(result.payload.is_none());
+        assert!(result.refresh_payload.is_none());
     }
 
     #[test]
@@ -173,26 +173,29 @@ pub mod tests {
                                                            password: Some("let me in".to_string()),
                                                        });
         let result = not_err!(authenticator.authenticate(&Authorization(auth_header), true));
-        assert!(result.payload.is_some()); // should include a refresh token
-        let result = not_err!(Authenticator::<Basic>::authenticate_refresh_token(&authenticator,
-                                                                                 result.payload.as_ref().unwrap()));
-        assert!(result.payload.is_none()); // should NOT include a refresh token
+        assert!(result.refresh_payload.is_some()); // should include a refresh token
+        let result =
+            not_err!(Authenticator::<Basic>::authenticate_refresh_token(&authenticator,
+                                                                        result.refresh_payload.as_ref().unwrap()));
+        assert!(result.refresh_payload.is_none()); // should NOT include a refresh token
 
         // Bearer
         let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
         let result = not_err!(authenticator.authenticate(&Authorization(auth_header), true));
-        assert!(result.payload.is_some()); // should include a refresh token
-        let result = not_err!(Authenticator::<Bearer>::authenticate_refresh_token(&authenticator,
-                                                                                  result.payload.as_ref().unwrap()));
-        assert!(result.payload.is_none()); // should NOT include a refresh token
+        assert!(result.refresh_payload.is_some()); // should include a refresh token
+        let result =
+            not_err!(Authenticator::<Bearer>::authenticate_refresh_token(&authenticator,
+                                                                         result.refresh_payload.as_ref().unwrap()));
+        assert!(result.refresh_payload.is_none()); // should NOT include a refresh token
 
         // String
         let auth_header = hyper::header::Authorization("anything goes".to_string());
         let result = not_err!(authenticator.authenticate(&Authorization(auth_header), true));
-        assert!(result.payload.is_some()); // should include a refresh token
-        let result = not_err!(Authenticator::<String>::authenticate_refresh_token(&authenticator,
-                                                                                  result.payload.as_ref().unwrap()));
-        assert!(result.payload.is_none()); // should NOT include a refresh token
+        assert!(result.refresh_payload.is_some()); // should include a refresh token
+        let result =
+            not_err!(Authenticator::<String>::authenticate_refresh_token(&authenticator,
+                                                                         result.refresh_payload.as_ref().unwrap()));
+        assert!(result.refresh_payload.is_none()); // should NOT include a refresh token
     }
 
     #[test]

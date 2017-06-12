@@ -225,7 +225,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
     /// Users should not user `authenticate` directly and use `prepare_authentication_response` instead.
     fn authenticate(&self,
                     authorization: &Authorization<S>,
-                    refresh_payload: bool)
+                    include_refresh_payload: bool)
                     -> Result<AuthenticationResult, ::Error>;
 
     /// Verify the credentials provided with the refresh token payload, if supported by the authenticator.
@@ -246,7 +246,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
                                        request_refresh_token: bool)
                                        -> Result<AuthenticationResult, ::Error> {
         let result = self.authenticate(authorization, request_refresh_token)?;
-        if !request_refresh_token && result.payload.is_some() {
+        if !request_refresh_token && result.refresh_payload.is_some() {
             Err(Error::GenericError("Misbehaving authenticator: refresh token payload was \
                                     returned when it was not requested for"
                                             .to_string()))?;
@@ -259,9 +259,9 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
     /// to be sent. Otherwise, the unwrapped authentication result will be returned in an `Ok`.
     /// This function will also check that the authenticator behaves correctly by checking that it does not
     /// return a refresh token payload
-    fn prepare_refresh_response(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-        let result = self.authenticate_refresh_token(payload)?;
-        if result.payload.is_some() {
+    fn prepare_refresh_response(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+        let result = self.authenticate_refresh_token(refresh_payload)?;
+        if result.refresh_payload.is_some() {
             Err(Error::GenericError("Misbehaving authenticator: refresh token payload was \
                                     returned for a refresh operation"
                                             .to_string()))?;
@@ -293,7 +293,7 @@ pub struct AuthenticationResult {
     /// The subject of the authentication
     pub subject: String,
     /// The payload to be included in a Refresh token, if any
-    pub payload: Option<JsonValue>,
+    pub refresh_payload: Option<JsonValue>,
 }
 
 #[cfg(test)]
@@ -342,9 +342,9 @@ pub mod tests {
         ///
         /// # Panics
         /// Panics if the refresh token payload is not in the right shape, or if the content is invalid
-        fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(payload: &JsonValue)
+        fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(refresh_payload: &JsonValue)
                                                                           -> header::Authorization<S> {
-            match *payload {
+            match *refresh_payload {
                 JsonValue::Object(ref map) => {
                     let header = map["header"].as_str().unwrap(); // will panic if the shape is incorrect
                     let header = header.as_bytes().to_vec();
@@ -358,28 +358,28 @@ pub mod tests {
     impl Authenticator<Basic> for MockAuthenticator {
         fn authenticate(&self,
                         authorization: &Authorization<Basic>,
-                        refresh_payload: bool)
+                        include_refresh_payload: bool)
                         -> Result<AuthenticationResult, Error> {
             let username = authorization.username();
             let password = authorization.password().unwrap_or_else(|| "".to_string());
 
             if username == "mei" && password == "冻住，不许走!" {
-                let payload = if refresh_payload {
+                let refresh_payload = if include_refresh_payload {
                     Some(Self::serialize_refresh_token_payload(authorization))
                 } else {
                     None
                 };
                 Ok(AuthenticationResult {
                        subject: username,
-                       payload: payload,
+                       refresh_payload: refresh_payload,
                    })
             } else {
                 Err(super::Error::AuthenticationFailure)?
             }
         }
 
-        fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-            let header: header::Authorization<Basic> = Self::deserialize_refresh_token_payload(payload);
+        fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<Basic> = Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
         }
     }
@@ -387,27 +387,27 @@ pub mod tests {
     impl Authenticator<Bearer> for MockAuthenticator {
         fn authenticate(&self,
                         authorization: &Authorization<Bearer>,
-                        refresh_payload: bool)
+                        include_refresh_payload: bool)
                         -> Result<AuthenticationResult, Error> {
             let token = authorization.token();
 
             if token == "这样可以挡住他们。" {
-                let payload = if refresh_payload {
+                let refresh_payload = if include_refresh_payload {
                     Some(Self::serialize_refresh_token_payload(authorization))
                 } else {
                     None
                 };
                 Ok(AuthenticationResult {
                        subject: "这样可以挡住他们。".to_string(),
-                       payload: payload,
+                       refresh_payload: refresh_payload,
                    })
             } else {
                 Err(super::Error::AuthenticationFailure)?
             }
         }
 
-        fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-            let header: header::Authorization<Bearer> = Self::deserialize_refresh_token_payload(payload);
+        fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<Bearer> = Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
         }
     }
@@ -415,27 +415,27 @@ pub mod tests {
     impl Authenticator<String> for MockAuthenticator {
         fn authenticate(&self,
                         authorization: &Authorization<String>,
-                        refresh_payload: bool)
+                        include_refresh_payload: bool)
                         -> Result<AuthenticationResult, Error> {
             let string = authorization.string();
 
             if string == "哦，对不起啦。" {
-                let payload = if refresh_payload {
+                let refresh_payload = if include_refresh_payload {
                     Some(Self::serialize_refresh_token_payload(authorization))
                 } else {
                     None
                 };
                 Ok(AuthenticationResult {
                        subject: "哦，对不起啦。".to_string(),
-                       payload: payload,
+                       refresh_payload: refresh_payload,
                    })
             } else {
                 Err(super::Error::AuthenticationFailure)?
             }
         }
 
-        fn authenticate_refresh_token(&self, payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-            let header: header::Authorization<String> = Self::deserialize_refresh_token_payload(payload);
+        fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<String> = Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
         }
     }
