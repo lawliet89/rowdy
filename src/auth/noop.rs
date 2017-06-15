@@ -15,8 +15,9 @@ impl NoOp {
     }
 
     /// Generate a refresh token payload from the header
-    fn serialize_refresh_token_payload<S: header::Scheme + 'static>(authorization: &header::Authorization<S>)
-                                                                    -> JsonValue {
+    fn serialize_refresh_token_payload<S: header::Scheme + 'static>(
+        authorization: &header::Authorization<S>,
+    ) -> JsonValue {
         let string = From::from(Self::format(authorization));
         let mut map = JsonMap::with_capacity(1);
         map.insert("header".to_string(), string);
@@ -24,8 +25,9 @@ impl NoOp {
     }
 
     /// From a refresh token payload, retrieve the headr
-    fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(refresh_payload: &JsonValue)
-                                                                      -> Result<header::Authorization<S>, Error> {
+    fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(
+        refresh_payload: &JsonValue,
+    ) -> Result<header::Authorization<S>, Error> {
         match *refresh_payload {
             JsonValue::Object(ref map) => {
                 let header = map.get("header")
@@ -33,9 +35,11 @@ impl NoOp {
                     .as_str()
                     .ok_or_else(|| Error::Auth(super::Error::AuthenticationFailure))?;
                 let header = header.as_bytes().to_vec();
-                let header: header::Authorization<S> =
-                    header::Authorization::parse_header(&[header])
-                        .map_err(|_| Error::Auth(super::Error::AuthenticationFailure))?;
+                let header: header::Authorization<S> = header::Authorization::parse_header(&[header]).map_err(
+                    |_| {
+                        Error::Auth(super::Error::AuthenticationFailure)
+                    },
+                )?;
                 Ok(header)
             }
             _ => Err(Error::Auth(super::Error::AuthenticationFailure)),
@@ -44,10 +48,11 @@ impl NoOp {
 }
 
 impl Authenticator<Basic> for NoOp {
-    fn authenticate(&self,
-                    authorization: &Authorization<Basic>,
-                    include_refresh_payload: bool)
-                    -> Result<AuthenticationResult, Error> {
+    fn authenticate(
+        &self,
+        authorization: &Authorization<Basic>,
+        include_refresh_payload: bool,
+    ) -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the NoOp authenticator in production");
         let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(authorization))
@@ -55,10 +60,10 @@ impl Authenticator<Basic> for NoOp {
             None
         };
         Ok(AuthenticationResult {
-               subject: authorization.username(),
-               private_claims: JsonValue::Object(JsonMap::new()),
-               refresh_payload,
-           })
+            subject: authorization.username(),
+            private_claims: JsonValue::Object(JsonMap::new()),
+            refresh_payload,
+        })
     }
 
     fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
@@ -69,10 +74,11 @@ impl Authenticator<Basic> for NoOp {
 }
 
 impl Authenticator<Bearer> for NoOp {
-    fn authenticate(&self,
-                    authorization: &Authorization<Bearer>,
-                    include_refresh_payload: bool)
-                    -> Result<AuthenticationResult, Error> {
+    fn authenticate(
+        &self,
+        authorization: &Authorization<Bearer>,
+        include_refresh_payload: bool,
+    ) -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the NoOp authenticator in production");
         let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(authorization))
@@ -80,10 +86,10 @@ impl Authenticator<Bearer> for NoOp {
             None
         };
         Ok(AuthenticationResult {
-               subject: authorization.token(),
-               private_claims: JsonValue::Object(JsonMap::new()),
-               refresh_payload,
-           })
+            subject: authorization.token(),
+            private_claims: JsonValue::Object(JsonMap::new()),
+            refresh_payload,
+        })
     }
 
     fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
@@ -94,10 +100,11 @@ impl Authenticator<Bearer> for NoOp {
 }
 
 impl Authenticator<String> for NoOp {
-    fn authenticate(&self,
-                    authorization: &Authorization<String>,
-                    include_refresh_payload: bool)
-                    -> Result<AuthenticationResult, Error> {
+    fn authenticate(
+        &self,
+        authorization: &Authorization<String>,
+        include_refresh_payload: bool,
+    ) -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the NoOp authenticator in production");
         let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(authorization))
@@ -105,10 +112,10 @@ impl Authenticator<String> for NoOp {
             None
         };
         Ok(AuthenticationResult {
-               subject: authorization.string(),
-               private_claims: JsonValue::Object(JsonMap::new()),
-               refresh_payload,
-           })
+            subject: authorization.string(),
+            private_claims: JsonValue::Object(JsonMap::new()),
+            refresh_payload,
+        })
     }
 
     fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
@@ -123,7 +130,8 @@ impl Authenticator<String> for NoOp {
 pub struct NoOpConfiguration {}
 
 impl<S: header::Scheme + 'static> AuthenticatorConfiguration<S> for NoOpConfiguration
-    where NoOp: Authenticator<S>
+where
+    NoOp: Authenticator<S>,
 {
     type Authenticator = NoOp;
 
@@ -149,20 +157,29 @@ pub mod tests {
 
         // Basic
         let auth_header = hyper::header::Authorization(Basic {
-                                                           username: "anything".to_owned(),
-                                                           password: Some("let me in".to_string()),
-                                                       });
-        let result = not_err!(authenticator.authenticate(&Authorization(auth_header), false));
+            username: "anything".to_owned(),
+            password: Some("let me in".to_string()),
+        });
+        let result = not_err!(authenticator.authenticate(
+            &Authorization(auth_header),
+            false,
+        ));
         assert!(result.refresh_payload.is_none());
 
         // Bearer
         let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
-        let result = not_err!(authenticator.authenticate(&Authorization(auth_header), false));
+        let result = not_err!(authenticator.authenticate(
+            &Authorization(auth_header),
+            false,
+        ));
         assert!(result.refresh_payload.is_none());
 
         // String
         let auth_header = hyper::header::Authorization("anything goes".to_string());
-        let result = not_err!(authenticator.authenticate(&Authorization(auth_header), false));
+        let result = not_err!(authenticator.authenticate(
+            &Authorization(auth_header),
+            false,
+        ));
         assert!(result.refresh_payload.is_none());
     }
 
@@ -172,32 +189,44 @@ pub mod tests {
 
         // Basic
         let auth_header = hyper::header::Authorization(Basic {
-                                                           username: "anything".to_owned(),
-                                                           password: Some("let me in".to_string()),
-                                                       });
-        let result = not_err!(authenticator.authenticate(&Authorization(auth_header), true));
+            username: "anything".to_owned(),
+            password: Some("let me in".to_string()),
+        });
+        let result = not_err!(authenticator.authenticate(
+            &Authorization(auth_header),
+            true,
+        ));
         assert!(result.refresh_payload.is_some()); // should include a refresh token
-        let result =
-            not_err!(Authenticator::<Basic>::authenticate_refresh_token(&authenticator,
-                                                                        result.refresh_payload.as_ref().unwrap()));
+        let result = not_err!(Authenticator::<Basic>::authenticate_refresh_token(
+            &authenticator,
+            result.refresh_payload.as_ref().unwrap(),
+        ));
         assert!(result.refresh_payload.is_none()); // should NOT include a refresh token
 
         // Bearer
         let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
-        let result = not_err!(authenticator.authenticate(&Authorization(auth_header), true));
+        let result = not_err!(authenticator.authenticate(
+            &Authorization(auth_header),
+            true,
+        ));
         assert!(result.refresh_payload.is_some()); // should include a refresh token
-        let result =
-            not_err!(Authenticator::<Bearer>::authenticate_refresh_token(&authenticator,
-                                                                         result.refresh_payload.as_ref().unwrap()));
+        let result = not_err!(Authenticator::<Bearer>::authenticate_refresh_token(
+            &authenticator,
+            result.refresh_payload.as_ref().unwrap(),
+        ));
         assert!(result.refresh_payload.is_none()); // should NOT include a refresh token
 
         // String
         let auth_header = hyper::header::Authorization("anything goes".to_string());
-        let result = not_err!(authenticator.authenticate(&Authorization(auth_header), true));
+        let result = not_err!(authenticator.authenticate(
+            &Authorization(auth_header),
+            true,
+        ));
         assert!(result.refresh_payload.is_some()); // should include a refresh token
-        let result =
-            not_err!(Authenticator::<String>::authenticate_refresh_token(&authenticator,
-                                                                         result.refresh_payload.as_ref().unwrap()));
+        let result = not_err!(Authenticator::<String>::authenticate_refresh_token(
+            &authenticator,
+            result.refresh_payload.as_ref().unwrap(),
+        ));
         assert!(result.refresh_payload.is_none()); // should NOT include a refresh token
     }
 
@@ -208,11 +237,13 @@ pub mod tests {
 
         // Make headers
         let auth_header = hyper::header::Authorization(Basic {
-                                                           username: "anything".to_owned(),
-                                                           password: Some("let me in".to_string()),
-                                                       });
-        let auth_header = http::Header::new("Authorization",
-                                            hyper::header::HeaderFormatter(&auth_header).to_string());
+            username: "anything".to_owned(),
+            password: Some("let me in".to_string()),
+        });
+        let auth_header = http::Header::new(
+            "Authorization",
+            hyper::header::HeaderFormatter(&auth_header).to_string(),
+        );
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -228,8 +259,10 @@ pub mod tests {
 
         // Make headers
         let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
-        let auth_header = http::Header::new("Authorization",
-                                            hyper::header::HeaderFormatter(&auth_header).to_string());
+        let auth_header = http::Header::new(
+            "Authorization",
+            hyper::header::HeaderFormatter(&auth_header).to_string(),
+        );
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);
@@ -245,8 +278,10 @@ pub mod tests {
 
         // Make headers
         let auth_header = hyper::header::Authorization("anything goes".to_string());
-        let auth_header = http::Header::new("Authorization",
-                                            hyper::header::HeaderFormatter(&auth_header).to_string());
+        let auth_header = http::Header::new(
+            "Authorization",
+            hyper::header::HeaderFormatter(&auth_header).to_string(),
+        );
         // Make and dispatch request
         let mut req = MockRequest::new(Get, "/").header(auth_header);
         let response = req.dispatch_with(&rocket);

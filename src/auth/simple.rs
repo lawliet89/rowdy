@@ -72,11 +72,11 @@ impl SimpleAuthenticator {
         let (users, errors): (ParsedRecordBytes, ParsedRecordBytes) = records
             .into_iter()
             .map(|r| {
-                     let (username, hash, salt) = r.unwrap(); // safe to unwrap
-                     let hash = test::from_hex(&hash)?;
-                     let salt = test::from_hex(&salt)?;
-                     Ok((username, hash, salt))
-                 })
+                let (username, hash, salt) = r.unwrap(); // safe to unwrap
+                let hash = test::from_hex(&hash)?;
+                let salt = test::from_hex(&salt)?;
+                Ok((username, hash, salt))
+            })
             .partition(Result::is_ok);
 
         if !errors.is_empty() {
@@ -87,9 +87,9 @@ impl SimpleAuthenticator {
         let users: Users = users
             .into_iter()
             .map(|r| {
-                     let (username, hash, salt) = r.unwrap(); // safe to unwrap
-                     (username, (hash, salt))
-                 })
+                let (username, hash, salt) = r.unwrap(); // safe to unwrap
+                (username, (hash, salt))
+            })
             .collect();
 
         Ok(users)
@@ -98,16 +98,19 @@ impl SimpleAuthenticator {
     /// Hash a password with the salt. See struct level documentation for the algorithm used.
     // TODO: Write an "example" tool to salt easily
     pub fn hash_password(password: &str, salt: &[u8]) -> Result<String, Error> {
-        Ok(hex_dump(Self::hash_password_digest(password, salt)?.as_ref()))
+        Ok(hex_dump(
+            Self::hash_password_digest(password, salt)?.as_ref(),
+        ))
     }
 
     /// Verify that some user with the provided password exists in the CSV database, and the password is correct.
     /// Returns the payload to be included in a refresh token if successful
-    pub fn verify(&self,
-                  username: &str,
-                  password: &str,
-                  include_refresh_payload: bool)
-                  -> Result<AuthenticationResult, Error> {
+    pub fn verify(
+        &self,
+        username: &str,
+        password: &str,
+        include_refresh_payload: bool,
+    ) -> Result<AuthenticationResult, Error> {
         match self.users.get(username) {
             None => Err(Error::Auth(super::Error::AuthenticationFailure)),
             Some(&(ref hash, ref salt)) => {
@@ -125,10 +128,10 @@ impl SimpleAuthenticator {
                     };
 
                     Ok(AuthenticationResult {
-                           subject: username.to_string(),
-                           private_claims: JsonValue::Object(JsonMap::new()),
-                           refresh_payload,
-                       })
+                        subject: username.to_string(),
+                        private_claims: JsonValue::Object(JsonMap::new()),
+                        refresh_payload,
+                    })
                 }
             }
         }
@@ -144,10 +147,11 @@ impl SimpleAuthenticator {
 }
 
 impl super::Authenticator<Basic> for SimpleAuthenticator {
-    fn authenticate(&self,
-                    authorization: &super::Authorization<Basic>,
-                    include_refresh_payload: bool)
-                    -> Result<AuthenticationResult, Error> {
+    fn authenticate(
+        &self,
+        authorization: &super::Authorization<Basic>,
+        include_refresh_payload: bool,
+    ) -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the Simple authenticator in production");
         let username = authorization.username();
         let password = authorization.password().unwrap_or_else(|| "".to_string());
@@ -207,7 +211,11 @@ impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfigurati
     type Authenticator = SimpleAuthenticator;
 
     fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
-        Ok(SimpleAuthenticator::with_csv_file(&self.csv_path, self.has_headers, self.delimiter as u8)?)
+        Ok(SimpleAuthenticator::with_csv_file(
+            &self.csv_path,
+            self.has_headers,
+            self.delimiter as u8,
+        )?)
     }
 }
 
@@ -256,7 +264,11 @@ mod tests {
     use super::*;
 
     fn make_authenticator() -> SimpleAuthenticator {
-        not_err!(SimpleAuthenticator::with_csv_file("test/fixtures/users.csv", false, b','))
+        not_err!(SimpleAuthenticator::with_csv_file(
+            "test/fixtures/users.csv",
+            false,
+            b',',
+        ))
     }
 
     #[test]
@@ -274,15 +286,22 @@ mod tests {
     #[test]
     fn hashing_is_done_correctly() {
         let hashed_password = not_err!(SimpleAuthenticator::hash_password("password", &[0; 32]));
-        assert_eq!("e6e1111452a5574d8d64f6f4ba6fabc86af5c45c341df1eb23026373c41d24b8",
-                   hashed_password);
+        assert_eq!(
+            "e6e1111452a5574d8d64f6f4ba6fabc86af5c45c341df1eb23026373c41d24b8",
+            hashed_password
+        );
     }
 
     #[test]
     fn hashing_is_done_correctly_for_unicode() {
-        let hashed_password = not_err!(SimpleAuthenticator::hash_password("冻住，不许走!", &[0; 32]));
-        assert_eq!("b400a5eea452afcc67a81602f28012e5634404ddf1e043d6ff1df67022c88cd2",
-                   hashed_password);
+        let hashed_password = not_err!(SimpleAuthenticator::hash_password(
+            "冻住，不许走!",
+            &[0; 32],
+        ));
+        assert_eq!(
+            "b400a5eea452afcc67a81602f28012e5634404ddf1e043d6ff1df67022c88cd2",
+            hashed_password
+        );
     }
 
     #[test]
@@ -299,8 +318,9 @@ mod tests {
         not_err!(write_csv(&users, &mut cursor));
 
         cursor.set_position(0);
-        let authenticator = not_err!(SimpleAuthenticator::new(csv::Reader::from_reader(&mut cursor)
-                                                                  .has_headers(false)));
+        let authenticator = not_err!(SimpleAuthenticator::new(
+            csv::Reader::from_reader(&mut cursor).has_headers(false),
+        ));
 
         let expected_keys = vec!["foobar".to_string(), "mei".to_string()];
         let mut actual_keys: Vec<String> = authenticator.users.keys().cloned().collect();
@@ -334,7 +354,9 @@ mod tests {
         let result = not_err!(authenticator.verify("foobar", "password", true));
         assert!(result.refresh_payload.is_some()); // refresh refresh_payload is provided when requested
 
-        let result = not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap()));
+        let result = not_err!(authenticator.authenticate_refresh_token(
+            result.refresh_payload.as_ref().unwrap(),
+        ));
         assert!(result.refresh_payload.is_none());
     }
 

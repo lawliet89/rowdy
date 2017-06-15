@@ -145,11 +145,12 @@ fn make_uuid() -> Result<Uuid, Error> {
     use jwt::jwa::SecureRandom;
 
     let mut bytes = vec![0; 16];
-    jwa::rng()
-        .fill(&mut bytes)
-        .map_err(|_| "Unable to generate UUID")?;
-    Ok(Uuid::from_bytes(&bytes)
-           .map_err(|e| e.description().to_string())?)
+    jwa::rng().fill(&mut bytes).map_err(
+        |_| "Unable to generate UUID",
+    )?;
+    Ok(Uuid::from_bytes(&bytes).map_err(
+        |e| e.description().to_string(),
+    )?)
 }
 
 fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Header<jwt::Empty> {
@@ -160,44 +161,49 @@ fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Hea
     jws::Header::from_registered_header(registered)
 }
 
-fn make_registered_claims(subject: &str,
-                          now: DateTime<UTC>,
-                          expiry_duration: Duration,
-                          issuer: &jwt::StringOrUri,
-                          audience: &jwt::SingleOrMultiple<jwt::StringOrUri>)
-                          -> Result<jwt::RegisteredClaims, ::Error> {
-    let expiry_duration = chrono::Duration::from_std(expiry_duration)
-        .map_err(|e| e.to_string())?;
+fn make_registered_claims(
+    subject: &str,
+    now: DateTime<UTC>,
+    expiry_duration: Duration,
+    issuer: &jwt::StringOrUri,
+    audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
+) -> Result<jwt::RegisteredClaims, ::Error> {
+    let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(
+        |e| e.to_string(),
+    )?;
 
     Ok(jwt::RegisteredClaims {
-           issuer: Some(issuer.clone()),
-           subject: Some(FromStr::from_str(subject).map_err(Error::JWTError)?),
-           audience: Some(audience.clone()),
-           issued_at: Some(now.into()),
-           not_before: Some(now.into()),
-           expiry: Some((now + expiry_duration).into()),
-           id: Some(make_uuid()?.urn().to_string()),
-       })
+        issuer: Some(issuer.clone()),
+        subject: Some(FromStr::from_str(subject).map_err(Error::JWTError)?),
+        audience: Some(audience.clone()),
+        issued_at: Some(now.into()),
+        not_before: Some(now.into()),
+        expiry: Some((now + expiry_duration).into()),
+        id: Some(make_uuid()?.urn().to_string()),
+    })
 }
 
 /// Make a new JWS
 #[cfg_attr(feature = "clippy_lints", allow(too_many_arguments))] // Internal function
-fn make_token<P: Serialize + DeserializeOwned + 'static>(subject: &str,
-                                                         issuer: &jwt::StringOrUri,
-                                                         audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
-                                                         expiry_duration: Duration,
-                                                         private_claims: P,
-                                                         signature_algorithm: Option<jwa::SignatureAlgorithm>,
-                                                         now: DateTime<UTC>)
-                                                         -> Result<jwt::JWT<P, jwt::Empty>, ::Error> {
+fn make_token<P: Serialize + DeserializeOwned + 'static>(
+    subject: &str,
+    issuer: &jwt::StringOrUri,
+    audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
+    expiry_duration: Duration,
+    private_claims: P,
+    signature_algorithm: Option<jwa::SignatureAlgorithm>,
+    now: DateTime<UTC>,
+) -> Result<jwt::JWT<P, jwt::Empty>, ::Error> {
     let header = make_header(signature_algorithm);
     let registered_claims = make_registered_claims(subject, now, expiry_duration, issuer, audience)?;
 
-    Ok(jwt::JWT::new_decoded(header,
-                             jwt::ClaimsSet::<P> {
-                                 private: private_claims,
-                                 registered: registered_claims,
-                             }))
+    Ok(jwt::JWT::new_decoded(
+        header,
+        jwt::ClaimsSet::<P> {
+            private: private_claims,
+            registered: registered_claims,
+        },
+    ))
 }
 
 /// Verify that the service requested for is allowed in the configuration
@@ -336,11 +342,11 @@ impl Configuration {
         };
 
         Ok(Keys {
-               signing: self.secret.for_signing()?,
-               signature_verification: self.secret.for_verification()?,
-               encryption: encryption,
-               decryption: decryption,
-           })
+            signing: self.secret.for_signing()?,
+            signature_verification: self.secret.for_verification()?,
+            encryption: encryption,
+            decryption: decryption,
+        })
     }
 }
 
@@ -404,34 +410,39 @@ pub struct RefreshToken(RefreshTokenJWE);
 
 impl RefreshToken {
     #[cfg_attr(feature = "clippy_lints", allow(too_many_arguments))] // Internal function
-    fn new_decrypted(subject: &str,
-                     issuer: &jwt::StringOrUri,
-                     audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
-                     expiry_duration: Duration,
-                     payload: &JsonValue,
-                     signature_algorithm: Option<jwa::SignatureAlgorithm>,
-                     cek_algorithm: jwa::KeyManagementAlgorithm,
-                     enc_algorithm: jwa::ContentEncryptionAlgorithm,
-                     now: DateTime<UTC>)
-                     -> Result<Self, ::Error> {
+    fn new_decrypted(
+        subject: &str,
+        issuer: &jwt::StringOrUri,
+        audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
+        expiry_duration: Duration,
+        payload: &JsonValue,
+        signature_algorithm: Option<jwa::SignatureAlgorithm>,
+        cek_algorithm: jwa::KeyManagementAlgorithm,
+        enc_algorithm: jwa::ContentEncryptionAlgorithm,
+        now: DateTime<UTC>,
+    ) -> Result<Self, ::Error> {
 
         // First, make a token
-        let token = make_token(subject,
-                               issuer,
-                               audience,
-                               expiry_duration,
-                               payload.clone(),
-                               signature_algorithm,
-                               now)?;
+        let token = make_token(
+            subject,
+            issuer,
+            audience,
+            expiry_duration,
+            payload.clone(),
+            signature_algorithm,
+            now,
+        )?;
         // Wrap it in a JWE
-        let jwe = jwt::JWE::new_decrypted(From::from(jwt::jwe::RegisteredHeader {
-                                                         cek_algorithm: cek_algorithm,
-                                                         enc_algorithm: enc_algorithm,
-                                                         media_type: Some("JOSE".to_string()),
-                                                         content_type: Some("JOSE".to_string()),
-                                                         ..Default::default()
-                                                     }),
-                                          token);
+        let jwe = jwt::JWE::new_decrypted(
+            From::from(jwt::jwe::RegisteredHeader {
+                cek_algorithm: cek_algorithm,
+                enc_algorithm: enc_algorithm,
+                media_type: Some("JOSE".to_string()),
+                content_type: Some("JOSE".to_string()),
+                ..Default::default()
+            }),
+            token,
+        );
         Ok(RefreshToken(jwe))
     }
 
@@ -476,13 +487,14 @@ impl RefreshToken {
 
     /// Consumes self, and decrypt and verify the signature of the refresh token
     /// If the refresh token is already decrypted, this will return an error
-    pub fn decrypt(self,
-                   secret: &jws::Secret,
-                   key: &jwk::JWK<jwt::Empty>,
-                   signing_algorithm: jwa::SignatureAlgorithm,
-                   cek_algorithm: jwa::KeyManagementAlgorithm,
-                   enc_algorithm: jwa::ContentEncryptionAlgorithm)
-                   -> Result<Self, Error> {
+    pub fn decrypt(
+        self,
+        secret: &jws::Secret,
+        key: &jwk::JWK<jwt::Empty>,
+        signing_algorithm: jwa::SignatureAlgorithm,
+        cek_algorithm: jwa::KeyManagementAlgorithm,
+        enc_algorithm: jwa::ContentEncryptionAlgorithm,
+    ) -> Result<Self, Error> {
         if self.decrypted() {
             Err(Error::RefreshTokenAlreadyDecrypted)?
         }
@@ -513,56 +525,54 @@ impl RefreshToken {
     }
 
     /// Validate the times and claims of the refresh token
-    pub fn validate(&self,
-                    service: &str,
-                    config: &Configuration,
-                    options: Option<jwt::TemporalValidationOptions>)
-                    -> Result<(), Error> {
+    pub fn validate(
+        &self,
+        service: &str,
+        config: &Configuration,
+        options: Option<jwt::TemporalValidationOptions>,
+    ) -> Result<(), Error> {
         use std::str::FromStr;
 
         let options = options.or_else(|| {
-                                          Some(jwt::TemporalValidationOptions {
-                                                   issued_at_required: true,
-                                                   not_before_required: true,
-                                                   expiry_required: true,
-                                                   ..Default::default()
-                                               })
-                                      });
+            Some(jwt::TemporalValidationOptions {
+                issued_at_required: true,
+                not_before_required: true,
+                expiry_required: true,
+                ..Default::default()
+            })
+        });
 
         let claims_set = self.claims_set()?;
-        let issuer = claims_set
-            .registered
-            .issuer
-            .as_ref()
-            .ok_or_else(|| Error::InvalidIssuer)?;
-        let audience = claims_set
-            .registered
-            .audience
-            .as_ref()
-            .ok_or_else(|| Error::InvalidAudience)?;
+        let issuer = claims_set.registered.issuer.as_ref().ok_or_else(
+            || Error::InvalidIssuer,
+        )?;
+        let audience = claims_set.registered.audience.as_ref().ok_or_else(|| {
+            Error::InvalidAudience
+        })?;
 
         verify_service(config, service)
             .and_then(|_| if audience.contains(&FromStr::from_str(service)?) {
-                          Ok(())
-                      } else {
-                          Err(Error::InvalidAudience)
-                      })
+                Ok(())
+            } else {
+                Err(Error::InvalidAudience)
+            })
             .and_then(|_| verify_audience(config, audience))
             .and_then(|_| verify_issuer(config, issuer))
             .and_then(|_| {
-                          claims_set
-                              .registered
-                              .validate_times(options)
-                              .map_err(|e| Error::JWTError(jwt::errors::Error::ValidationError(e)))
-                      })
+                claims_set.registered.validate_times(options).map_err(|e| {
+                    Error::JWTError(jwt::errors::Error::ValidationError(e))
+                })
+            })
     }
 
     /// Convenience function to convert a decrypted payload to string
     pub fn to_string(&self) -> Result<String, Error> {
-        Ok(self.0
-               .encrypted()
-               .map_err(|_| Error::RefreshTokenNotEncrypted)?
-               .to_string())
+        Ok(
+            self.0
+                .encrypted()
+                .map_err(|_| Error::RefreshTokenNotEncrypted)?
+                .to_string(),
+        )
     }
 }
 
@@ -596,7 +606,8 @@ pub struct Token<T> {
 }
 
 impl<T> Clone for Token<T>
-    where T: Serialize + DeserializeOwned + Clone
+where
+    T: Serialize + DeserializeOwned + Clone,
 {
     fn clone(&self) -> Self {
         Token {
@@ -610,37 +621,42 @@ impl<T> Clone for Token<T>
 
 impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     /// Internal token creation that allows for us to override the time `now`. For testing
-    fn with_configuration_and_time(config: &Configuration,
-                                   subject: &str,
-                                   service: &str,
-                                   private_claims: T,
-                                   refresh_token_payload: Option<&JsonValue>,
-                                   now: DateTime<UTC>)
-                                   -> Result<Self, ::Error> {
+    fn with_configuration_and_time(
+        config: &Configuration,
+        subject: &str,
+        service: &str,
+        private_claims: T,
+        refresh_token_payload: Option<&JsonValue>,
+        now: DateTime<UTC>,
+    ) -> Result<Self, ::Error> {
 
         verify_service(config, service)?;
 
-        let access_token = make_token(subject,
-                                      &config.issuer,
-                                      &config.audience,
-                                      config.expiry_duration,
-                                      private_claims,
-                                      config.signature_algorithm,
-                                      now)?;
+        let access_token = make_token(
+            subject,
+            &config.issuer,
+            &config.audience,
+            config.expiry_duration,
+            private_claims,
+            config.signature_algorithm,
+            now,
+        )?;
         let refresh_token = match config.refresh_token {
             None => None,
             Some(ref refresh_token_config) => {
                 match refresh_token_payload {
                     Some(payload) => {
-                        Some(RefreshToken::new_decrypted(subject,
-                                                         &config.issuer,
-                                                         &config.audience,
-                                                         refresh_token_config.expiry_duration,
-                                                         payload,
-                                                         config.signature_algorithm,
-                                                         refresh_token_config.cek_algorithm,
-                                                         refresh_token_config.enc_algorithm,
-                                                         now)?)
+                        Some(RefreshToken::new_decrypted(
+                            subject,
+                            &config.issuer,
+                            &config.audience,
+                            refresh_token_config.expiry_duration,
+                            payload,
+                            config.signature_algorithm,
+                            refresh_token_config.cek_algorithm,
+                            refresh_token_config.enc_algorithm,
+                            now,
+                        )?)
                     }
                     None => None,
                 }
@@ -665,18 +681,21 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     }
 
     /// Based on the configuration, make a token for the subject, along with some private claims.
-    pub fn with_configuration(config: &Configuration,
-                              subject: &str,
-                              service: &str,
-                              private_claims: T,
-                              refresh_token_payload: Option<&JsonValue>)
-                              -> Result<Self, ::Error> {
-        Self::with_configuration_and_time(config,
-                                          subject,
-                                          service,
-                                          private_claims,
-                                          refresh_token_payload,
-                                          UTC::now())
+    pub fn with_configuration(
+        config: &Configuration,
+        subject: &str,
+        service: &str,
+        private_claims: T,
+        refresh_token_payload: Option<&JsonValue>,
+    ) -> Result<Self, ::Error> {
+        Self::with_configuration_and_time(
+            config,
+            subject,
+            service,
+            private_claims,
+            refresh_token_payload,
+            UTC::now(),
+        )
     }
 
     /// Consumes self and encode the embedded JWT with signature.
@@ -788,16 +807,22 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     }
 
     /// Consumes self, and decrypt and verify the signature of the embedded refresh token
-    pub fn decrypt_refresh_token(mut self,
-                                 secret: &jws::Secret,
-                                 key: &jwk::JWK<jwt::Empty>,
-                                 signing_algorithm: jwa::SignatureAlgorithm,
-                                 cek_algorithm: jwa::KeyManagementAlgorithm,
-                                 enc_algorithm: jwa::ContentEncryptionAlgorithm)
-                                 -> Result<Self, Error> {
+    pub fn decrypt_refresh_token(
+        mut self,
+        secret: &jws::Secret,
+        key: &jwk::JWK<jwt::Empty>,
+        signing_algorithm: jwa::SignatureAlgorithm,
+        cek_algorithm: jwa::KeyManagementAlgorithm,
+        enc_algorithm: jwa::ContentEncryptionAlgorithm,
+    ) -> Result<Self, Error> {
         let refresh_token = self.refresh_token.ok_or_else(|| Error::NoRefreshToken)?;
-        let refresh_token = refresh_token
-            .decrypt(secret, key, signing_algorithm, cek_algorithm, enc_algorithm)?;
+        let refresh_token = refresh_token.decrypt(
+            secret,
+            key,
+            signing_algorithm,
+            cek_algorithm,
+            enc_algorithm,
+        )?;
         self.refresh_token = Some(refresh_token);
         Ok(self)
     }
@@ -952,10 +977,18 @@ impl Secret {
     /// Create a JWK for the purpose of encryption
     pub(super) fn for_encryption(&self) -> Result<jwk::JWK<jwt::Empty>, Error> {
         match *self {
-            Secret::None => Err(Error::GenericError("A key is required for encryption".to_string())),
-            Secret::ByteSequence(ref bytes) => Ok(jwk::JWK::new_octect_key(&bytes.as_bytes(), Default::default())),
+            Secret::None => Err(Error::GenericError(
+                "A key is required for encryption".to_string(),
+            )),
+            Secret::ByteSequence(ref bytes) => Ok(jwk::JWK::new_octect_key(
+                &bytes.as_bytes(),
+                Default::default(),
+            )),
             Secret::Bytes { ref path } => {
-                Ok(jwk::JWK::new_octect_key(&Self::read_file_to_bytes(path)?, Default::default()))
+                Ok(jwk::JWK::new_octect_key(
+                    &Self::read_file_to_bytes(path)?,
+                    Default::default(),
+                ))
             }
             Secret::RSAKeyPair { .. } => Err(Error::GenericError("Not supported yet".to_string())),
         }
@@ -1019,11 +1052,11 @@ mod tests {
     fn make_config(refresh_token: bool) -> Configuration {
         let refresh_token = if refresh_token {
             Some(RefreshTokenConfiguration {
-                     cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                     enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-                     key: Secret::ByteSequence(ByteSequence::Bytes(vec![0; 256/8])),
-                     expiry_duration: Duration::from_secs(86400),
-                 })
+                cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+                enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
+                key: Secret::ByteSequence(ByteSequence::Bytes(vec![0; 256/8])),
+                expiry_duration: Duration::from_secs(86400),
+            })
         } else {
             None
         };
@@ -1049,17 +1082,17 @@ mod tests {
     }
 
     fn make_refresh_token() -> RefreshToken {
-        RefreshToken::new_decrypted("foobar",
-                                    &FromStr::from_str("https://www.acme.com").unwrap(),
-                                    &jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com")
-                                                                       .unwrap()),
-                                    Duration::from_secs(120),
-                                    &refresh_token_payload(),
-                                    Some(Default::default()),
-                                    jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                                    jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-                                    UTC::now())
-                .unwrap()
+        RefreshToken::new_decrypted(
+            "foobar",
+            &FromStr::from_str("https://www.acme.com").unwrap(),
+            &jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap()),
+            Duration::from_secs(120),
+            &refresh_token_payload(),
+            Some(Default::default()),
+            jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+            jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
+            UTC::now(),
+        ).unwrap()
     }
 
     fn make_token(refresh_token: bool) -> Token<TestClaims> {
@@ -1070,11 +1103,13 @@ mod tests {
         };
 
         Token {
-            token: jwt::JWT::new_decoded(jwt::jws::Header::default(),
-                                         jwt::ClaimsSet {
-                                             private: Default::default(),
-                                             registered: Default::default(),
-                                         }),
+            token: jwt::JWT::new_decoded(
+                jwt::jws::Header::default(),
+                jwt::ClaimsSet {
+                    private: Default::default(),
+                    registered: Default::default(),
+                },
+            ),
             expires_in: Duration::from_secs(120),
             issued_at: UTC::now(),
             refresh_token: refresh_token,
@@ -1092,8 +1127,8 @@ mod tests {
         let encrypted_refresh_token = not_err!(refresh_token.clone().encrypt(&signing_secret, &key));
         assert!(encrypted_refresh_token.encrypted());
 
-        let decrypted_refresh_token =
-            not_err!(encrypted_refresh_token.decrypt(&signing_secret, &key, Default::default(),
+        let decrypted_refresh_token = not_err!(encrypted_refresh_token.decrypt(&signing_secret, &key,
+                                                                               Default::default(),
                                                          jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
                                                          jwt::jwa::ContentEncryptionAlgorithm::A256GCM));
         assert!(decrypted_refresh_token.decrypted());
@@ -1147,8 +1182,10 @@ mod tests {
     fn panics_when_decoding_decoded() {
         let token = make_token(false);
         token
-            .decode(&jwt::jws::Secret::bytes_from_str("secret"),
-                    Default::default())
+            .decode(
+                &jwt::jws::Secret::bytes_from_str("secret"),
+                Default::default(),
+            )
             .unwrap();
     }
 
@@ -1171,11 +1208,13 @@ mod tests {
 
         let token = make_token(true);
         token
-            .decrypt_refresh_token(&signing_secret,
-                                   &key,
-                                   Default::default(),
-                                   jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                                   jwt::jwa::ContentEncryptionAlgorithm::A256GCM)
+            .decrypt_refresh_token(
+                &signing_secret,
+                &key,
+                Default::default(),
+                jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+                jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
+            )
             .unwrap();
     }
 
@@ -1186,8 +1225,8 @@ mod tests {
         let serialized = not_err!(token.serialize_and_respond());
 
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&serialized));
-        let actual_token =
-            not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+        let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
+                                                        Default::default()));
         assert_eq!(expected_token, actual_token);
     }
 
@@ -1202,8 +1241,8 @@ mod tests {
         assert_eq!(response.status(), Status::Ok);
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&body_str));
-        let actual_token =
-            not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"), Default::default()));
+        let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
+                                                        Default::default()));
         assert_eq!(expected_token, actual_token);
     }
 
@@ -1361,13 +1400,14 @@ mod tests {
         let configuration = make_config(true);
 
         let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
-        Token::<TestClaims>::with_configuration_and_time(&configuration,
-                                                         "Donald Trump",
-                                                         "invalid",
-                                                         Default::default(),
-                                                         None,
-                                                         now)
-                .unwrap();
+        Token::<TestClaims>::with_configuration_and_time(
+            &configuration,
+            "Donald Trump",
+            "invalid",
+            Default::default(),
+            None,
+            now,
+        ).unwrap();
     }
 
     #[test]
@@ -1452,10 +1492,11 @@ mod tests {
         {
             let mut jws = jwe.payload_mut().unwrap();
             let mut claims_set = jws.payload_mut().unwrap();
-            claims_set.registered.audience =
-                Some(jwt::SingleOrMultiple::Multiple(vec![FromStr::from_str("https://www.invalid.com/").unwrap(),
+            claims_set.registered.audience = Some(jwt::SingleOrMultiple::Multiple(
+                vec![FromStr::from_str("https://www.invalid.com/").unwrap(),
                                                           FromStr::from_str("https://www.example.com/").unwrap(),
-                                                         ]));
+                                                         ],
+            ));
         }
         let refresh_token = RefreshToken(jwe);
 

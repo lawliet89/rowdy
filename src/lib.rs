@@ -328,7 +328,8 @@ impl fmt::Display for Url {
 
 impl Serialize for Url {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         serializer.serialize_str(self.0.as_str())
     }
@@ -336,7 +337,8 @@ impl Serialize for Url {
 
 impl<'de> Deserialize<'de> for Url {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         struct UrlVisitor;
         impl<'de> de::Visitor<'de> for UrlVisitor {
@@ -347,17 +349,21 @@ impl<'de> Deserialize<'de> for Url {
             }
 
             fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-                where E: de::Error
+            where
+                E: de::Error,
             {
-                Ok(Url(hyper::Url::from_str(&value)
-                           .map_err(|e| E::custom(e.to_string()))?))
+                Ok(Url(hyper::Url::from_str(&value).map_err(
+                    |e| E::custom(e.to_string()),
+                )?))
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-                where E: de::Error
+            where
+                E: de::Error,
             {
-                Ok(Url(hyper::Url::from_str(value)
-                           .map_err(|e| E::custom(e.to_string()))?))
+                Ok(Url(hyper::Url::from_str(value).map_err(
+                    |e| E::custom(e.to_string()),
+                )?))
             }
         }
 
@@ -442,11 +448,13 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
         // Prepare the keys
         let keys = self.token.keys()?;
 
-        Ok(rocket::ignite()
-               .manage(self.token)
-               .manage(token_getter_cors_options)
-               .manage(basic_authenticator)
-               .manage(keys))
+        Ok(
+            rocket::ignite()
+                .manage(self.token)
+                .manage(token_getter_cors_options)
+                .manage(basic_authenticator)
+                .manage(keys),
+        )
     }
 }
 
@@ -521,13 +529,17 @@ mod tests {
     fn url_serialization_token_round_trip() {
         let test = TestUrl { url: not_err!(Url::from_str("https://www.example.com/")) };
 
-        assert_tokens(&test,
-                      &[Token::Struct {
-                           name: "TestUrl",
-                           len: 1,
-                       },
-                       Token::Str("url"),
-                       Token::Str("https://www.example.com/"),
-                       Token::StructEnd]);
+        assert_tokens(
+            &test,
+            &[
+                Token::Struct {
+                    name: "TestUrl",
+                    len: 1,
+                },
+                Token::Str("url"),
+                Token::Str("https://www.example.com/"),
+                Token::StructEnd,
+            ],
+        );
     }
 }
