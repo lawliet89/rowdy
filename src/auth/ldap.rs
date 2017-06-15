@@ -48,6 +48,7 @@ impl From<SearchEntry> for User {
 ///     search_filter: Some("(uid={account})".to_string()),
 ///     include_attributes: vec!["cn".to_string()],
 ///     attributes_namespace: Some("user".to_string()),
+///     subject_attribute: Some("uid".to_string()),
 /// };
 /// ```
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
@@ -82,6 +83,12 @@ pub struct LdapAuthenticator {
     /// [here](https://github.com/lawliet89/biscuit/issues/78).
     #[serde(default)]
     pub attributes_namespace: Option<String>,
+    /// The LDAP attribute to be used as the "subject" of the JWT token issued. By default, the
+    /// `dn` attribute will be used. Another common attribute would be `cn`.
+    ///
+    /// The first value returned by the attribute will be used as the subject.
+    #[serde(default)]
+    pub subject_attribute: Option<String>,
 }
 
 impl LdapAuthenticator {
@@ -89,6 +96,11 @@ impl LdapAuthenticator {
     fn connect(&self) -> Result<LdapConn, Error> {
         let connection = LdapConn::new(&self.address)?;
         Ok(connection)
+    }
+
+    /// Get the `subject_attribute` setting or return default
+    fn get_subject_attribute(&self) -> &str {
+        self.subject_attribute.as_ref().map(String::as_ref).unwrap_or("dn")
     }
 
     /// Bind the "searcher" user
@@ -119,6 +131,9 @@ impl LdapAuthenticator {
         // This specifies what to get back from the LDAP server
         let mut search_attrs_vec = vec!["cn", "dn"];
         search_attrs_vec.extend(self.include_attributes.iter().map(String::as_str));
+        search_attrs_vec.push(self.get_subject_attribute());
+        search_attrs_vec.sort();
+        search_attrs_vec.dedup();
 
         let (results, status, _) = connection
             .search(&search_base,
@@ -156,13 +171,12 @@ impl LdapAuthenticator {
     }
 
     /// Build an `AuthenticationResult` for a `User`
-    fn build_authentication_result<T: AsRef<str>>(user: User,
+    fn build_authentication_result<T: AsRef<str>>(user: &User,
+                                                  subject: &str,
                                                   include_attributes: &[T],
                                                   attributes_namespace: Option<&str>,
                                                   include_refresh_payload: bool)
                                                   -> Result<AuthenticationResult, Error> {
-        let user_dn = user.dn.clone();
-
         // Include LDAP attributes
         let (map, errors): (Vec<_>, Vec<_>) = include_attributes
             .iter()
@@ -197,16 +211,32 @@ impl LdapAuthenticator {
         };
 
         let refresh_payload = if include_refresh_payload {
-            Some(Self::serialize_refresh_token_payload(&user)?)
+            Some(Self::serialize_refresh_token_payload(user)?)
         } else {
             None
         };
 
         Ok(AuthenticationResult {
-               subject: user_dn,
+               subject: subject.to_string(),
                private_claims,
                refresh_payload,
            })
+    }
+
+    /// Based on the current settings, retrieve the subject for the `User` struct
+    fn get_user_subject<'a>(&self, user: &'a User) -> Result<&'a str, Error> {
+        match self.get_subject_attribute() {
+            "dn" => Ok(&user.dn),
+            attribute => {
+                let values = user.attributes.get(attribute)
+                    .ok_or_else(|| format!("{} attribute was not returned and cannot be used as the subject",
+                                           attribute))?;
+                let first_value = values.first()
+                    .ok_or_else(|| format!("{} attribute does not have any value and cannot be used as the subject",
+                                           attribute))?;
+                Ok(first_value)
+            }
+        }
     }
 
     /// Authenticate the user with the username/password
@@ -237,7 +267,9 @@ impl LdapAuthenticator {
                 .map_err(|_e| super::Error::AuthenticationFailure)?;
         }
 
-        Self::build_authentication_result(From::from(user),
+        let user = From::from(user);
+        Self::build_authentication_result(&user,
+                                          self.get_user_subject(&user)?,
                                           self.include_attributes.as_slice(),
                                           self.attributes_namespace.as_ref().map(String::as_ref),
                                           include_refresh_payload)
@@ -268,7 +300,8 @@ impl super::Authenticator<Basic> for LdapAuthenticator {
     // TODO: Implement retrieving updated information from LDAP server
     fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
         let user = Self::deserialize_refresh_token_payload(refresh_payload.clone())?;
-        Self::build_authentication_result(user,
+        Self::build_authentication_result(&user,
+                                          self.get_user_subject(&user)?,
                                           self.include_attributes.as_slice(),
                                           self.attributes_namespace.as_ref().map(String::as_ref),
                                           false)
@@ -306,6 +339,7 @@ mod tests {
             search_filter: Some("(uid={account})".to_string()),
             include_attributes: vec!["cn".to_string()],
             attributes_namespace: None,
+            subject_attribute: Some("uid".to_string()),
         }
     }
 
@@ -313,10 +347,54 @@ mod tests {
         User {
             dn: "CN=John Doe,CN=Users,DC=acme,DC=example,DC=com".to_string(),
             attributes: vec![("cn".to_string(), vec!["John Doe".to_string()]),
-                             ("groups".to_string(), vec!["admins".to_string(), "user".to_string()])]
+                             ("uid".to_string(), vec!["john.doe".to_string()]),
+                             ("memberOf".to_string(), vec!["admins".to_string(), "user".to_string()])]
                     .into_iter()
                     .collect(),
         }
+    }
+
+    #[test]
+    fn get_subject_attribute_returns_correctly() {
+        let mut authenticator = make_authenticator();
+        assert_eq!("uid", authenticator.get_subject_attribute());
+
+        authenticator.subject_attribute = None;
+        assert_eq!("dn", authenticator.get_subject_attribute());
+    }
+
+    #[test]
+    fn get_user_subject_returns_correctly() {
+        let mut authenticator = make_authenticator();
+        let user = make_user();
+
+        let subject = not_err!(authenticator.get_user_subject(&user));
+        assert_eq!("john.doe", subject);
+
+        authenticator.subject_attribute = None;
+        let subject = not_err!(authenticator.get_user_subject(&user));
+        assert_eq!("CN=John Doe,CN=Users,DC=acme,DC=example,DC=com", subject);
+    }
+
+    #[test]
+    #[should_panic(expected = "attribute was not returned")]
+    fn get_user_subject_errors_on_missing_attribute() {
+        let mut authenticator = make_authenticator();
+        let user = make_user();
+
+        authenticator.subject_attribute = Some("does not exist".to_string());
+        authenticator.get_user_subject(&user).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "attribute does not have any value")]
+    fn get_user_subject_errors_on_empty_attribute() {
+        let mut authenticator = make_authenticator();
+        let mut user = make_user();
+
+        authenticator.subject_attribute = Some("empty".to_string());
+        user.attributes.insert("empty".to_string(), vec![]);
+        authenticator.get_user_subject(&user).unwrap();
     }
 
     #[test]
@@ -328,10 +406,12 @@ mod tests {
         let authenticator = make_authenticator();
 
         let result = not_err!(authenticator.verify("euler", "password", false));
+        assert_eq!(result.subject, "euler");
         assert!(result.refresh_payload.is_none());
         assert_eq!(result.private_claims, expected_private_claim);
 
         let result = not_err!(authenticator.verify("euler", "password", true));
+        assert_eq!(result.subject, "euler");
         assert!(result.refresh_payload.is_some());
         assert_eq!(result.private_claims, expected_private_claim);
 
@@ -344,12 +424,13 @@ mod tests {
 
     #[test]
     fn attributes_are_included_correctly() {
-        let result = not_err!(LdapAuthenticator::build_authentication_result(make_user(),
-                                                                             vec!["cn", "groups"].as_slice(),
+        let result = not_err!(LdapAuthenticator::build_authentication_result(&make_user(),
+                                                                             "john.doe",
+                                                                             vec!["cn", "memberOf"].as_slice(),
                                                                              None,
                                                                              false));
         let expected_attributes: JsonMap<_, _> = vec![("cn".to_string(), vec!["John Doe".to_string()]),
-                                                      ("groups".to_string(),
+                                                      ("memberOf".to_string(),
                                                        vec!["admins".to_string(), "user".to_string()])]
                 .into_iter()
                 .map(|(key, value)| (key, value::to_value(value).unwrap()))
@@ -361,12 +442,13 @@ mod tests {
 
     #[test]
     fn attributes_are_namespaced_correctly() {
-        let result = not_err!(LdapAuthenticator::build_authentication_result(make_user(),
-                                                                             vec!["cn", "groups"].as_slice(),
+        let result = not_err!(LdapAuthenticator::build_authentication_result(&make_user(),
+                                                                             "john.doe",
+                                                                             vec!["cn", "memberOf"].as_slice(),
                                                                              Some("namespace"),
                                                                              false));
         let expected_attributes: JsonMap<_, _> = vec![("cn".to_string(), vec!["John Doe".to_string()]),
-                                                      ("groups".to_string(),
+                                                      ("memberOf".to_string(),
                                                        vec!["admins".to_string(), "user".to_string()])]
                 .into_iter()
                 .map(|(key, value)| (key, value::to_value(value).unwrap()))
@@ -383,7 +465,8 @@ mod tests {
 
     #[test]
     fn missing_attributes_are_ignored() {
-        let result = not_err!(LdapAuthenticator::build_authentication_result(make_user(),
+        let result = not_err!(LdapAuthenticator::build_authentication_result(&make_user(),
+                                                                             "john.doe",
                                                                              vec!["cn", "not_exist"].as_slice(),
                                                                              None,
                                                                              false));
