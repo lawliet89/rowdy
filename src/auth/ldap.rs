@@ -94,6 +94,7 @@ pub struct LdapAuthenticator {
 impl LdapAuthenticator {
     /// Connects to the LDAP server
     fn connect(&self) -> Result<LdapConn, Error> {
+        debug_!("Connecting to LDAP {}", self.address);
         let connection = LdapConn::new(&self.address)?;
         Ok(connection)
     }
@@ -113,6 +114,7 @@ impl LdapAuthenticator {
 
     /// Bind the connection to some dn
     fn bind(&self, connection: &LdapConn, dn: &str, password: &str) -> Result<(), Error> {
+        debug_!("Binding to DN {}", dn);
         let (result, _) = connection.simple_bind(dn, password)?;
         if result.rc == LDAP_SUCCESS {
             Ok(())
@@ -139,6 +141,8 @@ impl LdapAuthenticator {
         search_attrs_vec.push(self.get_subject_attribute());
         search_attrs_vec.sort();
         search_attrs_vec.dedup();
+
+        debug_!("Searching base {} with filter {} and attributes {:?}", search_base, search_filter, search_attrs_vec);
 
         let (results, status, _) = connection.search(
             &search_base,
