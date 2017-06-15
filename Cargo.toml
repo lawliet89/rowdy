@@ -1,6 +1,6 @@
 [package]
 name = "rowdy"
-version = "0.0.3"
+version = "0.0.4"
 license = "Apache-2.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 build = "build.rs"
