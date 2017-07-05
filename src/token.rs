@@ -13,7 +13,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::time::Duration;
 
-use chrono::{self, DateTime, UTC};
+use chrono::{self, DateTime, Utc};
 use jwt::{self, jws, jwa, jwk};
 use rocket::http::{ContentType, Status};
 use rocket::response::{Response, Responder};
@@ -163,7 +163,7 @@ fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Hea
 
 fn make_registered_claims(
     subject: &str,
-    now: DateTime<UTC>,
+    now: DateTime<Utc>,
     expiry_duration: Duration,
     issuer: &jwt::StringOrUri,
     audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
@@ -192,7 +192,7 @@ fn make_token<P: Serialize + DeserializeOwned + 'static>(
     expiry_duration: Duration,
     private_claims: P,
     signature_algorithm: Option<jwa::SignatureAlgorithm>,
-    now: DateTime<UTC>,
+    now: DateTime<Utc>,
 ) -> Result<jwt::JWT<P, jwt::Empty>, ::Error> {
     let header = make_header(signature_algorithm);
     let registered_claims = make_registered_claims(subject, now, expiry_duration, issuer, audience)?;
@@ -419,7 +419,7 @@ impl RefreshToken {
         signature_algorithm: Option<jwa::SignatureAlgorithm>,
         cek_algorithm: jwa::KeyManagementAlgorithm,
         enc_algorithm: jwa::ContentEncryptionAlgorithm,
-        now: DateTime<UTC>,
+        now: DateTime<Utc>,
     ) -> Result<Self, ::Error> {
 
         // First, make a token
@@ -599,7 +599,7 @@ pub struct Token<T> {
     #[serde(with = "::serde_custom::duration")]
     pub expires_in: Duration,
     /// Time the token was issued at
-    pub issued_at: DateTime<UTC>,
+    pub issued_at: DateTime<Utc>,
     /// Refresh token, if enabled and requested for
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<RefreshToken>,
@@ -627,7 +627,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         service: &str,
         private_claims: T,
         refresh_token_payload: Option<&JsonValue>,
-        now: DateTime<UTC>,
+        now: DateTime<Utc>,
     ) -> Result<Self, ::Error> {
 
         verify_service(config, service)?;
@@ -694,7 +694,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
             service,
             private_claims,
             refresh_token_payload,
-            UTC::now(),
+            Utc::now(),
         )
     }
 
@@ -1027,7 +1027,7 @@ mod tests {
     use std::str::FromStr;
     use std::time::Duration;
 
-    use chrono::{DateTime, NaiveDateTime, UTC};
+    use chrono::{DateTime, NaiveDateTime, Utc};
     use serde_json;
 
     use {JsonValue, JsonMap};
@@ -1091,7 +1091,7 @@ mod tests {
             Some(Default::default()),
             jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
             jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-            UTC::now(),
+            Utc::now(),
         ).unwrap()
     }
 
@@ -1111,7 +1111,7 @@ mod tests {
                 },
             ),
             expires_in: Duration::from_secs(120),
-            issued_at: UTC::now(),
+            issued_at: Utc::now(),
             refresh_token: refresh_token,
         }
     }
@@ -1284,7 +1284,7 @@ mod tests {
         map.insert("test".to_string(), From::from("foobar"));
         let refresh_token_payload = JsonValue::Object(map);
 
-        let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
+        let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
         let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
                                                                               "Donald Trump",
@@ -1320,7 +1320,7 @@ mod tests {
     fn token_created_with_no_refresh_token_payload() {
         let configuration = make_config(true);
 
-        let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
+        let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
         let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
                                                                               "Donald Trump",
@@ -1360,7 +1360,7 @@ mod tests {
         map.insert("test".to_string(), From::from("foobar"));
         let refresh_token_payload = JsonValue::Object(map);
 
-        let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
+        let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
         let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
                                                                               "Donald Trump",
@@ -1399,7 +1399,7 @@ mod tests {
     fn validates_service_correctly() {
         let configuration = make_config(true);
 
-        let now = DateTime::<UTC>::from_utc(NaiveDateTime::from_timestamp(0, 0), UTC);
+        let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
         Token::<TestClaims>::with_configuration_and_time(
             &configuration,
             "Donald Trump",
