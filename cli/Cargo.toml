@@ -12,8 +12,8 @@ doc = false
 [dependencies]
 docopt = "0.7"
 log = "0.3"
-rocket = "= 0.2.8"
-rocket_codegen = "= 0.2.8"
+rocket = "= 0.2.9"
+rocket_codegen = "= 0.2.9"
 rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
 rustc-serialize = "0.3"
 serde = "1.0"

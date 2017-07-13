@@ -11,7 +11,6 @@
 //!
 //! # Features
 //!
-//! - `clippy_lints`: Enable clippy lints during builds
 //! - `simple_authenticator`: A simple CSV based authenticator
 //! - `ldap_authenticator`: An LDAP based authenticator
 //!
@@ -163,7 +162,6 @@
 //!
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
-#![cfg_attr(feature="clippy_lints", plugin(clippy))]
 
 #![deny(missing_docs)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
