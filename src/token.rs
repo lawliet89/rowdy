@@ -15,6 +15,7 @@ use std::time::Duration;
 
 use chrono::{self, DateTime, Utc};
 use jwt::{self, jws, jwa, jwk};
+use rocket::Request;
 use rocket::http::{ContentType, Status};
 use rocket::response::{Response, Responder};
 use serde::Serialize;
@@ -97,10 +98,10 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            Error::JWTError(ref e) => Some(e as &error::Error),
-            Error::IOError(ref e) => Some(e as &error::Error),
-            Error::TokenSerializationError(ref e) => Some(e as &error::Error),
-            _ => Some(self as &error::Error),
+            Error::JWTError(ref e) => Some(e),
+            Error::IOError(ref e) => Some(e),
+            Error::TokenSerializationError(ref e) => Some(e),
+            _ => Some(self),
         }
     }
 }
@@ -118,7 +119,7 @@ impl fmt::Display for Error {
 }
 
 impl<'r> Responder<'r> for Error {
-    fn respond(self) -> Result<Response<'r>, Status> {
+    fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
         error_!("Token Error: {:?}", self);
         match self {
             Error::InvalidService | Error::InvalidIssuer | Error::InvalidAudience => Err(Status::Forbidden),
@@ -722,12 +723,20 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         }
     }
 
-    fn serialize_and_respond(self) -> Result<String, Error> {
+    fn serialize(self) -> Result<String, Error> {
         if self.is_decoded() {
             Err(Error::TokenNotEncoded)?
         }
         let serialized = serde_json::to_string(&self)?;
         Ok(serialized)
+    }
+
+    fn respond<'r>(self) -> Result<Response<'r>, Error> {
+        let serialized = self.serialize()?;
+        Response::build()
+            .header(ContentType::JSON)
+            .sized_body(Cursor::new(serialized))
+            .ok()
     }
 
     /// Returns whether the wrapped token is decoded and verified
@@ -834,15 +843,10 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
 }
 
 impl<'r, T: Serialize + DeserializeOwned + 'static> Responder<'r> for Token<T> {
-    fn respond(self) -> Result<Response<'r>, Status> {
-        match self.serialize_and_respond() {
-            Ok(serialized) => {
-                Response::build()
-                    .header(ContentType::JSON)
-                    .sized_body(Cursor::new(serialized))
-                    .ok()
-            }
-            Err(e) => Err::<String, Error>(e).respond(),
+    fn respond_to(self, request: &Request) -> Result<Response<'r>, Status> {
+        match self.respond() {
+            Ok(r) => Ok(r),
+            Err(e) => Err::<String, Error>(e).respond_to(request),
         }
     }
 }
@@ -1003,7 +1007,7 @@ impl Secret {
     fn read_file_to_bytes(path: &str) -> Result<Vec<u8>, Error> {
         let mut file = File::open(path)?;
         let mut bytes = Vec::<u8>::new();
-        file.read_to_end(&mut bytes)?;
+        let _ = file.read_to_end(&mut bytes)?;
         Ok(bytes)
     }
 }
@@ -1077,7 +1081,7 @@ mod tests {
 
     fn refresh_token_payload() -> JsonValue {
         let mut map = JsonMap::with_capacity(1);
-        map.insert("test".to_string(), From::from("foobar"));
+        let _ = map.insert("test".to_string(), From::from("foobar"));
         JsonValue::Object(map)
     }
 
@@ -1172,7 +1176,7 @@ mod tests {
     fn panics_when_encoding_encoded() {
         let token = make_token(false);
         let token = not_err!(token.encode(&jwt::jws::Secret::bytes_from_str("secret")));
-        token
+        let _ = token
             .encode(&jwt::jws::Secret::bytes_from_str("secret"))
             .unwrap();
     }
@@ -1181,7 +1185,7 @@ mod tests {
     #[should_panic(expected = "TokenAlreadyDecoded")]
     fn panics_when_decoding_decoded() {
         let token = make_token(false);
-        token
+        let _ = token
             .decode(
                 &jwt::jws::Secret::bytes_from_str("secret"),
                 Default::default(),
@@ -1197,7 +1201,7 @@ mod tests {
 
         let token = make_token(true);
         let token = not_err!(token.encrypt_refresh_token(&signing_secret, &key));
-        token.encrypt_refresh_token(&signing_secret, &key).unwrap();
+        let _ = token.encrypt_refresh_token(&signing_secret, &key).unwrap();
     }
 
     #[test]
@@ -1207,7 +1211,7 @@ mod tests {
         let signing_secret = jwt::jws::Secret::bytes_from_str("secret");
 
         let token = make_token(true);
-        token
+        let _ = token
             .decrypt_refresh_token(
                 &signing_secret,
                 &key,
@@ -1222,7 +1226,7 @@ mod tests {
     fn token_serialization_smoke_test() {
         let expected_token = make_token(false);
         let token = not_err!(expected_token.clone().encode(&jwt::jws::Secret::bytes_from_str("secret")));
-        let serialized = not_err!(token.serialize_and_respond());
+        let serialized = not_err!(token.serialize());
 
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&serialized));
         let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
@@ -1232,8 +1236,6 @@ mod tests {
 
     #[test]
     fn token_response_smoke_test() {
-        use rocket::response::Responder;
-
         let expected_token = make_token(false);
         let token = not_err!(expected_token.clone().encode(&jwt::jws::Secret::bytes_from_str("secret")));
         let mut response = not_err!(token.respond());
@@ -1281,7 +1283,7 @@ mod tests {
         let configuration = make_config(false);
 
         let mut map = JsonMap::with_capacity(1);
-        map.insert("test".to_string(), From::from("foobar"));
+        let _ = map.insert("test".to_string(), From::from("foobar"));
         let refresh_token_payload = JsonValue::Object(map);
 
         let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
@@ -1357,7 +1359,7 @@ mod tests {
         let configuration = make_config(true);
 
         let mut map = JsonMap::with_capacity(1);
-        map.insert("test".to_string(), From::from("foobar"));
+        let _ = map.insert("test".to_string(), From::from("foobar"));
         let refresh_token_payload = JsonValue::Object(map);
 
         let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
@@ -1400,7 +1402,7 @@ mod tests {
         let configuration = make_config(true);
 
         let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
-        Token::<TestClaims>::with_configuration_and_time(
+        let _ = Token::<TestClaims>::with_configuration_and_time(
             &configuration,
             "Donald Trump",
             "invalid",

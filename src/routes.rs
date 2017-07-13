@@ -67,14 +67,15 @@ impl AuthParam {
 }
 
 /// CORS pre-flight route for access token retrieval via initial authentication and refresh token
-#[options("/?<_auth_param>")]
+#[options("/?<auth_param>")]
 fn token_getter_options(
     origin: Option<cors::Origin>,
     method: cors::AccessControlRequestMethod,
     headers: cors::AccessControlRequestHeaders,
     options: State<TokenGetterCorsOptions>,
-    _auth_param: AuthParam,
+    auth_param: AuthParam,
 ) -> Result<cors::Response<()>, cors::Error> {
+    let _ = auth_param;
     options.preflight(origin, &method, Some(&headers))
 }
 
@@ -172,8 +173,9 @@ fn refresh_token(
 }
 
 /// Route to catch missing Authorization
-#[get("/?<_auth_param>", rank = 3)]
-fn bad_request(_auth_param: AuthParam, configuration: State<Configuration>) -> Result<(), ::Error> {
+#[get("/?<auth_param>", rank = 3)]
+fn bad_request(auth_param: AuthParam, configuration: State<Configuration>) -> Result<(), ::Error> {
+    let _ = auth_param;
     auth::missing_authorization(&configuration.issuer.to_string())
 }
 
@@ -203,8 +205,7 @@ mod tests {
     use jwt;
     use rocket::Rocket;
     use rocket::http::{Header, Status};
-    use rocket::http::Method::*;
-    use rocket::testing::MockRequest;
+    use rocket::local::Client;
     use serde_json;
 
     use ByteSequence;
@@ -241,9 +242,10 @@ mod tests {
     #[test]
     fn ping_pong() {
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
-        let mut req = MockRequest::new(Get, "/ping");
-        let mut response = req.dispatch_with(&rocket);
+        let req = client.get("/ping");
+        let mut response = req.dispatch();
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
 
         assert_eq!("Pong", body_str);
@@ -252,6 +254,7 @@ mod tests {
     #[test]
     fn token_getter_options_test() {
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let origin_header = Header::from(not_err!(
@@ -265,11 +268,12 @@ mod tests {
         let request_headers = Header::from(request_headers);
 
         // Make and dispatch request
-        let mut req = MockRequest::new(Options, "/?service=https://www.example.com&scope=all")
+        let req = client
+            .options("/?service=https://www.example.com&scope=all")
             .header(origin_header)
             .header(method_header)
             .header(request_headers);
-        let response = req.dispatch_with(&rocket);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -279,6 +283,7 @@ mod tests {
     #[allow(deprecated)]
     fn token_getter_get_test() {
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let origin_header = Header::from(not_err!(
@@ -293,10 +298,11 @@ mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
+        let req = client
+            .get("/?service=https://www.example.com&scope=all")
             .header(origin_header)
             .header(auth_header);
-        let mut response = req.dispatch_with(&rocket);
+        let mut response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -336,6 +342,7 @@ mod tests {
     fn token_getter_get_invalid_credentials() {
         // Ignite rocket
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let origin_header = Header::from(not_err!(
@@ -350,10 +357,11 @@ mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
+        let req = client
+            .get("/?service=https://www.example.com&scope=all")
             .header(origin_header)
             .header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
@@ -364,6 +372,7 @@ mod tests {
     fn token_getter_get_missing_credentials() {
         // Ignite rocket
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let origin_header = Header::from(not_err!(
@@ -371,13 +380,15 @@ mod tests {
         ));
 
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all").header(origin_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client
+            .get("/?service=https://www.example.com&scope=all")
+            .header(origin_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
 
-        let www_header: Vec<_> = response.header_values("WWW-Authenticate").collect();
+        let www_header: Vec<_> = response.headers().get("WWW-Authenticate").collect();
         assert_eq!(www_header, vec!["Basic realm=https://www.acme.com/"]);
     }
 
@@ -386,6 +397,7 @@ mod tests {
     fn token_getter_get_invalid_service() {
         // Ignite rocket
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let origin_header = Header::from(not_err!(
@@ -400,10 +412,11 @@ mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=foobar&scope=all")
+        let req = client
+            .get("/?service=foobar&scope=all")
             .header(origin_header)
             .header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Forbidden);
@@ -414,6 +427,7 @@ mod tests {
     #[allow(deprecated)]
     fn token_getter_with_refresh_token_round_trip() {
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
         // Initial authentication request
         // Make headers
@@ -429,12 +443,13 @@ mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(
-            Get,
-            "/?service=https://www.example.com&scope=all&offline_token=true",
-        ).header(origin_header)
+        let req = client
+            .get(
+                "/?service=https://www.example.com&scope=all&offline_token=true",
+            )
+            .header(origin_header)
             .header(auth_header);
-        let mut response = req.dispatch_with(&rocket);
+        let mut response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -458,10 +473,11 @@ mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/?service=https://www.example.com&scope=all")
+        let req = client
+            .get("/?service=https://www.example.com&scope=all")
             .header(origin_header)
             .header(auth_header);
-        let mut response = req.dispatch_with(&rocket);
+        let mut response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -500,6 +516,7 @@ mod tests {
     #[allow(deprecated)]
     fn token_refresh_with_offline_token_should_return_bad_request() {
         let rocket = ignite();
+        let client = not_err!(Client::new(rocket));
 
         let origin_header = Header::from(not_err!(
             hyper::header::Origin::from_str("https://www.example.com")
@@ -510,12 +527,13 @@ mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(
-            Get,
-            "/?service=https://www.example.com&scope=all&offline_token=true",
-        ).header(origin_header)
+        let req = client
+            .get(
+                "/?service=https://www.example.com&scope=all&offline_token=true",
+            )
+            .header(origin_header)
             .header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::BadRequest);

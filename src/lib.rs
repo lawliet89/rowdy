@@ -163,7 +163,58 @@
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
 
-#![deny(missing_docs)]
+// See https://github.com/rust-unofficial/patterns/blob/master/anti_patterns/deny-warnings.md
+#![allow(
+    legacy_directory_ownership,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    unknown_lints,
+    unsafe_code,
+)]
+#![deny(
+    const_err,
+    dead_code,
+    deprecated,
+    exceeding_bitshifts,
+    fat_ptr_transmutes,
+    improper_ctypes,
+    missing_docs,
+    mutable_transmutes,
+    no_mangle_const_items,
+    non_camel_case_types,
+    non_shorthand_field_patterns,
+    non_upper_case_globals,
+    overflowing_literals,
+    path_statements,
+    plugin_as_library,
+    private_no_mangle_fns,
+    private_no_mangle_statics,
+    stable_features,
+    trivial_casts,
+    trivial_numeric_casts,
+    unconditional_recursion,
+    unknown_crate_types,
+    unreachable_code,
+    unused_allocation,
+    unused_assignments,
+    unused_attributes,
+    unused_comparisons,
+    unused_extern_crates,
+    unused_features,
+    unused_imports,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    unused_mut,
+    unused_parens,
+    unused_results,
+    unused_unsafe,
+    unused_variables,
+    variant_size_differences,
+    warnings,
+    while_true,
+)]
+
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
 extern crate biscuit as jwt;
@@ -213,6 +264,7 @@ use std::io;
 use std::ops::Deref;
 use std::str::FromStr;
 
+use rocket::Request;
 use rocket::http::Status;
 use rocket::response::{Response, Responder};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
@@ -262,13 +314,13 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            Error::Auth(ref e) => Some(e as &error::Error),
-            Error::CORS(ref e) => Some(e as &error::Error),
-            Error::Token(ref e) => Some(e as &error::Error),
-            Error::IOError(ref e) => Some(e as &error::Error),
+            Error::Auth(ref e) => Some(e),
+            Error::CORS(ref e) => Some(e),
+            Error::Token(ref e) => Some(e),
+            Error::IOError(ref e) => Some(e),
             Error::UnsupportedOperation |
             Error::GenericError(_) |
-            Error::BadRequest(_) => Some(self as &error::Error),
+            Error::BadRequest(_) => Some(self),
         }
     }
 }
@@ -288,11 +340,11 @@ impl fmt::Display for Error {
 }
 
 impl<'r> Responder<'r> for Error {
-    fn respond(self) -> Result<Response<'r>, Status> {
+    fn respond_to(self, request: &Request) -> Result<Response<'r>, Status> {
         match self {
-            Error::Auth(e) => e.respond(),
-            Error::CORS(e) => e.respond(),
-            Error::Token(e) => e.respond(),
+            Error::Auth(e) => e.respond_to(request),
+            Error::CORS(e) => e.respond_to(request),
+            Error::Token(e) => e.respond_to(request),
             Error::BadRequest(e) => {
                 error_!("{}", e);
                 Err(Status::BadRequest)
@@ -490,9 +542,11 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
 /// rowdy::launch(config);
 /// # }
 /// ```
-pub fn launch<B: auth::AuthenticatorConfiguration<auth::Basic>>(config: Configuration<B>) {
+pub fn launch<B: auth::AuthenticatorConfiguration<auth::Basic>>(
+    config: Configuration<B>,
+) -> rocket::error::LaunchError {
     let rocket = config.ignite().unwrap_or_else(|e| panic!("{}", e));
-    rocket.mount("/", routes::routes()).launch()
+    rocket.mount("/", routes()).launch()
 }
 
 #[cfg(test)]

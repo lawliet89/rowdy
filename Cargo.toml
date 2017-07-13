@@ -1,6 +1,6 @@
 [package]
 name = "rowdy"
-version = "0.0.4"
+version = "0.0.5-dev"
 license = "Apache-2.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 build = "build.rs"
@@ -30,12 +30,12 @@ simple_authenticator = ["argon2rs", "csv", "ring"]
 ldap_authenticator = ["ldap3", "strfmt"]
 
 [dependencies]
-biscuit = "0.0.5"
+biscuit = "0.0.6"
 chrono = { version = "0.4", features = ["serde"] }
 hyper = "0.10"
 log = "0.3"
-rocket = "= 0.2.9"
-rocket_codegen = "= 0.2.9"
+rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "aa51fe0" }
+rocket_codegen = { git = "https://github.com/SergioBenitez/Rocket", rev = "aa51fe0" }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -46,17 +46,11 @@ uuid = { version = "0.4", features = ["use_std", "serde"] }
 argon2rs = { version = "0.2.5", optional = true }
 csv = { version = "0.15", optional = true }
 ldap3 = { version = "0.4.0", optional = true }
-ring = { version = "0.10", optional = true } # rust-jwt has this as its dependency
+ring = { version = "0.11", optional = true } # rust-jwt has this as its dependency
 strfmt = { version = "0.1.5", optional = true }
-
-[dependencies.rocket_contrib]
-version = "= 0.2.9"
-default-features = false
-features = ["json", "uuid"]
 
 [dev-dependencies]
 serde_test = "1.0"
-rocket = { version = "= 0.2.9", features = ["testing"] }
 
 [build-dependencies]
 ansi_term = "0.9"

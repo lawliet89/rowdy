@@ -20,7 +20,7 @@ impl NoOp {
     ) -> JsonValue {
         let string = From::from(Self::format(authorization));
         let mut map = JsonMap::with_capacity(1);
-        map.insert("header".to_string(), string);
+        let _ = map.insert("header".to_string(), string);
         JsonValue::Object(map)
     }
 
@@ -144,8 +144,7 @@ where
 pub mod tests {
     use hyper;
     use rocket::http::{self, Status};
-    use rocket::http::Method::Get;
-    use rocket::testing::MockRequest;
+    use rocket::local::Client;
 
     use auth::Authenticator;
     use super::*;
@@ -234,6 +233,7 @@ pub mod tests {
     #[allow(deprecated)]
     fn noop_basic_auth_get_test() {
         let rocket = ignite_basic(Box::new(NoOp {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization(Basic {
@@ -245,8 +245,8 @@ pub mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -256,6 +256,7 @@ pub mod tests {
     #[allow(deprecated)]
     fn noop_bearer_auth_get_test() {
         let rocket = ignite_bearer(Box::new(NoOp {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization(Bearer { token: "foobar".to_string() });
@@ -264,8 +265,8 @@ pub mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -275,6 +276,7 @@ pub mod tests {
     #[allow(deprecated)]
     fn noop_string_auth_get_test() {
         let rocket = ignite_string(Box::new(NoOp {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization("anything goes".to_string());
@@ -283,8 +285,8 @@ pub mod tests {
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);

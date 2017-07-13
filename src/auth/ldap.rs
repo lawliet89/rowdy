@@ -171,7 +171,7 @@ impl LdapAuthenticator {
             |_| super::Error::AuthenticationFailure,
         )?;
         let mut map = JsonMap::with_capacity(1);
-        map.insert("user".to_string(), user);
+        let _ = map.insert("user".to_string(), user);
         Ok(JsonValue::Object(map))
     }
 
@@ -425,7 +425,7 @@ mod tests {
         let user = make_user();
 
         authenticator.subject_attribute = Some("does not exist".to_string());
-        authenticator.get_user_subject(&user).unwrap();
+        let _ = authenticator.get_user_subject(&user).unwrap();
     }
 
     #[test]
@@ -435,14 +435,14 @@ mod tests {
         let mut user = make_user();
 
         authenticator.subject_attribute = Some("empty".to_string());
-        user.attributes.insert("empty".to_string(), vec![]);
-        authenticator.get_user_subject(&user).unwrap();
+        let _ = user.attributes.insert("empty".to_string(), vec![]);
+        let _ = authenticator.get_user_subject(&user).unwrap();
     }
 
     #[test]
     fn authentication() {
         let mut expected_map = JsonMap::new();
-        expected_map.insert("cn".to_string(), From::from(vec!["Leonhard Euler"]));
+        let _ = expected_map.insert("cn".to_string(), From::from(vec!["Leonhard Euler"]));
         let expected_private_claim = JsonValue::Object(expected_map);
 
         let authenticator = make_authenticator();
@@ -547,7 +547,7 @@ mod tests {
     #[should_panic(expected = "AuthenticationFailure")]
     fn authentication_invalid_user() {
         let authenticator = make_authenticator();
-        authenticator
+        let _ = authenticator
             .verify("donald_trump", "password", false)
             .unwrap();
     }
@@ -556,6 +556,6 @@ mod tests {
     #[should_panic(expected = "AuthenticationFailure")]
     fn authentication_invalid_password() {
         let authenticator = make_authenticator();
-        authenticator.verify("einstein", "FTL", false).unwrap();
+        let _ = authenticator.verify("einstein", "FTL", false).unwrap();
     }
 }

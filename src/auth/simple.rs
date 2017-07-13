@@ -120,8 +120,8 @@ impl SimpleAuthenticator {
                 } else {
                     let refresh_payload = if include_refresh_payload {
                         let mut map = JsonMap::with_capacity(2);
-                        map.insert("user".to_string(), From::from(username));
-                        map.insert("password".to_string(), From::from(password));
+                        let _ = map.insert("user".to_string(), From::from(username));
+                        let _ = map.insert("password".to_string(), From::from(password));
                         Some(JsonValue::Object(map))
                     } else {
                         None
@@ -226,7 +226,7 @@ pub fn hash_passwords(users: &HashMap<String, String>, salt_len: usize) -> Resul
     for (user, password) in users {
         let salt = generate_salt(salt_len)?;
         let hash = SimpleAuthenticator::hash_password_digest(password, &salt)?;
-        hashed.insert(user.to_string(), (hash, salt));
+        let _ = hashed.insert(user.to_string(), (hash, salt));
     }
     Ok(hashed)
 }
@@ -327,7 +327,7 @@ mod tests {
         actual_keys.sort();
         assert_eq!(expected_keys, actual_keys);
 
-        not_err!(authenticator.verify("foobar", "password", false));
+        let _ = not_err!(authenticator.verify("foobar", "password", false));
 
         let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
         assert!(result.refresh_payload.is_none()); // refresh refresh_payload is not provided when not requested
@@ -341,7 +341,7 @@ mod tests {
         actual_keys.sort();
         assert_eq!(expected_keys, actual_keys);
 
-        not_err!(authenticator.verify("foobar", "password", false));
+        let _ = not_err!(authenticator.verify("foobar", "password", false));
 
         let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
         assert!(result.refresh_payload.is_none()); // refresh refresh_payload is not provided when not requested
@@ -378,6 +378,6 @@ mod tests {
         };
         assert_eq!(deserialized, expected_config);
 
-        not_err!(expected_config.make_authenticator());
+        let _ = not_err!(expected_config.make_authenticator());
     }
 }

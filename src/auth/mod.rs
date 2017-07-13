@@ -77,8 +77,8 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            Error::HyperError(ref e) => Some(e as &error::Error),
-            _ => Some(self as &error::Error),
+            Error::HyperError(ref e) => Some(e),
+            _ => Some(self),
         }
     }
 }
@@ -93,7 +93,7 @@ impl fmt::Display for Error {
 }
 
 impl<'r> response::Responder<'r> for Error {
-    fn respond(self) -> Result<response::Response<'r>, Status> {
+    fn respond_to(self, _: &Request) -> Result<response::Response<'r>, Status> {
         error_!("Headers Error: {:?}", self);
         match self {
             Error::MissingAuthorization { ref realm } => {
@@ -122,16 +122,12 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
     type Error = Error;
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Error> {
-        use hyper::header::Header;
-
         match request.headers().get_one("Authorization") {
             Some(authorization) => {
-                let bytes: Vec<u8> = authorization.as_bytes().to_vec();
-                match header::Authorization::parse_header(&[bytes]) {
+                match Self::new(authorization) {
                     Err(_) => Outcome::Forward(()),
-                    Ok(parsed) => Outcome::Success(Authorization(parsed)),
+                    Ok(parsed) => Outcome::Success(parsed),
                 }
-
             }
             None => Outcome::Forward(()),
         }
@@ -139,6 +135,15 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
 }
 
 impl<S: header::Scheme + 'static> Authorization<S> {
+    /// Create a new Authorization header
+    pub fn new<'a>(header: &'a str) -> Result<Self, Error> {
+        use hyper::header::Header;
+
+        let bytes: Vec<u8> = header.as_bytes().to_vec();
+        let parsed = header::Authorization::parse_header(&[bytes])?;
+        Ok(Authorization(parsed))
+    }
+
     /// Convenience function to check if the Authorization is `Basic`
     pub fn is_basic(&self) -> bool {
         if let Some("Basic") = S::scheme() {
@@ -310,11 +315,9 @@ pub struct AuthenticationResult {
 pub mod tests {
     #[allow(deprecated)]
     use hyper::header::{self, Header, HeaderFormatter};
-    use rocket::{self, Outcome, State, Rocket};
+    use rocket::{self, State, Rocket};
     use rocket::http;
-    use rocket::http::Method::Get;
-    use rocket::request::{self, Request, FromRequest};
-    use rocket::testing::MockRequest;
+    use rocket::local::Client;
 
     use {JsonMap, Error};
     use super::*;
@@ -345,7 +348,7 @@ pub mod tests {
         ) -> JsonValue {
             let string = From::from(Self::format(authorization));
             let mut map = JsonMap::with_capacity(1);
-            map.insert("header".to_string(), string);
+            let _ = map.insert("header".to_string(), string);
             JsonValue::Object(map)
         }
 
@@ -548,16 +551,9 @@ pub mod tests {
             username: "Aladdin".to_owned(),
             password: Some("open sesame".to_string()),
         });
-        let mut request = Request::new(rocket::http::Method::Get, "/");
-        let header = rocket::http::Header::new(
-            header::Authorization::<Basic>::header_name(),
-            HeaderFormatter(&auth).to_string(),
-        );
-        request.add_header(header);
-        let outcome: request::Outcome<::auth::Authorization<Basic>, ::auth::Error> =
-            FromRequest::from_request(&request);
 
-        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let header = HeaderFormatter(&auth).to_string();
+        let parsed_header = not_err!(::auth::Authorization::new(&header));
         let ::auth::Authorization(header::Authorization(Basic { username, password })) = parsed_header;
         assert_eq!(username, "Aladdin");
         assert_eq!(password, Some("open sesame".to_string()));
@@ -567,16 +563,8 @@ pub mod tests {
     #[allow(deprecated)]
     fn parses_bearer_auth_correctly() {
         let auth = header::Authorization(Bearer { token: "token".to_string() });
-        let mut request = Request::new(rocket::http::Method::Get, "/");
-        let header = rocket::http::Header::new(
-            header::Authorization::<Bearer>::header_name(),
-            HeaderFormatter(&auth).to_string(),
-        );
-        request.add_header(header);
-        let outcome: request::Outcome<::auth::Authorization<Bearer>, ::auth::Error> =
-            FromRequest::from_request(&request);
-
-        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let header = HeaderFormatter(&auth).to_string();
+        let parsed_header = not_err!(::auth::Authorization::new(&header));
         let ::auth::Authorization(header::Authorization(Bearer { token })) = parsed_header;
         assert_eq!(token, "token");
     }
@@ -585,16 +573,8 @@ pub mod tests {
     #[allow(deprecated)]
     fn parses_string_auth_correctly() {
         let auth = header::Authorization("hello".to_string());
-        let mut request = Request::new(rocket::http::Method::Get, "/");
-        let header = rocket::http::Header::new(
-            header::Authorization::<String>::header_name(),
-            HeaderFormatter(&auth).to_string(),
-        );
-        request.add_header(header);
-        let outcome: request::Outcome<::auth::Authorization<String>, ::auth::Error> =
-            FromRequest::from_request(&request);
-
-        let parsed_header = assert_matches!(outcome, Outcome::Success(s), s);
+        let header = HeaderFormatter(&auth).to_string();
+        let parsed_header: ::auth::Authorization<String> = not_err!(::auth::Authorization::new(&header));
         let ::auth::Authorization(header::Authorization(ref s)) = parsed_header;
         assert_eq!(s, "hello");
     }
@@ -603,19 +583,17 @@ pub mod tests {
     #[allow(deprecated)]
     fn mock_basic_auth_get_test() {
         let rocket = ignite_basic(Box::new(MockAuthenticator {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization(Basic {
             username: "mei".to_owned(),
             password: Some("冻住，不许走!".to_string()),
         });
-        let auth_header = http::Header::new(
-            "Authorization",
-            hyper::header::HeaderFormatter(&auth_header).to_string(),
-        );
+        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -625,16 +603,14 @@ pub mod tests {
     #[allow(deprecated)]
     fn mock_bearer_auth_get_test() {
         let rocket = ignite_bearer(Box::new(MockAuthenticator {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization(Bearer { token: "这样可以挡住他们。".to_string() });
-        let auth_header = http::Header::new(
-            "Authorization",
-            hyper::header::HeaderFormatter(&auth_header).to_string(),
-        );
+        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -644,16 +620,14 @@ pub mod tests {
     #[allow(deprecated)]
     fn mock_string_auth_get_test() {
         let rocket = ignite_string(Box::new(MockAuthenticator {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization("哦，对不起啦。".to_string());
-        let auth_header = http::Header::new(
-            "Authorization",
-            hyper::header::HeaderFormatter(&auth_header).to_string(),
-        );
+        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Ok);
@@ -664,19 +638,17 @@ pub mod tests {
     fn mock_basic_auth_get_invalid_credentials() {
         // Ignite rocket
         let rocket = ignite_basic(Box::new(MockAuthenticator {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization(Basic {
             username: "Aladin".to_owned(),
             password: Some("let me in".to_string()),
         });
-        let auth_header = http::Header::new(
-            "Authorization",
-            hyper::header::HeaderFormatter(&auth_header).to_string(),
-        );
+        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
@@ -687,16 +659,14 @@ pub mod tests {
     fn mock_bearer_auth_get_invalid_credentials() {
         // Ignite rocket
         let rocket = ignite_bearer(Box::new(MockAuthenticator {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization(Bearer { token: "bad".to_string() });
-        let auth_header = http::Header::new(
-            "Authorization",
-            hyper::header::HeaderFormatter(&auth_header).to_string(),
-        );
+        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
@@ -707,16 +677,14 @@ pub mod tests {
     fn mock_string_auth_get_invalid_credentials() {
         // Ignite rocket
         let rocket = ignite_string(Box::new(MockAuthenticator {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make headers
         let auth_header = hyper::header::Authorization("bad".to_string());
-        let auth_header = http::Header::new(
-            "Authorization",
-            hyper::header::HeaderFormatter(&auth_header).to_string(),
-        );
+        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/").header(auth_header);
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/").header(auth_header);
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
@@ -727,15 +695,16 @@ pub mod tests {
     fn mock_basic_auth_get_missing_credentials() {
         // Ignite rocket
         let rocket = ignite_basic(Box::new(MockAuthenticator {}));
+        let client = not_err!(Client::new(rocket));
 
         // Make and dispatch request
-        let mut req = MockRequest::new(Get, "/");
-        let response = req.dispatch_with(&rocket);
+        let req = client.get("/");
+        let response = req.dispatch();
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
 
-        let www_header: Vec<_> = response.header_values("WWW-Authenticate").collect();
+        let www_header: Vec<_> = response.headers().get("WWW-Authenticate").collect();
         assert_eq!(www_header, vec!["Basic realm=https://www.acme.com"]);
     }
 }

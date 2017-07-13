@@ -67,7 +67,7 @@ fn main() {
     };
 
     let rocket = rocket.unwrap_or_else(|e| panic!("{}", e));
-    rocket.mount("/", rowdy::routes()).launch()
+    rocket.mount("/", rowdy::routes()).launch();
 }
 
 /// Read configuration files, and ignite a `Rocket`
