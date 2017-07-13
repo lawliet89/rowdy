@@ -142,7 +142,12 @@ impl LdapAuthenticator {
         search_attrs_vec.sort();
         search_attrs_vec.dedup();
 
-        debug_!("Searching base {} with filter {} and attributes {:?}", search_base, search_filter, search_attrs_vec);
+        debug_!(
+            "Searching base {} with filter {} and attributes {:?}",
+            search_base,
+            search_filter,
+            search_attrs_vec
+        );
 
         let (results, status, _) = connection.search(
             &search_base,
