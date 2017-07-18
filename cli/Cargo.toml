@@ -12,8 +12,8 @@ doc = false
 [dependencies]
 docopt = "0.7"
 log = "0.3"
-rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "aa51fe0" }
-rocket_codegen = { git = "https://github.com/SergioBenitez/Rocket", rev = "aa51fe0" }
+rocket = "0.3.0"
+rocket_codegen = "0.3.0"
 rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
 rustc-serialize = "0.3"
 serde = "1.0"
