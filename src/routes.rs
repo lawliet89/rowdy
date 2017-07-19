@@ -230,7 +230,7 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
     }
 
     #[test]
@@ -265,7 +265,7 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
         let actual_token = not_err!(deserialized.decode(
@@ -328,7 +328,7 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
     }
 
     #[test]
@@ -355,7 +355,7 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
 
         let www_header: Vec<_> = response.headers().get("WWW-Authenticate").collect();
         assert_eq!(www_header, vec!["Basic realm=https://www.acme.com/"]);
@@ -393,7 +393,7 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
     }
 
     /// Tests that we can request a refresh token and then get a new access token with the issued refresh token
@@ -432,7 +432,7 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
         let actual_token = not_err!(deserialized.decode(
@@ -465,7 +465,7 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
         let actual_token = not_err!(deserialized.decode(
@@ -525,6 +525,6 @@ mod tests {
             .headers()
             .get_one("Access-Control-Allow-Origin")
             .expect("to exist");
-        assert_eq!("https://www.example.com/", origin_header);
+        assert_eq!("https://www.example.com", origin_header);
     }
 }
