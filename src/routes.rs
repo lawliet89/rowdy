@@ -164,7 +164,7 @@ mod tests {
     fn ignite() -> Rocket {
         // Ignite rocket
         let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllOrSome::new_from_str_list(&allowed_origins);
+        let (allowed_origins, _) = ::cors::AllowedOrigins::some(&allowed_origins);
         let token_configuration = Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
             allowed_origins: allowed_origins,

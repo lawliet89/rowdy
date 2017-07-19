@@ -460,7 +460,7 @@ impl ByteSequence {
 /// let json = r#"{
 ///     "token" : {
 ///         "issuer": "https://www.acme.com",
-///         "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///         "allowed_origins": { "Some": ["https://www.example.com", "https://www.foobar.com"] },
 ///         "audience": ["https://www.example.com", "https://www.foobar.com"],
 ///         "signature_algorithm": "RS256",
 ///         "secret": {

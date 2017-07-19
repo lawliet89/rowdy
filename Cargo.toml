@@ -30,13 +30,13 @@ simple_authenticator = ["argon2rs", "csv", "ring"]
 ldap_authenticator = ["ldap3", "strfmt"]
 
 [dependencies]
-biscuit = "0.0.6"
+biscuit = "0.0.7"
 chrono = { version = "0.4", features = ["serde"] }
 hyper = "0.10"
 log = "0.3"
 rocket = "0.3.0"
 rocket_codegen = "0.3.0"
-rocket_cors = "0.1.2"
+rocket_cors = "0.1.3"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"

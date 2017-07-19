@@ -259,7 +259,7 @@ const TOKEN_GETTER_HEADERS: &[&str] = &[
 /// ```json
 /// {
 ///     "issuer": "https://www.acme.com",
-///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///     "allowed_origins": { "Some": ["https://www.example.com", "https://www.foobar.com"] },
 ///     "audience": ["https://www.example.com", "https://www.foobar.com"],
 ///     "signature_algorithm": "RS256",
 ///     "secret": {
@@ -279,7 +279,7 @@ const TOKEN_GETTER_HEADERS: &[&str] = &[
 /// # fn main() {
 /// let json = r#"{
 ///     "issuer": "https://www.acme.com",
-///     "allowed_origins": ["https://www.example.com", "https://www.foobar.com"],
+///     "allowed_origins": { "Some": ["https://www.example.com", "https://www.foobar.com"] },
 ///     "audience": ["https://www.example.com", "https://www.foobar.com"],
 ///     "signature_algorithm": "RS256",
 ///     "secret": {
@@ -1096,7 +1096,7 @@ mod tests {
         };
 
         let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllOrSome::new_from_str_list(&allowed_origins);
+        let (allowed_origins, _) = ::cors::AllowedOrigins::some(&allowed_origins);
 
         Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
