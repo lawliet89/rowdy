@@ -3,44 +3,11 @@
 // mounted via `::launch()`
 #![allow(unmounted_route)]
 
-#![cfg_attr(feature = "clippy_lints", allow(needless_pass_by_value))]
-use std::ops::Deref;
-
 use hyper;
-use rocket::{self, State, Route};
-use rocket::http::Method::*;
+use rocket::{State, Route};
 
 use auth;
-use cors;
 use token::{Token, PrivateClaim, Configuration, RefreshToken, Keys};
-
-/// A wrapper around `cors::Options` for options specific to the token retrival route
-pub struct TokenGetterCorsOptions(cors::Options);
-impl_deref!(TokenGetterCorsOptions, cors::Options);
-
-const TOKEN_GETTER_METHODS: &[rocket::http::Method] = &[Get];
-const TOKEN_GETTER_HEADERS: &[&str] = &[
-    "Authorization",
-    "Accept",
-    "Accept-Language",
-    "Content-Language",
-    "Content-Type",
-];
-
-impl TokenGetterCorsOptions {
-    pub fn new(config: &Configuration) -> Self {
-        TokenGetterCorsOptions(cors::Options {
-            allowed_origins: config.allowed_origins.clone(),
-            allowed_methods: TOKEN_GETTER_METHODS.iter().cloned().collect(),
-            allowed_headers: TOKEN_GETTER_HEADERS
-                .iter()
-                .map(|s| s.to_string().into())
-                .collect(),
-            allow_credentials: true,
-            ..Default::default()
-        })
-    }
-}
 
 #[derive(FromForm, Default, Clone, Debug)]
 struct AuthParam {
@@ -66,30 +33,15 @@ impl AuthParam {
     }
 }
 
-/// CORS pre-flight route for access token retrieval via initial authentication and refresh token
-#[options("/?<auth_param>")]
-fn token_getter_options(
-    origin: Option<cors::Origin>,
-    method: cors::AccessControlRequestMethod,
-    headers: cors::AccessControlRequestHeaders,
-    options: State<TokenGetterCorsOptions>,
-    auth_param: AuthParam,
-) -> Result<cors::Response<()>, cors::Error> {
-    let _ = auth_param;
-    options.preflight(origin, &method, Some(&headers))
-}
-
 /// Access token retrieval via initial authentication route
 #[get("/?<auth_param>", rank = 1)]
 fn token_getter(
-    origin: Option<cors::Origin>,
     authorization: auth::Authorization<auth::Basic>,
     auth_param: AuthParam,
     configuration: State<Configuration>,
-    cors_options: State<TokenGetterCorsOptions>,
     keys: State<Keys>,
     authenticator: State<Box<auth::BasicAuthenticator>>,
-) -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
+) -> Result<Token<PrivateClaim>, ::Error> {
 
     auth_param.verify(&authorization)?;
     authenticator
@@ -114,21 +66,19 @@ fn token_getter(
                 token
             };
 
-            Ok(cors_options.respond(token, origin)?)
+            Ok(token)
         })
 }
 
 /// Access token retrieval via refresh token route
 #[get("/?<auth_param>", rank = 2)]
 fn refresh_token(
-    origin: Option<cors::Origin>,
     authorization: auth::Authorization<auth::Bearer>,
     auth_param: AuthParam,
     configuration: State<Configuration>,
-    cors_options: State<TokenGetterCorsOptions>,
     keys: State<Keys>,
     authenticator: State<Box<auth::BasicAuthenticator>>,
-) -> Result<cors::Response<Token<PrivateClaim>>, ::Error> {
+) -> Result<Token<PrivateClaim>, ::Error> {
 
     if !configuration.refresh_token_enabled() {
         return Err(::Error::BadRequest(
@@ -168,7 +118,7 @@ fn refresh_token(
                 None,
             )?;
             let token = token.encode(&keys.signing)?;
-            Ok(cors_options.respond(token, origin)?)
+            Ok(token)
         })
 }
 
@@ -189,7 +139,6 @@ fn ping() -> &'static str {
 pub fn routes() -> Vec<Route> {
     routes![
         token_getter,
-        token_getter_options,
         refresh_token,
         bad_request,
         ping,
@@ -215,7 +164,7 @@ mod tests {
     fn ignite() -> Rocket {
         // Ignite rocket
         let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
+        let (allowed_origins, _) = ::cors::AllOrSome::new_from_str_list(&allowed_origins);
         let token_configuration = Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
             allowed_origins: allowed_origins,
@@ -276,7 +225,12 @@ mod tests {
         let response = req.dispatch();
 
         // Assert
-        assert_eq!(response.status(), Status::Ok);
+        assert!(response.status().class().is_success());
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
     }
 
     #[test]
@@ -305,8 +259,13 @@ mod tests {
         let mut response = req.dispatch();
 
         // Assert
-        assert_eq!(response.status(), Status::Ok);
+        assert!(response.status().class().is_success());
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
         let actual_token = not_err!(deserialized.decode(
@@ -365,6 +324,11 @@ mod tests {
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
     }
 
     #[test]
@@ -387,6 +351,11 @@ mod tests {
 
         // Assert
         assert_eq!(response.status(), Status::Unauthorized);
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
 
         let www_header: Vec<_> = response.headers().get("WWW-Authenticate").collect();
         assert_eq!(www_header, vec!["Basic realm=https://www.acme.com/"]);
@@ -420,6 +389,11 @@ mod tests {
 
         // Assert
         assert_eq!(response.status(), Status::Forbidden);
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
     }
 
     /// Tests that we can request a refresh token and then get a new access token with the issued refresh token
@@ -452,8 +426,13 @@ mod tests {
         let mut response = req.dispatch();
 
         // Assert
-        assert_eq!(response.status(), Status::Ok);
+        assert!(response.status().class().is_success());
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
         let actual_token = not_err!(deserialized.decode(
@@ -480,8 +459,13 @@ mod tests {
         let mut response = req.dispatch();
 
         // Assert
-        assert_eq!(response.status(), Status::Ok);
+        assert!(response.status().class().is_success());
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
 
         let deserialized: Token<PrivateClaim> = not_err!(serde_json::from_str(&body_str));
         let actual_token = not_err!(deserialized.decode(
@@ -537,5 +521,10 @@ mod tests {
 
         // Assert
         assert_eq!(response.status(), Status::BadRequest);
+        let origin_header = response
+            .headers()
+            .get_one("Access-Control-Allow-Origin")
+            .expect("to exist");
+        assert_eq!("https://www.example.com/", origin_header);
     }
 }

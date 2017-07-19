@@ -224,11 +224,11 @@ extern crate hyper;
 extern crate log;
 #[macro_use]
 extern crate rocket; // we are using the "log_!" macros which are redefined from `log`'s
+extern crate rocket_cors as cors;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate unicase;
 extern crate uuid;
 
 #[cfg(feature = "simple_authenticator")]
@@ -251,7 +251,6 @@ mod macros;
 #[macro_use]
 mod test;
 pub mod auth;
-pub mod cors;
 mod routes;
 pub mod serde_custom;
 pub mod token;
@@ -490,7 +489,7 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
     /// Remember to mount routes and call `launch` on the returned Rocket object.
     /// See the struct documentation for an example.
     pub fn ignite(self) -> Result<rocket::Rocket, Error> {
-        let token_getter_cors_options = routes::TokenGetterCorsOptions::new(&self.token);
+        let token_getter_cors_options = self.token.cors_option();
 
         let basic_authenticator = self.basic_authenticator.make_authenticator()?;
         let basic_authenticator: Box<auth::BasicAuthenticator> = Box::new(basic_authenticator);
@@ -501,9 +500,9 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
         Ok(
             rocket::ignite()
                 .manage(self.token)
-                .manage(token_getter_cors_options)
                 .manage(basic_authenticator)
-                .manage(keys),
+                .manage(keys)
+                .attach(token_getter_cors_options),
         )
     }
 }

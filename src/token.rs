@@ -13,10 +13,11 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::time::Duration;
 
+use cors;
 use chrono::{self, DateTime, Utc};
 use jwt::{self, jws, jwa, jwk};
 use rocket::Request;
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, Status, Method};
 use rocket::response::{Response, Responder};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -237,6 +238,18 @@ fn verify_audience(config: &Configuration, audience: &jwt::SingleOrMultiple<jwt:
     }
 }
 
+/// A wrapper around `cors::Options` for options specific to the token retrival route
+pub type TokenGetterCorsOptions = cors::Cors;
+
+const TOKEN_GETTER_METHODS: &[Method] = &[Method::Get];
+const TOKEN_GETTER_HEADERS: &[&str] = &[
+    "Authorization",
+    "Accept",
+    "Accept-Language",
+    "Content-Language",
+    "Content-Type",
+];
+
 /// Token configuration. Usually deserialized as part of [`rowdy::Configuration`] from JSON for use.
 ///
 ///
@@ -290,10 +303,7 @@ pub struct Configuration {
     /// Origins that are allowed to issue CORS request. This is needed for browser
     /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
     ///
-    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
-    ///
-    /// See [`cors::AllowedOrigins`] for serialization examples.
-    pub allowed_origins: ::cors::AllowedOrigins,
+    pub allowed_origins: cors::AllOrSome<HashSet<cors::headers::Url>>,
     /// The audience intended for your tokens. The `service` request paremeter will be validated against this
     pub audience: jwt::SingleOrMultiple<jwt::StringOrUri>,
     /// Defaults to `none`
@@ -318,6 +328,26 @@ const DEFAULT_EXPIRY_DURATION: u64 = 86400;
 impl Configuration {
     fn default_expiry_duration() -> Duration {
         Duration::from_secs(DEFAULT_EXPIRY_DURATION)
+    }
+
+    /// Return a new CORS Option
+    pub(crate) fn cors_option(&self) -> TokenGetterCorsOptions {
+        cors::Cors {
+            allowed_origins: self.allowed_origins.clone(),
+            allowed_methods: TOKEN_GETTER_METHODS
+                .iter()
+                .cloned()
+                .map(From::from)
+                .collect(),
+            allowed_headers: cors::AllOrSome::Some(
+                TOKEN_GETTER_HEADERS
+                    .iter()
+                    .map(|s| s.to_string().into())
+                    .collect(),
+            ),
+            allow_credentials: true,
+            ..Default::default()
+        }
     }
 
     /// Returns whether refresh tokens are enabled
@@ -1066,7 +1096,7 @@ mod tests {
         };
 
         let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::new_from_str_list(&allowed_origins);
+        let (allowed_origins, _) = ::cors::AllOrSome::new_from_str_list(&allowed_origins);
 
         Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
