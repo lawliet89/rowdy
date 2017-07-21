@@ -2,13 +2,12 @@
 use std::collections::HashMap;
 
 use ldap3::{LdapConn, Scope, SearchEntry};
+use ldap3::ldap_escape;
 use strfmt::{FmtError, strfmt};
 use serde_json::value;
 
 use {Error, JsonValue, JsonMap};
 use super::{Basic, AuthenticationResult};
-
-const LDAP_SUCCESS: u8 = 0;
 
 /// Error mapping for `FmtError`
 impl From<FmtError> for Error {
@@ -115,19 +114,15 @@ impl LdapAuthenticator {
     /// Bind the connection to some dn
     fn bind(&self, connection: &LdapConn, dn: &str, password: &str) -> Result<(), Error> {
         debug_!("Binding to DN {}", dn);
-        let (result, _) = connection.simple_bind(dn, password)?;
-        if result.rc == LDAP_SUCCESS {
-            Ok(())
-        } else {
-            Err(Error::GenericError(
-                format!("Binding failed with reason code: {}", result.rc),
-            ))
-        }
+        let _s = connection.simple_bind(dn, password)?
+            .success()
+            .map_err(|e| Error::GenericError(format!("Bind failed: {}", e)))?;
+        Ok(())
     }
 
     /// Search for the specified account in the directory
     fn search(&self, connection: &LdapConn, account: &str) -> Result<Vec<SearchEntry>, Error> {
-        let account = Self::escape_filter(account);
+        let account = ldap_escape(account).into();
         let account: HashMap<String, String> = [("account".to_string(), account)].iter().cloned().collect();
         let search_base = strfmt(&self.search_base, &account)?;
         let search_filter = match self.search_filter {
@@ -149,18 +144,12 @@ impl LdapAuthenticator {
             search_attrs_vec
         );
 
-        let (results, status, _) = connection.search(
+        let (results, _) = connection.search(
             &search_base,
             Scope::Subtree,
             &search_filter,
             search_attrs_vec,
-        )?;
-
-        if status.rc != LDAP_SUCCESS {
-            Err(Error::GenericError(
-                format!("Search failed with reason code: {}", status.rc),
-            ))?;
-        }
+        )?.success().map_err(|e| Error::GenericError(format!("Search failed: {}", e)))?;
 
         Ok(results.into_iter().map(SearchEntry::construct).collect())
     }
@@ -308,17 +297,6 @@ impl LdapAuthenticator {
             self.attributes_namespace.as_ref().map(String::as_ref),
             include_refresh_payload,
         )
-    }
-
-    /// Escape search filters according to RFC 4515. Since all strings in Rust are valid unicode,
-    /// invalid unicode escaping is not done
-    pub fn escape_filter(filter: &str) -> String {
-        filter
-            .replace("\\", "\\5c")
-            .replace("*", "\\2a")
-            .replace("(", "\\28")
-            .replace(")", "\\29")
-            .replace("\x00", "\\00")
     }
 }
 

@@ -304,7 +304,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "lber"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -314,14 +314,14 @@ dependencies = [
 
 [[package]]
 name = "ldap3"
-version = "0.4.4"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "lber 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lber 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "native-tls 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -687,7 +687,7 @@ dependencies = [
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "csv 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.10.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "ldap3 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ldap3 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ring 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rocket 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1181,8 +1181,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
 "checksum lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3b37545ab726dd833ec6420aaba8231c5b320814b9029ad585555d2a03e94fbf"
 "checksum lazycell 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce12306c4739d86ee97c23139f3a34ddf0387bbf181bc7929d287025a8c3ef6b"
-"checksum lber 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "9a641f60225ff5b53780d6af60f8efb7e4cb7452b84801dfb2bb30c0987b6bee"
-"checksum ldap3 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "e17563a38b586f02538a92a89570f0915c9097e4797f314b8a93ac666ffc1fa5"
+"checksum lber 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "b2ba3d9e03604fda60029cb5b2aa77bbcf8d7dd68a47592b3ff1f1df268c8d5e"
+"checksum ldap3 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "27295c0d7ea9b479420394e548d482091544382855d941f6d0c6752af4765b0b"
 "checksum libc 0.2.26 (registry+https://github.com/rust-lang/crates.io-index)" = "30885bcb161cf67054244d10d4a7f4835ffd58773bc72e07d35fecf472295503"
 "checksum linked-hash-map 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7860ec297f7008ff7a1e3382d7f7e1dcd69efc94751a2284bafc3d013c2aa939"
 "checksum log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "880f77541efa6e5cc74e76910c9884d9859683118839d6a1dc3b11e63512565b"
