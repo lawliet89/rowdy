@@ -7,8 +7,9 @@ extern crate log;
 #[macro_use]
 extern crate rocket;
 extern crate rowdy;
-extern crate rustc_serialize;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 
 use docopt::Docopt;
@@ -45,7 +46,7 @@ Options:
   -h --help                 Show this screen.
 "#;
 
-#[derive(Debug, RustcDecodable, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct Args {
     arg_configuration_json: String,
     cmd_noop: bool,
@@ -54,7 +55,7 @@ struct Args {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
+    let args: Args = Docopt::new(USAGE).and_then(|d| d.deserialize()).unwrap_or_else(|e| e.exit());
 
     let rocket = if args.cmd_noop {
         ignite::<auth::NoOpConfiguration>(&args.arg_configuration_json)
@@ -126,7 +127,7 @@ mod tests {
     fn docopt_noop() {
         let docopt = Docopt::new(USAGE).unwrap();
         let docopt = docopt.argv(["rowdy", "noop", "test/fixtures/config/noop.json"].iter());
-        let args = docopt.decode().unwrap();
+        let args = docopt.deserialize().unwrap();
 
         let expected_args = Args {
             arg_configuration_json: "test/fixtures/config/noop.json".to_string(),
@@ -142,7 +143,7 @@ mod tests {
     fn docopt_csv() {
         let docopt = Docopt::new(USAGE).unwrap();
         let docopt = docopt.argv(["rowdy", "csv", "test/fixtures/config/csv.json"].iter());
-        let args = docopt.decode().unwrap();
+        let args = docopt.deserialize().unwrap();
 
         let expected_args = Args {
             arg_configuration_json: "test/fixtures/config/csv.json".to_string(),
@@ -158,7 +159,7 @@ mod tests {
     fn docopt_ldap() {
         let docopt = Docopt::new(USAGE).unwrap();
         let docopt = docopt.argv(["rowdy", "ldap", "test/fixtures/config/ldap.json"].iter());
-        let args = docopt.decode().unwrap();
+        let args = docopt.deserialize().unwrap();
 
         let expected_args = Args {
             arg_configuration_json: "test/fixtures/config/ldap.json".to_string(),

@@ -10,11 +10,11 @@ test = true
 doc = false
 
 [dependencies]
-docopt = "0.7"
+docopt = "0.8"
 log = "0.3"
 rocket = "0.3.0"
 rocket_codegen = "0.3.0"
 rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
-rustc-serialize = "0.3"
 serde = "1.0"
+serde_derive = "1.0"
 serde_json = "1.0"
