@@ -114,9 +114,11 @@ impl LdapAuthenticator {
     /// Bind the connection to some dn
     fn bind(&self, connection: &LdapConn, dn: &str, password: &str) -> Result<(), Error> {
         debug_!("Binding to DN {}", dn);
-        let _s = connection.simple_bind(dn, password)?
-            .success()
-            .map_err(|e| Error::GenericError(format!("Bind failed: {}", e)))?;
+        let _s = connection.simple_bind(dn, password)?.success().map_err(
+            |e| {
+                Error::GenericError(format!("Bind failed: {}", e))
+            },
+        )?;
         Ok(())
     }
 
@@ -144,12 +146,15 @@ impl LdapAuthenticator {
             search_attrs_vec
         );
 
-        let (results, _) = connection.search(
-            &search_base,
-            Scope::Subtree,
-            &search_filter,
-            search_attrs_vec,
-        )?.success().map_err(|e| Error::GenericError(format!("Search failed: {}", e)))?;
+        let (results, _) = connection
+            .search(
+                &search_base,
+                Scope::Subtree,
+                &search_filter,
+                search_attrs_vec,
+            )?
+            .success()
+            .map_err(|e| Error::GenericError(format!("Search failed: {}", e)))?;
 
         Ok(results.into_iter().map(SearchEntry::construct).collect())
     }
