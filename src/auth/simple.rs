@@ -48,16 +48,17 @@ impl SimpleAuthenticator {
     /// Create a new `SimpleAuthenticator` with a path to a CSV file.
     ///
     pub fn with_csv_file(path: &str, has_headers: bool, delimiter: u8) -> Result<Self, Error> {
-        let reader = csv::Reader::from_file(path)
-            .map_err(|e| e.to_string())?
+        let reader = csv::ReaderBuilder::new()
             .has_headers(has_headers)
-            .delimiter(delimiter);
+            .delimiter(delimiter)
+            .from_path(path)
+            .map_err(|e| e.to_string())?;
         Self::new(reader)
     }
 
     fn users_from_csv<R: Read>(mut csv: csv::Reader<R>) -> Result<Users, Error> {
         // Parse the records, and look for errors
-        let records: Vec<csv::Result<(String, String, String)>> = csv.decode().collect();
+        let records: Vec<csv::Result<(String, String, String)>> = csv.deserialize().collect();
         let (records, errors): (Vec<_>, Vec<_>) = records.into_iter().partition(Result::is_ok);
         if !errors.is_empty() {
             let errors: Vec<String> = errors
@@ -319,7 +320,9 @@ mod tests {
 
         cursor.set_position(0);
         let authenticator = not_err!(SimpleAuthenticator::new(
-            csv::Reader::from_reader(&mut cursor).has_headers(false),
+            csv::ReaderBuilder::new().has_headers(false).from_reader(
+                &mut cursor,
+            ),
         ));
 
         let expected_keys = vec!["foobar".to_string(), "mei".to_string()];
