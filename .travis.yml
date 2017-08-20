@@ -12,10 +12,13 @@ addons:
       - libcurl4-openssl-dev
       - libelf-dev
       - libdw-dev
+services:
+  - mysql
 before_script:
   - |
     pip install 'travis-cargo<0.2' --user &&
     export PATH=$HOME/.local/bin:$PATH
+  - mysql -uroot < test/fixtures/travis.sql
 script:
   - |
     travis-cargo build -- --all-features --all --locked &&

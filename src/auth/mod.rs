@@ -29,6 +29,13 @@ mod ldap;
 #[cfg(feature = "ldap_authenticator")]
 pub use self::ldap::LdapAuthenticator;
 
+#[cfg(feature = "mysql_authenticator")]
+mod mysql;
+#[cfg(feature = "mysql_authenticator")]
+pub use self::mysql::MySqlAuthenticator;
+#[cfg(feature = "mysql_authenticator")]
+mod schema;
+
 use JsonValue;
 
 /// Re-exported [`hyper::header::Scheme`]
