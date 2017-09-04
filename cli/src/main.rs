@@ -23,6 +23,7 @@ Usage:
   rowdy noop <configuration-json>
   rowdy csv <configuration-json>
   rowdy ldap <configuration-json>
+  rowdy mysql <configuration-json>
   rowdy (-h | --help)
 
 Provide a configuration JSON file to run `rowdy` with. For available fields and examples for the JSON
@@ -34,6 +35,8 @@ See https://rocket.rs/guide/overview#configuration
 The `noop` subcommand allows all username and passwords to authenticate.
 The `csv` subcommand uses a CSV file as its username database. See
 https://lawliet89.github.io/rowdy/rowdy/auth/simple/index.html for the database format.
+The `mysql` subcommand uses a MySQL database for usernames. See
+https://lawliet89.github.io/rowdy/rowdy/auth/mysql/index.html for the database format.
 
 The subcommands will change the format expected by the `basic_authenticator` key of the configuration JSON.
   - noop: The key is expected to be simply an empty map: i.e. `{}`
@@ -41,6 +44,8 @@ The subcommands will change the format expected by the `basic_authenticator` key
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.SimpleAuthenticatorConfiguration.html
   - ldap: The key should behave according to the format documented at
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.LdapAuthenticator.html
+  - mysql: The key should behave according to the format documented at
+    https://lawliet89.github.io/rowdy/rowdy/auth/struct.MysqlAuthenticatorConfiguration.html
 
 Options:
   -h --help                 Show this screen.
@@ -52,6 +57,7 @@ struct Args {
     cmd_noop: bool,
     cmd_csv: bool,
     cmd_ldap: bool,
+    cmd_mysql: bool,
 }
 
 fn main() {
@@ -63,6 +69,8 @@ fn main() {
         ignite::<auth::SimpleAuthenticatorConfiguration>(&args.arg_configuration_json)
     } else if args.cmd_ldap {
         ignite::<auth::LdapAuthenticator>(&args.arg_configuration_json)
+    } else if args.cmd_mysql {
+        ignite::<auth::MySqlAuthenticatorConfiguration>(&args.arg_configuration_json)
     } else {
         unreachable!("Should never happen");
     };
@@ -119,6 +127,11 @@ mod tests {
     }
 
     #[test]
+    fn ignite_mysql() {
+        ignite::<auth::NoOpConfiguration>("test/fixtures/config_mysql.json").unwrap();
+    }
+
+    #[test]
     fn docopt_usage_string_parsing() {
         Docopt::new(USAGE).unwrap();
     }
@@ -134,6 +147,7 @@ mod tests {
             cmd_noop: true,
             cmd_csv: false,
             cmd_ldap: false,
+            cmd_mysql: false,
         };
 
         assert_eq!(expected_args, args);
@@ -150,6 +164,7 @@ mod tests {
             cmd_noop: false,
             cmd_csv: true,
             cmd_ldap: false,
+            cmd_mysql: false,
         };
 
         assert_eq!(expected_args, args);
@@ -166,6 +181,24 @@ mod tests {
             cmd_noop: false,
             cmd_csv: false,
             cmd_ldap: true,
+            cmd_mysql: false,
+        };
+
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn docopt_mysql() {
+        let docopt = Docopt::new(USAGE).unwrap();
+        let docopt = docopt.argv(["rowdy", "mysql", "test/fixtures/config/mysql.json"].iter());
+        let args = docopt.deserialize().unwrap();
+
+        let expected_args = Args {
+            arg_configuration_json: "test/fixtures/config/mysql.json".to_string(),
+            cmd_noop: false,
+            cmd_csv: false,
+            cmd_ldap: false,
+            cmd_mysql: true,
         };
 
         assert_eq!(expected_args, args);

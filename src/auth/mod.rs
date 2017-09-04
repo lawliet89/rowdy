@@ -34,6 +34,8 @@ mod mysql;
 #[cfg(feature = "mysql_authenticator")]
 pub use self::mysql::MySqlAuthenticator;
 #[cfg(feature = "mysql_authenticator")]
+pub use self::mysql::MySqlAuthenticatorConfiguration;
+#[cfg(feature = "mysql_authenticator")]
 mod schema;
 
 use JsonValue;
