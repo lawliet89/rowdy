@@ -248,6 +248,7 @@ const TOKEN_GETTER_HEADERS: &[&str] = &[
     "Accept-Language",
     "Content-Language",
     "Content-Type",
+    "Origin",
 ];
 
 /// Token configuration. Usually deserialized as part of [`rowdy::Configuration`] from JSON for use.
