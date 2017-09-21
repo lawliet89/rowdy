@@ -1,17 +1,17 @@
 //! MySql authenticator module
 use diesel::prelude::*;
 use diesel::mysql::MysqlConnection;
-
-use serde_json::value;
-
+use r2d2::{Config, PooledConnection};
+use r2d2_diesel::ConnectionManager;
 // FIXME: Remove dependency on `ring`.
 use ring::constant_time::verify_slices_are_equal;
+use serde_json::value;
 
 use rowdy::{self, JsonMap, JsonValue};
 use rowdy::auth::{self, AuthenticationResult, AuthenticatorConfiguration, Authorization, Basic};
 use rowdy::auth::util::{hash_password_digest, hex_dump};
 
-use Error;
+use {ConnectionPool, Error};
 
 /// MySql user record
 #[derive(Queryable, Serialize, Deserialize)]
@@ -21,58 +21,53 @@ pub struct User {
     salt: Vec<u8>,
 }
 
-/// A simple authenticator that uses a MySql backed user database.
-///
-/// Requires the `mysql_authenticator` feature
-///
-/// The user database should be a MySql database with a table of the following format:
-/// username(VARCHAR(255)), pw_hash(VARCHAR(255)), salt(VARCHAR(255))
-///
-/// # Password Hashing
-/// See `Authenticator::hash_password` for the implementation of password hashing.
-/// The password is hashed using the [`argon2i`](https://github.com/p-h-c/phc-winner-argon2) algorithm with
-/// a randomly generated salt.
+/// A rowdy authenticator that uses a MySQL backed database to provide the users
 pub struct Authenticator {
-    database_uri: String,
+    pool: ConnectionPool<MysqlConnection>,
 }
 
 impl Authenticator {
-    /// Create a new `Authenticator` with a database connection
-    ///
-    pub fn new(uri: String) -> Self {
-        Authenticator { database_uri: uri }
+    /// Creates an authenticator backed by a table in a MySQL database using a connection pool.
+    pub fn new(pool: ConnectionPool<MysqlConnection>) -> Self {
+        Self { pool }
+    }
+
+    /// Using a database connection string of the form `mysql://[user[:password]@]host/database_name`,
+    /// create an authenticator that is backed by a connection pool to a MySQL database
+    pub fn with_uri(uri: &str) -> Result<Self, Error> {
+        // Attempt a test connection with diesel
+        let _ = Self::connect(uri)?;
+
+        let config = Config::default();
+        let manager = ConnectionManager::new(uri);
+        debug_!("Creating a connection pool");
+        let pool = ConnectionPool::new(config, manager)?;
+        Ok(Self::new(pool))
     }
 
     /// Create a new `Authenticator` with a database config
     ///
     pub fn with_configuration(host: &str, port: u16, database: &str, user: &str, pass: &str) -> Result<Self, Error> {
-        let database_uri: String = String::from(format!(
-            "mysql://{}:{}@{}:{}/{}",
-            user,
-            pass,
-            host,
-            port,
-            database
-        ));
-        let authenticator = Authenticator { database_uri };
-        authenticator.test_connection().map(|()| authenticator)
+        let database_uri = format!("mysql://{}:{}@{}:{}/{}", user, pass, host, port, database);
+        Self::with_uri(&database_uri)
     }
 
-    fn test_connection(&self) -> Result<(), Error> {
-        let _ = self.connect()?;
-        Ok(())
+    /// Test connection with the database uri
+    fn connect(uri: &str) -> Result<MysqlConnection, Error> {
+        debug_!("Attempting a connection to MySQL database");
+        Ok(MysqlConnection::establish(uri)?)
     }
 
-    /// Connects to MySql Server
-    fn connect(&self) -> Result<MysqlConnection, Error> {
-        debug_!("Connecting to MySQL server");
-        let connection = MysqlConnection::establish(&self.database_uri)?;
-        Ok(connection)
+    /// Retrieve a connection to the database from the pool
+    fn get_pooled_connection(&self) -> Result<PooledConnection<ConnectionManager<MysqlConnection>>, Error> {
+        debug_!("Retrieving a connection from the pool");
+        Ok(self.pool.get()?)
     }
 
     /// Search for the specified user entry
     fn search(&self, connection: &MysqlConnection, search_user: &str) -> Result<Vec<User>, Error> {
         use super::schema::users::dsl::*;
+        debug_!("Querying user {} from database", search_user);
         let results = users
             .filter(username.eq(search_user))
             .load::<User>(connection)?;
@@ -133,7 +128,7 @@ impl Authenticator {
         include_refresh_payload: bool,
     ) -> Result<AuthenticationResult, Error> {
         let user = {
-            let connection = self.connect()?;
+            let connection = self.get_pooled_connection()?;
             let mut user = self.search(&connection, username)
                 .map_err(|_e| Error::AuthenticationFailure)?;
             if user.len() != 1 {
