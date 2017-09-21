@@ -7,9 +7,9 @@ use csv;
 use ring::test;
 use ring::constant_time::verify_slices_are_equal;
 
-use {Error, JsonValue, JsonMap};
-use super::{Basic, AuthenticationResult};
-use super::util::{generate_salt, hex_dump, hash_password_digest};
+use {Error, JsonMap, JsonValue};
+use super::{AuthenticationResult, Basic};
+use super::util::{generate_salt, hash_password_digest, hex_dump};
 
 // Code for conversion to hex stolen from rustc-serialize:
 // https://doc.rust-lang.org/rustc-serialize/src/rustc_serialize/hex.rs.html
@@ -39,7 +39,9 @@ impl SimpleAuthenticator {
     ///
     pub fn new<R: Read>(csv: csv::Reader<R>) -> Result<Self, Error> {
         warn_!("Do not use the Simple authenticator in production");
-        Ok(SimpleAuthenticator { users: Self::users_from_csv(csv)? })
+        Ok(SimpleAuthenticator {
+            users: Self::users_from_csv(csv)?,
+        })
     }
 
     /// Create a new `SimpleAuthenticator` with a path to a CSV file.
@@ -212,7 +214,7 @@ impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfigurati
 pub fn hash_passwords(users: &HashMap<String, String>, salt_len: usize) -> Result<Users, Error> {
     let mut hashed: Users = HashMap::new();
     for (user, password) in users {
-        let salt = generate_salt(salt_len).map_err(|()| "Unspecified error".to_string() )?;
+        let salt = generate_salt(salt_len).map_err(|()| "Unspecified error".to_string())?;
         let hash = hash_password_digest(password, &salt);
         let _ = hashed.insert(user.to_string(), (hash, salt));
     }
@@ -290,9 +292,9 @@ mod tests {
 
         cursor.set_position(0);
         let authenticator = not_err!(SimpleAuthenticator::new(
-            csv::ReaderBuilder::new().has_headers(false).from_reader(
-                &mut cursor,
-            ),
+            csv::ReaderBuilder::new()
+                .has_headers(false,)
+                .from_reader(&mut cursor,),
         ));
 
         let expected_keys = vec!["foobar".to_string(), "mei".to_string()];
@@ -327,9 +329,7 @@ mod tests {
         let result = not_err!(authenticator.verify("foobar", "password", true));
         assert!(result.refresh_payload.is_some()); // refresh refresh_payload is provided when requested
 
-        let result = not_err!(authenticator.authenticate_refresh_token(
-            result.refresh_payload.as_ref().unwrap(),
-        ));
+        let result = not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),));
         assert!(result.refresh_payload.is_none());
     }
 

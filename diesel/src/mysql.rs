@@ -8,7 +8,7 @@ use serde_json::value;
 use ring::constant_time::verify_slices_are_equal;
 
 use rowdy::{self, JsonMap, JsonValue};
-use rowdy::auth::{self, Authorization, AuthenticatorConfiguration, AuthenticationResult, Basic};
+use rowdy::auth::{self, AuthenticationResult, AuthenticatorConfiguration, Authorization, Basic};
 use rowdy::auth::util::{hash_password_digest, hex_dump};
 
 use Error;
@@ -73,9 +73,9 @@ impl Authenticator {
     /// Search for the specified user entry
     fn search(&self, connection: &MysqlConnection, search_user: &str) -> Result<Vec<User>, Error> {
         use super::schema::users::dsl::*;
-        let results = users.filter(username.eq(search_user)).load::<User>(
-            connection,
-        )?;
+        let results = users
+            .filter(username.eq(search_user))
+            .load::<User>(connection)?;
         Ok(results)
     }
 
@@ -87,9 +87,7 @@ impl Authenticator {
 
     /// Serialize a user as payload for a refresh token
     fn serialize_refresh_token_payload(user: &User) -> Result<JsonValue, Error> {
-        let user = value::to_value(user).map_err(
-            |_| Error::AuthenticationFailure,
-        )?;
+        let user = value::to_value(user).map_err(|_| Error::AuthenticationFailure)?;
         let mut map = JsonMap::with_capacity(1);
         let _ = map.insert("user".to_string(), user);
         Ok(JsonValue::Object(map))
@@ -101,9 +99,8 @@ impl Authenticator {
             JsonValue::Object(ref map) => {
                 let user = map.get("user").ok_or_else(|| Error::AuthenticationFailure)?;
                 // TODO verify the user object matches the database
-                Ok(value::from_value(user.clone()).map_err(|_| {
-                    Error::AuthenticationFailure
-                })?)
+                Ok(value::from_value(user.clone())
+                    .map_err(|_| Error::AuthenticationFailure)?)
             }
             _ => Err(Error::AuthenticationFailure),
         }
@@ -137,9 +134,8 @@ impl Authenticator {
     ) -> Result<AuthenticationResult, Error> {
         let user = {
             let connection = self.connect()?;
-            let mut user = self.search(&connection, username).map_err(|_e| {
-                Error::AuthenticationFailure
-            })?;
+            let mut user = self.search(&connection, username)
+                .map_err(|_e| Error::AuthenticationFailure)?;
             if user.len() != 1 {
                 Err(Error::AuthenticationFailure)?;
             }
@@ -284,9 +280,7 @@ mod tests {
         let result = not_err!(authenticator.verify("foobar", "password", true));
         assert!(result.refresh_payload.is_some()); // refresh refresh_payload is provided when requested
 
-        let result = not_err!(authenticator.authenticate_refresh_token(
-            result.refresh_payload.as_ref().unwrap(),
-        ));
+        let result = not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),));
         assert!(result.refresh_payload.is_none());
     }
 

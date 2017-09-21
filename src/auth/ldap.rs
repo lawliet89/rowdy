@@ -3,11 +3,11 @@ use std::collections::HashMap;
 
 use ldap3::{LdapConn, Scope, SearchEntry};
 use ldap3::ldap_escape;
-use strfmt::{FmtError, strfmt};
+use strfmt::{strfmt, FmtError};
 use serde_json::value;
 
-use {Error, JsonValue, JsonMap};
-use super::{Basic, AuthenticationResult};
+use {Error, JsonMap, JsonValue};
+use super::{AuthenticationResult, Basic};
 
 /// Error mapping for `FmtError`
 impl From<FmtError> for Error {
@@ -114,11 +114,10 @@ impl LdapAuthenticator {
     /// Bind the connection to some dn
     fn bind(&self, connection: &LdapConn, dn: &str, password: &str) -> Result<(), Error> {
         debug_!("Binding to DN {}", dn);
-        let _s = connection.simple_bind(dn, password)?.success().map_err(
-            |e| {
-                Error::GenericError(format!("Bind failed: {}", e))
-            },
-        )?;
+        let _s = connection
+            .simple_bind(dn, password)?
+            .success()
+            .map_err(|e| Error::GenericError(format!("Bind failed: {}", e)))?;
         Ok(())
     }
 
@@ -161,9 +160,7 @@ impl LdapAuthenticator {
 
     /// Serialize a user as payload for a refresh token
     fn serialize_refresh_token_payload(user: &User) -> Result<JsonValue, Error> {
-        let user = value::to_value(user).map_err(
-            |_| super::Error::AuthenticationFailure,
-        )?;
+        let user = value::to_value(user).map_err(|_| super::Error::AuthenticationFailure)?;
         let mut map = JsonMap::with_capacity(1);
         let _ = map.insert("user".to_string(), user);
         Ok(JsonValue::Object(map))
@@ -173,12 +170,10 @@ impl LdapAuthenticator {
     fn deserialize_refresh_token_payload(refresh_payload: JsonValue) -> Result<User, Error> {
         match refresh_payload {
             JsonValue::Object(ref map) => {
-                let user = map.get("user").ok_or_else(|| {
-                    Error::Auth(super::Error::AuthenticationFailure)
-                })?;
-                Ok(value::from_value(user.clone()).map_err(|_| {
-                    super::Error::AuthenticationFailure
-                })?)
+                let user = map.get("user")
+                    .ok_or_else(|| Error::Auth(super::Error::AuthenticationFailure))?;
+                Ok(value::from_value(user.clone())
+                    .map_err(|_| super::Error::AuthenticationFailure)?)
             }
             _ => Err(Error::Auth(super::Error::AuthenticationFailure)),
         }
@@ -274,9 +269,8 @@ impl LdapAuthenticator {
             // First, we search for the user
             let connection = self.connect()?;
             self.searcher_bind(&connection)?;
-            let mut user = self.search(&connection, username).map_err(|_e| {
-                super::Error::AuthenticationFailure
-            })?;
+            let mut user = self.search(&connection, username)
+                .map_err(|_e| super::Error::AuthenticationFailure)?;
             if user.len() != 1 {
                 Err(super::Error::AuthenticationFailure)?;
             }
@@ -289,9 +283,8 @@ impl LdapAuthenticator {
         {
             // Attempt a bind with the user's DN and password
             let connection = self.connect()?;
-            self.bind(&connection, &user_dn, password).map_err(|_e| {
-                super::Error::AuthenticationFailure
-            })?;
+            self.bind(&connection, &user_dn, password)
+                .map_err(|_e| super::Error::AuthenticationFailure)?;
         }
 
         let user = From::from(user);
@@ -372,7 +365,7 @@ mod tests {
                 ("uid".to_string(), vec!["john.doe".to_string()]),
                 (
                     "memberOf".to_string(),
-                    vec!["admins".to_string(), "user".to_string()]
+                    vec!["admins".to_string(), "user".to_string()],
                 ),
             ].into_iter()
                 .collect(),
@@ -440,9 +433,8 @@ mod tests {
         assert!(result.refresh_payload.is_some());
         assert_eq!(result.private_claims, expected_private_claim);
 
-        let refresh_result = not_err!(authenticator.authenticate_refresh_token(
-            result.refresh_payload.as_ref().unwrap(),
-        ));
+        let refresh_result =
+            not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),));
         assert!(refresh_result.refresh_payload.is_none());
 
         assert_eq!(result.subject, refresh_result.subject);
@@ -461,7 +453,7 @@ mod tests {
             ("cn".to_string(), vec!["John Doe".to_string()]),
             (
                 "memberOf".to_string(),
-                vec!["admins".to_string(), "user".to_string()]
+                vec!["admins".to_string(), "user".to_string()],
             ),
         ].into_iter()
             .map(|(key, value)| (key, value::to_value(value).unwrap()))
@@ -486,7 +478,7 @@ mod tests {
             ("cn".to_string(), vec!["John Doe".to_string()]),
             (
                 "memberOf".to_string(),
-                vec!["admins".to_string(), "user".to_string()]
+                vec!["admins".to_string(), "user".to_string()],
             ),
         ].into_iter()
             .map(|(key, value)| (key, value::to_value(value).unwrap()))
@@ -495,7 +487,7 @@ mod tests {
         let namespaced_attributes: JsonMap<_, _> = vec![
             (
                 "namespace".to_string(),
-                JsonValue::Object(expected_attributes)
+                JsonValue::Object(expected_attributes),
             ),
         ].into_iter()
             .collect();

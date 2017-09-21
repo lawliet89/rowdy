@@ -5,8 +5,8 @@
 extern crate ansi_term;
 extern crate version_check;
 
-use ansi_term::Color::{Red, Yellow, Blue, White};
-use version_check::{is_nightly, is_min_version, is_min_date};
+use ansi_term::Color::{Blue, Red, White, Yellow};
+use version_check::{is_min_date, is_min_version, is_nightly};
 
 // Specifies the minimum nightly version that is targetted
 // Note that sometimes the `rustc` date might be older than the nightly version, usually one day older

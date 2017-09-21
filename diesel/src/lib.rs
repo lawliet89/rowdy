@@ -11,9 +11,10 @@ extern crate diesel_codegen;
 #[macro_use]
 extern crate log;
 extern crate ring;
-extern crate rowdy;
 #[macro_use]
-extern crate rocket; // we are using the "log_!" macros which are redefined from `log`'s
+extern crate rocket;
+extern crate rowdy;
+// we are using the "log_!" macros which are redefined from `log`'s
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;

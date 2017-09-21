@@ -101,9 +101,8 @@ where
     info_!("Reading configuration from '{}'", path);
     let mut file = File::open(&path).map_err(|e| format!("{:?}", e))?;
     let mut config_json = String::new();
-    file.read_to_string(&mut config_json).map_err(
-        |e| format!("{:?}", e),
-    )?;
+    file.read_to_string(&mut config_json)
+        .map_err(|e| format!("{:?}", e))?;
 
     deserialize_json(&config_json)
 }

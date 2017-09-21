@@ -7,7 +7,7 @@ use hyper;
 use hyper::header;
 use rocket;
 use rocket::http::Status;
-use rocket::request::{self, Request, FromRequest};
+use rocket::request::{self, FromRequest, Request};
 use rocket::response;
 use rocket::Outcome;
 use serde::Serialize;
@@ -125,12 +125,10 @@ impl<'a, 'r, S: header::Scheme + 'static> FromRequest<'a, 'r> for Authorization<
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Error> {
         match request.headers().get_one("Authorization") {
-            Some(authorization) => {
-                match Self::new(authorization) {
-                    Err(_) => Outcome::Forward(()),
-                    Ok(parsed) => Outcome::Success(parsed),
-                }
-            }
+            Some(authorization) => match Self::new(authorization) {
+                Err(_) => Outcome::Forward(()),
+                Ok(parsed) => Outcome::Success(parsed),
+            },
             None => Outcome::Forward(()),
         }
     }
@@ -260,7 +258,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
         if !request_refresh_token && result.refresh_payload.is_some() {
             Err(Error::GenericError(
                 "Misbehaving authenticator: refresh token payload was \
-                                    returned when it was not requested for"
+                 returned when it was not requested for"
                     .to_string(),
             ))?;
         }
@@ -277,7 +275,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
         if result.refresh_payload.is_some() {
             Err(Error::GenericError(
                 "Misbehaving authenticator: refresh token payload was \
-                                    returned for a refresh operation"
+                 returned for a refresh operation"
                     .to_string(),
             ))?;
         }
@@ -287,7 +285,9 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
 
 /// Convenience function to respond with a missing authorization error
 pub fn missing_authorization<T>(realm: &str) -> Result<T, ::Error> {
-    Err(Error::MissingAuthorization { realm: realm.to_string() })?
+    Err(Error::MissingAuthorization {
+        realm: realm.to_string(),
+    })?
 }
 
 /// Configuration for the associated type `Authenticator`. [`rowdy::Configuration`] expects its `authenticator` field
@@ -317,11 +317,11 @@ pub struct AuthenticationResult {
 pub mod tests {
     #[allow(deprecated)]
     use hyper::header::{self, Header, HeaderFormatter};
-    use rocket::{self, State, Rocket};
+    use rocket::{self, Rocket, State};
     use rocket::http;
     use rocket::local::Client;
 
-    use {JsonMap, Error};
+    use {Error, JsonMap};
     use super::*;
 
     /// Mock authenticator that authenticates only the following:
@@ -468,7 +468,8 @@ pub mod tests {
     pub struct MockAuthenticatorConfiguration {}
 
     impl<S: header::Scheme + 'static> AuthenticatorConfiguration<S> for MockAuthenticatorConfiguration
-        where MockAuthenticator: Authenticator<S>
+    where
+        MockAuthenticator: Authenticator<S>,
     {
         type Authenticator = MockAuthenticator;
 
@@ -480,9 +481,9 @@ pub mod tests {
     /// Ignite a Rocket with a Basic authenticator
     pub fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
         // Ignite rocket
-        rocket::ignite().mount("/", routes![auth_basic]).manage(
-            authenticator,
-        )
+        rocket::ignite()
+            .mount("/", routes![auth_basic])
+            .manage(authenticator)
     }
 
     #[get("/")]
@@ -503,9 +504,9 @@ pub mod tests {
     /// Ignite a Rocket with a Bearer authenticator
     pub fn ignite_bearer(authenticator: Box<Authenticator<Bearer>>) -> Rocket {
         // Ignite rocket
-        rocket::ignite().mount("/", routes![auth_bearer]).manage(
-            authenticator,
-        )
+        rocket::ignite()
+            .mount("/", routes![auth_bearer])
+            .manage(authenticator)
     }
 
     #[get("/")]
@@ -526,9 +527,9 @@ pub mod tests {
     /// Ignite a Rocket with a String authenticator
     pub fn ignite_string(authenticator: Box<Authenticator<String>>) -> Rocket {
         // Ignite rocket
-        rocket::ignite().mount("/", routes![auth_string]).manage(
-            authenticator,
-        )
+        rocket::ignite()
+            .mount("/", routes![auth_string])
+            .manage(authenticator)
     }
 
     #[get("/")]
@@ -564,7 +565,9 @@ pub mod tests {
     #[test]
     #[allow(deprecated)]
     fn parses_bearer_auth_correctly() {
-        let auth = header::Authorization(Bearer { token: "token".to_string() });
+        let auth = header::Authorization(Bearer {
+            token: "token".to_string(),
+        });
         let header = HeaderFormatter(&auth).to_string();
         let parsed_header = not_err!(::auth::Authorization::new(&header));
         let ::auth::Authorization(header::Authorization(Bearer { token })) = parsed_header;
@@ -608,7 +611,9 @@ pub mod tests {
         let client = not_err!(Client::new(rocket));
 
         // Make headers
-        let auth_header = hyper::header::Authorization(Bearer { token: "这样可以挡住他们。".to_string() });
+        let auth_header = hyper::header::Authorization(Bearer {
+            token: "这样可以挡住他们。".to_string(),
+        });
         let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);
@@ -664,7 +669,9 @@ pub mod tests {
         let client = not_err!(Client::new(rocket));
 
         // Make headers
-        let auth_header = hyper::header::Authorization(Bearer { token: "bad".to_string() });
+        let auth_header = hyper::header::Authorization(Bearer {
+            token: "bad".to_string(),
+        });
         let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);

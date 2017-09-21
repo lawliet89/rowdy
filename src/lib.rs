@@ -162,59 +162,17 @@
 //!
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
-
 // See https://github.com/rust-unofficial/patterns/blob/master/anti_patterns/deny-warnings.md
-#![allow(
-    legacy_directory_ownership,
-    missing_copy_implementations,
-    missing_debug_implementations,
-    unknown_lints,
-    unsafe_code,
-)]
-#![deny(
-    const_err,
-    dead_code,
-    deprecated,
-    exceeding_bitshifts,
-    fat_ptr_transmutes,
-    improper_ctypes,
-    missing_docs,
-    mutable_transmutes,
-    no_mangle_const_items,
-    non_camel_case_types,
-    non_shorthand_field_patterns,
-    non_upper_case_globals,
-    overflowing_literals,
-    path_statements,
-    plugin_as_library,
-    private_no_mangle_fns,
-    private_no_mangle_statics,
-    stable_features,
-    trivial_casts,
-    trivial_numeric_casts,
-    unconditional_recursion,
-    unknown_crate_types,
-    unreachable_code,
-    unused_allocation,
-    unused_assignments,
-    unused_attributes,
-    unused_comparisons,
-    unused_extern_crates,
-    unused_features,
-    unused_imports,
-    unused_import_braces,
-    unused_qualifications,
-    unused_must_use,
-    unused_mut,
-    unused_parens,
-    unused_results,
-    unused_unsafe,
-    unused_variables,
-    variant_size_differences,
-    warnings,
-    while_true,
-)]
-
+#![allow(legacy_directory_ownership, missing_copy_implementations, missing_debug_implementations, unknown_lints,
+        unsafe_code)]
+#![deny(const_err, dead_code, deprecated, exceeding_bitshifts, fat_ptr_transmutes, improper_ctypes, missing_docs,
+       mutable_transmutes, no_mangle_const_items, non_camel_case_types, non_shorthand_field_patterns,
+       non_upper_case_globals, overflowing_literals, path_statements, plugin_as_library, private_no_mangle_fns,
+       private_no_mangle_statics, stable_features, trivial_casts, trivial_numeric_casts, unconditional_recursion,
+       unknown_crate_types, unreachable_code, unused_allocation, unused_assignments, unused_attributes,
+       unused_comparisons, unused_extern_crates, unused_features, unused_imports, unused_import_braces,
+       unused_qualifications, unused_must_use, unused_mut, unused_parens, unused_results, unused_unsafe,
+       unused_variables, variant_size_differences, warnings, while_true)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
 extern crate biscuit as jwt;
@@ -223,7 +181,8 @@ extern crate hyper;
 #[macro_use]
 extern crate log;
 #[macro_use]
-extern crate rocket; // we are using the "log_!" macros which are redefined from `log`'s
+extern crate rocket;
+// we are using the "log_!" macros which are redefined from `log`'s
 extern crate rocket_cors as cors;
 extern crate serde;
 #[macro_use]
@@ -235,10 +194,10 @@ extern crate uuid;
 extern crate argon2rs;
 #[cfg(feature = "simple_authenticator")]
 extern crate csv;
-#[cfg(feature = "simple_authenticator")]
-extern crate ring;
 #[cfg(feature = "ldap_authenticator")]
 extern crate ldap3;
+#[cfg(feature = "simple_authenticator")]
+extern crate ring;
 #[cfg(feature = "ldap_authenticator")]
 extern crate strfmt;
 
@@ -265,8 +224,8 @@ use std::str::FromStr;
 
 use rocket::Request;
 use rocket::http::Status;
-use rocket::response::{Response, Responder};
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use rocket::response::{Responder, Response};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de;
 
 pub use serde_json::Value as JsonValue;
@@ -306,8 +265,7 @@ impl error::Error for Error {
             Error::CORS(ref e) => e.description(),
             Error::Token(ref e) => e.description(),
             Error::IOError(ref e) => e.description(),
-            Error::GenericError(ref e) |
-            Error::BadRequest(ref e) => e,
+            Error::GenericError(ref e) | Error::BadRequest(ref e) => e,
         }
     }
 
@@ -317,9 +275,7 @@ impl error::Error for Error {
             Error::CORS(ref e) => Some(e),
             Error::Token(ref e) => Some(e),
             Error::IOError(ref e) => Some(e),
-            Error::UnsupportedOperation |
-            Error::GenericError(_) |
-            Error::BadRequest(_) => Some(self),
+            Error::UnsupportedOperation | Error::GenericError(_) | Error::BadRequest(_) => Some(self),
         }
     }
 }
@@ -401,18 +357,16 @@ impl<'de> Deserialize<'de> for Url {
             where
                 E: de::Error,
             {
-                Ok(Url(hyper::Url::from_str(&value).map_err(
-                    |e| E::custom(e.to_string()),
-                )?))
+                Ok(Url(hyper::Url::from_str(&value)
+                    .map_err(|e| E::custom(e.to_string()))?))
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
-                Ok(Url(hyper::Url::from_str(value).map_err(
-                    |e| E::custom(e.to_string()),
-                )?))
+                Ok(Url(hyper::Url::from_str(value)
+                    .map_err(|e| E::custom(e.to_string()))?))
             }
         }
 
@@ -552,7 +506,7 @@ pub fn launch<B: auth::AuthenticatorConfiguration<auth::Basic>>(
 mod tests {
     use std::str::FromStr;
 
-    use serde_test::{Token, assert_tokens};
+    use serde_test::{assert_tokens, Token};
 
     use super::*;
 
@@ -578,7 +532,9 @@ mod tests {
 
     #[test]
     fn url_serialization_token_round_trip() {
-        let test = TestUrl { url: not_err!(Url::from_str("https://www.example.com/")) };
+        let test = TestUrl {
+            url: not_err!(Url::from_str("https://www.example.com/")),
+        };
 
         assert_tokens(
             &test,

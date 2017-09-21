@@ -4,10 +4,10 @@
 #![allow(unmounted_route)]
 
 use hyper;
-use rocket::{State, Route};
+use rocket::{Route, State};
 
 use auth;
-use token::{Token, PrivateClaim, Configuration, RefreshToken, Keys};
+use token::{Configuration, Keys, PrivateClaim, RefreshToken, Token};
 
 #[derive(FromForm, Default, Clone, Debug)]
 struct AuthParam {
@@ -25,8 +25,7 @@ impl AuthParam {
     ) -> Result<(), ::Error> {
         if authorization.is_bearer() && self.offline_token.is_some() {
             Err(::Error::BadRequest(
-                "Offline token cannot be requested for when authenticating with a refresh token"
-                    .to_string(),
+                "Offline token cannot be requested for when authenticating with a refresh token".to_string(),
             ))?
         }
         Ok(())
@@ -42,7 +41,6 @@ fn token_getter(
     keys: State<Keys>,
     authenticator: State<Box<auth::BasicAuthenticator>>,
 ) -> Result<Token<PrivateClaim>, ::Error> {
-
     auth_param.verify(&authorization)?;
     authenticator
         .prepare_authentication_response(&authorization, auth_param.offline_token.unwrap_or(false))
@@ -58,9 +56,9 @@ fn token_getter(
             let token = token.encode(signing_key)?;
 
             let token = if configuration.refresh_token_enabled() && token.has_refresh_token() {
-                let refresh_token_key = keys.encryption.as_ref().expect(
-                    "Refresh token was enabled but encryption key is missing",
-                );
+                let refresh_token_key = keys.encryption
+                    .as_ref()
+                    .expect("Refresh token was enabled but encryption key is missing");
                 token.encrypt_refresh_token(signing_key, refresh_token_key)?
             } else {
                 token
@@ -79,7 +77,6 @@ fn refresh_token(
     keys: State<Keys>,
     authenticator: State<Box<auth::BasicAuthenticator>>,
 ) -> Result<Token<PrivateClaim>, ::Error> {
-
     if !configuration.refresh_token_enabled() {
         return Err(::Error::BadRequest(
             "Refresh token is not enabled".to_string(),
@@ -91,21 +88,15 @@ fn refresh_token(
     let refresh_token = RefreshToken::new_encrypted(&authorization.token());
     let refresh_token = refresh_token.decrypt(
         &keys.signature_verification,
-        keys.decryption.as_ref().expect(
-            "Refresh token was enabled but decryption key is missing",
-        ),
-        configuration
-            .signature_algorithm
-            .unwrap_or_default(),
+        keys.decryption
+            .as_ref()
+            .expect("Refresh token was enabled but decryption key is missing"),
+        configuration.signature_algorithm.unwrap_or_default(),
         refresh_token_configuration.cek_algorithm,
         refresh_token_configuration.enc_algorithm,
     )?;
 
-    refresh_token.validate(
-        &auth_param.service,
-        &configuration,
-        None,
-    )?;
+    refresh_token.validate(&auth_param.service, &configuration, None)?;
 
     authenticator
         .prepare_refresh_response(refresh_token.payload()?)
@@ -137,12 +128,7 @@ fn ping() -> &'static str {
 
 /// Return routes provided by rowdy
 pub fn routes() -> Vec<Route> {
-    routes![
-        token_getter,
-        refresh_token,
-        bad_request,
-        ping,
-    ]
+    routes![token_getter, refresh_token, bad_request, ping,]
 }
 
 #[cfg(test)]
@@ -159,7 +145,7 @@ mod tests {
 
     use ByteSequence;
     use super::*;
-    use token::{Secret, RefreshTokenConfiguration};
+    use token::{RefreshTokenConfiguration, Secret};
 
     fn ignite() -> Rocket {
         // Ignite rocket
@@ -283,7 +269,7 @@ mod tests {
         assert_eq!(
             Some(jwt::SingleOrMultiple::Single(
                 FromStr::from_str("https://www.example.com").unwrap(),
-            )),
+            ),),
             registered.audience
         );
 
@@ -418,9 +404,7 @@ mod tests {
         );
         // Make and dispatch request
         let req = client
-            .get(
-                "/?service=https://www.example.com&scope=all&offline_token=true",
-            )
+            .get("/?service=https://www.example.com&scope=all&offline_token=true")
             .header(origin_header)
             .header(auth_header);
         let mut response = req.dispatch();
@@ -446,7 +430,9 @@ mod tests {
         let origin_header = Header::from(not_err!(
             hyper::header::Origin::from_str("https://www.example.com")
         ));
-        let auth_header = hyper::header::Authorization(auth::Bearer { token: refresh_token.to_string().unwrap() });
+        let auth_header = hyper::header::Authorization(auth::Bearer {
+            token: refresh_token.to_string().unwrap(),
+        });
         let auth_header = Header::new(
             "Authorization",
             hyper::header::HeaderFormatter(&auth_header).to_string(),
@@ -482,7 +468,7 @@ mod tests {
         assert_eq!(
             Some(jwt::SingleOrMultiple::Single(
                 FromStr::from_str("https://www.example.com").unwrap(),
-            )),
+            ),),
             registered.audience
         );
 
@@ -505,16 +491,16 @@ mod tests {
         let origin_header = Header::from(not_err!(
             hyper::header::Origin::from_str("https://www.example.com")
         ));
-        let auth_header = hyper::header::Authorization(auth::Bearer { token: "foobar".to_string() });
+        let auth_header = hyper::header::Authorization(auth::Bearer {
+            token: "foobar".to_string(),
+        });
         let auth_header = Header::new(
             "Authorization",
             hyper::header::HeaderFormatter(&auth_header).to_string(),
         );
         // Make and dispatch request
         let req = client
-            .get(
-                "/?service=https://www.example.com&scope=all&offline_token=true",
-            )
+            .get("/?service=https://www.example.com&scope=all&offline_token=true")
             .header(origin_header)
             .header(auth_header);
         let response = req.dispatch();

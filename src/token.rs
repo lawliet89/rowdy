@@ -15,10 +15,10 @@ use std::time::Duration;
 
 use cors;
 use chrono::{self, DateTime, Utc};
-use jwt::{self, jws, jwa, jwk};
+use jwt::{self, jwa, jwk, jws};
 use rocket::Request;
-use rocket::http::{ContentType, Status, Method};
-use rocket::response::{Response, Responder};
+use rocket::http::{ContentType, Method, Status};
+use rocket::response::{Responder, Response};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -128,11 +128,9 @@ impl<'r> Responder<'r> for Error {
                 use jwt::errors::Error::*;
 
                 let status = match *e {
-                    ValidationError(_) |
-                    JsonError(_) |
-                    DecodeBase64(_) |
-                    Utf8(_) |
-                    UnspecifiedCryptographicError => Status::Unauthorized,
+                    ValidationError(_) | JsonError(_) | DecodeBase64(_) | Utf8(_) | UnspecifiedCryptographicError => {
+                        Status::Unauthorized
+                    }
                     _ => Status::InternalServerError,
                 };
                 Err(status)
@@ -147,12 +145,11 @@ fn make_uuid() -> Result<Uuid, Error> {
     use jwt::jwa::SecureRandom;
 
     let mut bytes = vec![0; 16];
-    jwa::rng().fill(&mut bytes).map_err(
-        |_| "Unable to generate UUID",
-    )?;
-    Ok(Uuid::from_bytes(&bytes).map_err(
-        |e| e.description().to_string(),
-    )?)
+    jwa::rng()
+        .fill(&mut bytes)
+        .map_err(|_| "Unable to generate UUID")?;
+    Ok(Uuid::from_bytes(&bytes)
+        .map_err(|e| e.description().to_string())?)
 }
 
 fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Header<jwt::Empty> {
@@ -170,9 +167,7 @@ fn make_registered_claims(
     issuer: &jwt::StringOrUri,
     audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
 ) -> Result<jwt::RegisteredClaims, ::Error> {
-    let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(
-        |e| e.to_string(),
-    )?;
+    let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| e.to_string())?;
 
     Ok(jwt::RegisteredClaims {
         issuer: Some(issuer.clone()),
@@ -453,7 +448,6 @@ impl RefreshToken {
         enc_algorithm: jwa::ContentEncryptionAlgorithm,
         now: DateTime<Utc>,
     ) -> Result<Self, ::Error> {
-
         // First, make a token
         let token = make_token(
             subject,
@@ -575,12 +569,16 @@ impl RefreshToken {
         });
 
         let claims_set = self.claims_set()?;
-        let issuer = claims_set.registered.issuer.as_ref().ok_or_else(
-            || Error::InvalidIssuer,
-        )?;
-        let audience = claims_set.registered.audience.as_ref().ok_or_else(|| {
-            Error::InvalidAudience
-        })?;
+        let issuer = claims_set
+            .registered
+            .issuer
+            .as_ref()
+            .ok_or_else(|| Error::InvalidIssuer)?;
+        let audience = claims_set
+            .registered
+            .audience
+            .as_ref()
+            .ok_or_else(|| Error::InvalidAudience)?;
 
         verify_service(config, service)
             .and_then(|_| if audience.contains(&FromStr::from_str(service)?) {
@@ -591,9 +589,10 @@ impl RefreshToken {
             .and_then(|_| verify_audience(config, audience))
             .and_then(|_| verify_issuer(config, issuer))
             .and_then(|_| {
-                claims_set.registered.validate_times(options).map_err(|e| {
-                    Error::JWTError(jwt::errors::Error::ValidationError(e))
-                })
+                claims_set
+                    .registered
+                    .validate_times(options)
+                    .map_err(|e| Error::JWTError(jwt::errors::Error::ValidationError(e)))
             })
     }
 
@@ -661,7 +660,6 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         refresh_token_payload: Option<&JsonValue>,
         now: DateTime<Utc>,
     ) -> Result<Self, ::Error> {
-
         verify_service(config, service)?;
 
         let access_token = make_token(
@@ -675,24 +673,20 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         )?;
         let refresh_token = match config.refresh_token {
             None => None,
-            Some(ref refresh_token_config) => {
-                match refresh_token_payload {
-                    Some(payload) => {
-                        Some(RefreshToken::new_decrypted(
-                            subject,
-                            &config.issuer,
-                            &config.audience,
-                            refresh_token_config.expiry_duration,
-                            payload,
-                            config.signature_algorithm,
-                            refresh_token_config.cek_algorithm,
-                            refresh_token_config.enc_algorithm,
-                            now,
-                        )?)
-                    }
-                    None => None,
-                }
-            }
+            Some(ref refresh_token_config) => match refresh_token_payload {
+                Some(payload) => Some(RefreshToken::new_decrypted(
+                    subject,
+                    &config.issuer,
+                    &config.audience,
+                    refresh_token_config.expiry_duration,
+                    payload,
+                    config.signature_algorithm,
+                    refresh_token_config.cek_algorithm,
+                    refresh_token_config.enc_algorithm,
+                    now,
+                )?),
+                None => None,
+            },
         };
 
         // Safe to unwrap
@@ -787,14 +781,12 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     pub fn registered_claims(&self) -> Result<&jwt::RegisteredClaims, ::Error> {
         match self.token {
             jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
-            ref jwt @ jwt::jws::Compact::Decoded { .. } => {
-                Ok(match_extract!(*jwt,
+            ref jwt @ jwt::jws::Compact::Decoded { .. } => Ok(match_extract!(*jwt,
                                  jwt::jws::Compact::Decoded {
                                      payload: jwt::ClaimsSet { ref registered, .. },
                                      ..
                                  },
-                                 registered)?)
-            }
+                                 registered)?),
         }
     }
 
@@ -802,14 +794,12 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     pub fn private_claims(&self) -> Result<&T, ::Error> {
         match self.token {
             jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
-            ref jwt @ jwt::jws::Compact::Decoded { .. } => {
-                Ok(match_extract!(*jwt,
+            ref jwt @ jwt::jws::Compact::Decoded { .. } => Ok(match_extract!(*jwt,
                                  jwt::jws::Compact::Decoded {
                                      payload: jwt::ClaimsSet { ref private, .. },
                                      ..
                                  },
-                                 private)?)
-            }
+                                 private)?),
         }
     }
 
@@ -817,14 +807,12 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     pub fn header(&self) -> Result<&jwt::jws::Header<jwt::Empty>, ::Error> {
         match self.token {
             jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
-            ref jwt @ jwt::jws::Compact::Decoded { .. } => {
-                Ok(match_extract!(*jwt,
+            ref jwt @ jwt::jws::Compact::Decoded { .. } => Ok(match_extract!(*jwt,
                                  jwt::jws::Compact::Decoded {
                                      ref header,
                                      ..
                                  },
-                                 header)?)
-            }
+                                 header)?),
         }
     }
 
@@ -856,13 +844,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         enc_algorithm: jwa::ContentEncryptionAlgorithm,
     ) -> Result<Self, Error> {
         let refresh_token = self.refresh_token.ok_or_else(|| Error::NoRefreshToken)?;
-        let refresh_token = refresh_token.decrypt(
-            secret,
-            key,
-            signing_algorithm,
-            cek_algorithm,
-            enc_algorithm,
-        )?;
+        let refresh_token = refresh_token.decrypt(secret, key, signing_algorithm, cek_algorithm, enc_algorithm)?;
         self.refresh_token = Some(refresh_token);
         Ok(self)
     }
@@ -995,7 +977,9 @@ impl Secret {
             Secret::None => Ok(jws::Secret::None),
             Secret::ByteSequence(ref bytes) => Ok(jws::Secret::Bytes(bytes.as_bytes())),
             Secret::Bytes { ref path } => Ok(jws::Secret::Bytes(Self::read_file_to_bytes(path)?)),
-            Secret::RSAKeyPair { ref rsa_private, .. } => Ok(jws::Secret::rsa_keypair_from_file(rsa_private)?),
+            Secret::RSAKeyPair {
+                ref rsa_private, ..
+            } => Ok(jws::Secret::rsa_keypair_from_file(rsa_private)?),
         }
     }
 
@@ -1019,12 +1003,10 @@ impl Secret {
                 &bytes.as_bytes(),
                 Default::default(),
             )),
-            Secret::Bytes { ref path } => {
-                Ok(jwk::JWK::new_octect_key(
-                    &Self::read_file_to_bytes(path)?,
-                    Default::default(),
-                ))
-            }
+            Secret::Bytes { ref path } => Ok(jwk::JWK::new_octect_key(
+                &Self::read_file_to_bytes(path)?,
+                Default::default(),
+            )),
             Secret::RSAKeyPair { .. } => Err(Error::GenericError("Not supported yet".to_string())),
         }
     }
@@ -1065,7 +1047,7 @@ mod tests {
     use chrono::{DateTime, NaiveDateTime, Utc};
     use serde_json;
 
-    use {JsonValue, JsonMap};
+    use {JsonMap, JsonValue};
     use jwt;
     use super::*;
 
@@ -1089,7 +1071,7 @@ mod tests {
             Some(RefreshTokenConfiguration {
                 cek_algorithm: jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
                 enc_algorithm: jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
-                key: Secret::ByteSequence(ByteSequence::Bytes(vec![0; 256/8])),
+                key: Secret::ByteSequence(ByteSequence::Bytes(vec![0; 256 / 8])),
                 expiry_duration: Duration::from_secs(86400),
             })
         } else {
@@ -1162,10 +1144,13 @@ mod tests {
         let encrypted_refresh_token = not_err!(refresh_token.clone().encrypt(&signing_secret, &key));
         assert!(encrypted_refresh_token.encrypted());
 
-        let decrypted_refresh_token = not_err!(encrypted_refresh_token.decrypt(&signing_secret, &key,
-                                                                               Default::default(),
-                                                         jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                                                         jwt::jwa::ContentEncryptionAlgorithm::A256GCM));
+        let decrypted_refresh_token = not_err!(encrypted_refresh_token.decrypt(
+            &signing_secret,
+            &key,
+            Default::default(),
+            jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+            jwt::jwa::ContentEncryptionAlgorithm::A256GCM
+        ));
         assert!(decrypted_refresh_token.decrypted());
 
         let actual_refresh_token_payload: &JsonValue = decrypted_refresh_token.payload().unwrap();
@@ -1189,9 +1174,13 @@ mod tests {
         assert_eq!(deserialized, token);
 
         let token = not_err!(token.decode(&signing_secret, Default::default()));
-        let token = not_err!(token.decrypt_refresh_token(&signing_secret, &key, Default::default(),
-                                                         jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
-                                                         jwt::jwa::ContentEncryptionAlgorithm::A256GCM));
+        let token = not_err!(token.decrypt_refresh_token(
+            &signing_secret,
+            &key,
+            Default::default(),
+            jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
+            jwt::jwa::ContentEncryptionAlgorithm::A256GCM
+        ));
 
         let private = not_err!(token.private_claims());
         assert_eq!(*private, Default::default());
@@ -1256,26 +1245,38 @@ mod tests {
     #[test]
     fn token_serialization_smoke_test() {
         let expected_token = make_token(false);
-        let token = not_err!(expected_token.clone().encode(&jwt::jws::Secret::bytes_from_str("secret")));
+        let token = not_err!(
+            expected_token
+                .clone()
+                .encode(&jwt::jws::Secret::bytes_from_str("secret"))
+        );
         let serialized = not_err!(token.serialize());
 
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&serialized));
-        let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
-                                                        Default::default()));
+        let actual_token = not_err!(deserialized.decode(
+            &jwt::jws::Secret::bytes_from_str("secret"),
+            Default::default()
+        ));
         assert_eq!(expected_token, actual_token);
     }
 
     #[test]
     fn token_response_smoke_test() {
         let expected_token = make_token(false);
-        let token = not_err!(expected_token.clone().encode(&jwt::jws::Secret::bytes_from_str("secret")));
+        let token = not_err!(
+            expected_token
+                .clone()
+                .encode(&jwt::jws::Secret::bytes_from_str("secret"))
+        );
         let mut response = not_err!(token.respond());
 
         assert_eq!(response.status(), Status::Ok);
         let body_str = not_none!(response.body().and_then(|body| body.into_string()));
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&body_str));
-        let actual_token = not_err!(deserialized.decode(&jwt::jws::Secret::bytes_from_str("secret"),
-                                                        Default::default()));
+        let actual_token = not_err!(deserialized.decode(
+            &jwt::jws::Secret::bytes_from_str("secret"),
+            Default::default()
+        ));
         assert_eq!(expected_token, actual_token);
     }
 
@@ -1300,13 +1301,19 @@ mod tests {
         assert_matches_non_debug!(not_err!(none.for_verification()), jwt::jws::Secret::None);
 
         let string = Secret::ByteSequence(ByteSequence::String("secret".to_string()));
-        assert_matches_non_debug!(not_err!(string.for_verification()), jwt::jws::Secret::Bytes(_));
+        assert_matches_non_debug!(
+            not_err!(string.for_verification()),
+            jwt::jws::Secret::Bytes(_)
+        );
 
         let rsa = Secret::RSAKeyPair {
             rsa_private: "test/fixtures/rsa_private_key.der".to_string(),
             rsa_public: "test/fixtures/rsa_public_key.der".to_string(),
         };
-        assert_matches_non_debug!(not_err!(rsa.for_verification()), jwt::jws::Secret::PublicKey(_));
+        assert_matches_non_debug!(
+            not_err!(rsa.for_verification()),
+            jwt::jws::Secret::PublicKey(_)
+        );
     }
 
     #[test]
@@ -1319,20 +1326,32 @@ mod tests {
 
         let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
-        let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
-                                                                              "Donald Trump",
-                                                                              "https://www.example.com/",
-                                                                              Default::default(),
-                                                                              Some(&refresh_token_payload),
-                                                                              now));
+        let token = not_err!(Token::<TestClaims>::with_configuration_and_time(
+            &configuration,
+            "Donald Trump",
+            "https://www.example.com/",
+            Default::default(),
+            Some(&refresh_token_payload),
+            now
+        ));
 
         // Assert registered claims
         let registered = not_err!(token.registered_claims());
 
-        assert_eq!(registered.issuer, Some(FromStr::from_str("https://www.acme.com").unwrap()));
-        assert_eq!(registered.subject, Some(FromStr::from_str("Donald Trump").unwrap()));
-        assert_eq!(registered.audience,
-                   Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())));
+        assert_eq!(
+            registered.issuer,
+            Some(FromStr::from_str("https://www.acme.com").unwrap())
+        );
+        assert_eq!(
+            registered.subject,
+            Some(FromStr::from_str("Donald Trump").unwrap())
+        );
+        assert_eq!(
+            registered.audience,
+            Some(jwt::SingleOrMultiple::Single(
+                FromStr::from_str("https://www.example.com").unwrap()
+            ))
+        );
         assert_eq!(registered.issued_at, Some(now.into()));
         assert_eq!(registered.not_before, Some(now.into()));
         assert_eq!(registered.expiry, Some(expected_expiry.into()));
@@ -1343,7 +1362,10 @@ mod tests {
 
         // Assert header
         let header = not_err!(token.header());
-        assert_eq!(header.registered.algorithm, jwt::jwa::SignatureAlgorithm::HS512);
+        assert_eq!(
+            header.registered.algorithm,
+            jwt::jwa::SignatureAlgorithm::HS512
+        );
 
         // Assert refresh token
         assert!(token.refresh_token().is_none());
@@ -1355,20 +1377,32 @@ mod tests {
 
         let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
-        let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
-                                                                              "Donald Trump",
-                                                                              "https://www.example.com/",
-                                                                              Default::default(),
-                                                                              None,
-                                                                              now));
+        let token = not_err!(Token::<TestClaims>::with_configuration_and_time(
+            &configuration,
+            "Donald Trump",
+            "https://www.example.com/",
+            Default::default(),
+            None,
+            now
+        ));
 
         // Assert registered claims
         let registered = not_err!(token.registered_claims());
 
-        assert_eq!(registered.issuer, Some(FromStr::from_str("https://www.acme.com").unwrap()));
-        assert_eq!(registered.subject, Some(FromStr::from_str("Donald Trump").unwrap()));
-        assert_eq!(registered.audience,
-                   Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())));
+        assert_eq!(
+            registered.issuer,
+            Some(FromStr::from_str("https://www.acme.com").unwrap())
+        );
+        assert_eq!(
+            registered.subject,
+            Some(FromStr::from_str("Donald Trump").unwrap())
+        );
+        assert_eq!(
+            registered.audience,
+            Some(jwt::SingleOrMultiple::Single(
+                FromStr::from_str("https://www.example.com").unwrap()
+            ))
+        );
         assert_eq!(registered.issued_at, Some(now.into()));
         assert_eq!(registered.not_before, Some(now.into()));
         assert_eq!(registered.expiry, Some(expected_expiry.into()));
@@ -1379,7 +1413,10 @@ mod tests {
 
         // Assert header
         let header = not_err!(token.header());
-        assert_eq!(header.registered.algorithm, jwt::jwa::SignatureAlgorithm::HS512);
+        assert_eq!(
+            header.registered.algorithm,
+            jwt::jwa::SignatureAlgorithm::HS512
+        );
 
         // Assert refresh token
         assert!(token.refresh_token().is_none());
@@ -1395,20 +1432,32 @@ mod tests {
 
         let now = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
         let expected_expiry = now + chrono::Duration::from_std(Duration::from_secs(120)).unwrap();
-        let token = not_err!(Token::<TestClaims>::with_configuration_and_time(&configuration,
-                                                                              "Donald Trump",
-                                                                              "https://www.example.com/",
-                                                                              Default::default(),
-                                                                              Some(&refresh_token_payload),
-                                                                              now));
+        let token = not_err!(Token::<TestClaims>::with_configuration_and_time(
+            &configuration,
+            "Donald Trump",
+            "https://www.example.com/",
+            Default::default(),
+            Some(&refresh_token_payload),
+            now
+        ));
 
         // Assert registered claims
         let registered = not_err!(token.registered_claims());
 
-        assert_eq!(registered.issuer, Some(FromStr::from_str("https://www.acme.com").unwrap()));
-        assert_eq!(registered.subject, Some(FromStr::from_str("Donald Trump").unwrap()));
-        assert_eq!(registered.audience,
-                   Some(jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com").unwrap())));
+        assert_eq!(
+            registered.issuer,
+            Some(FromStr::from_str("https://www.acme.com").unwrap())
+        );
+        assert_eq!(
+            registered.subject,
+            Some(FromStr::from_str("Donald Trump").unwrap())
+        );
+        assert_eq!(
+            registered.audience,
+            Some(jwt::SingleOrMultiple::Single(
+                FromStr::from_str("https://www.example.com").unwrap()
+            ))
+        );
         assert_eq!(registered.issued_at, Some(now.into()));
         assert_eq!(registered.not_before, Some(now.into()));
         assert_eq!(registered.expiry, Some(expected_expiry.into()));
@@ -1419,7 +1468,10 @@ mod tests {
 
         // Assert header
         let header = not_err!(token.header());
-        assert_eq!(header.registered.algorithm, jwt::jwa::SignatureAlgorithm::HS512);
+        assert_eq!(
+            header.registered.algorithm,
+            jwt::jwa::SignatureAlgorithm::HS512
+        );
 
         // Assert refresh token
         let refresh_token = token.refresh_token().unwrap();
@@ -1447,7 +1499,11 @@ mod tests {
     fn refresh_token_validates_correctly() {
         let configuration = make_config(true);
         let refresh_token = make_refresh_token();
-        not_err!(refresh_token.validate("https://www.example.com/", &configuration, None));
+        not_err!(refresh_token.validate(
+            "https://www.example.com/",
+            &configuration,
+            None
+        ));
     }
 
     /// Token does not have an issuer field
@@ -1525,11 +1581,10 @@ mod tests {
         {
             let jws = jwe.payload_mut().unwrap();
             let claims_set = jws.payload_mut().unwrap();
-            claims_set.registered.audience = Some(jwt::SingleOrMultiple::Multiple(
-                vec![FromStr::from_str("https://www.invalid.com/").unwrap(),
-                                                          FromStr::from_str("https://www.example.com/").unwrap(),
-                                                         ],
-            ));
+            claims_set.registered.audience = Some(jwt::SingleOrMultiple::Multiple(vec![
+                FromStr::from_str("https://www.invalid.com/").unwrap(),
+                FromStr::from_str("https://www.example.com/").unwrap(),
+            ]));
         }
         let refresh_token = RefreshToken(jwe);
 
