@@ -1,6 +1,6 @@
 [package]
 name = "rowdy"
-version = "0.0.6"
+version = "0.0.7"
 license = "Apache-2.0"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 build = "build.rs"
@@ -28,16 +28,14 @@ default = ["simple_authenticator"]
 simple_authenticator = ["argon2rs", "csv", "ring"]
 # LDAP based authenticator
 ldap_authenticator = ["ldap3", "strfmt"]
-# MySql database based authenticator
-mysql_authenticator = ["argon2rs", "diesel", "diesel_codegen", "ring"]
 
 [dependencies]
 biscuit = "0.0.7"
 chrono = { version = "0.4", features = ["serde"] }
 hyper = "0.10"
 log = "0.3"
-rocket = "0.3.0"
-rocket_codegen = "0.3.0"
+rocket = "0.3.2"
+rocket_codegen = "0.3.2"
 rocket_cors = "0.2.0"
 serde = "1.0"
 serde_derive = "1.0"
@@ -48,11 +46,8 @@ uuid = { version = "0.4", features = ["use_std", "serde"] }
 argon2rs = { version = "0.2.5", optional = true }
 csv = { version = "1.0.0-beta.3", optional = true }
 ldap3 = { version = "0.5", optional = true }
-ring = { version = "0.11", optional = true } # rust-jwt has this as its dependency
+ring = { version = "0.11", optional = true }
 strfmt = { version = "0.1.5", optional = true }
-mysql = { version = "12.0.1", optional = true }
-diesel = { version = "0.15.2", features = ["mysql"], optional = true }
-diesel_codegen = { version = "0.15.0", features = ["mysql"], optional = true }
 
 [dev-dependencies]
 serde_test = "1.0"
@@ -62,7 +57,7 @@ ansi_term = "0.9"
 version_check = "0.1"
 
 [workspace]
-members = ["cli"]
+members = ["cli", "diesel"]
 
 [package.metadata.docs.rs]
 all-features = true

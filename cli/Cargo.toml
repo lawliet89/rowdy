@@ -1,6 +1,6 @@
 [package]
 name = "rowdy-cli"
-version = "0.0.6"
+version = "0.0.7"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 
 [[bin]]
@@ -12,9 +12,10 @@ doc = false
 [dependencies]
 docopt = "0.8"
 log = "0.3"
-rocket = "0.3.0"
-rocket_codegen = "0.3.0"
-rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator", "mysql_authenticator"] }
+rocket = "0.3.2"
+rocket_codegen = "0.3.2"
+rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
+rowdy-diesel = { path = "../diesel/"}
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"

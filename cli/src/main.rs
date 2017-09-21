@@ -7,6 +7,7 @@ extern crate log;
 #[macro_use]
 extern crate rocket;
 extern crate rowdy;
+extern crate rowdy_diesel;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -61,7 +62,9 @@ struct Args {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE).and_then(|d| d.deserialize()).unwrap_or_else(|e| e.exit());
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.deserialize())
+        .unwrap_or_else(|e| e.exit());
 
     let rocket = if args.cmd_noop {
         ignite::<auth::NoOpConfiguration>(&args.arg_configuration_json)
@@ -70,7 +73,7 @@ fn main() {
     } else if args.cmd_ldap {
         ignite::<auth::LdapAuthenticator>(&args.arg_configuration_json)
     } else if args.cmd_mysql {
-        ignite::<auth::MySqlAuthenticatorConfiguration>(&args.arg_configuration_json)
+        ignite::<rowdy_diesel::mysql::Configuration>(&args.arg_configuration_json)
     } else {
         unreachable!("Should never happen");
     };
@@ -81,14 +84,16 @@ fn main() {
 
 /// Read configuration files, and ignite a `Rocket`
 fn ignite<B>(path: &str) -> Result<Rocket, rowdy::Error>
-    where B: auth::AuthenticatorConfiguration<auth::Basic>
+where
+    B: auth::AuthenticatorConfiguration<auth::Basic>,
 {
     let config = read_config::<B>(path)?;
     config.ignite()
 }
 
 fn read_config<B>(path: &str) -> Result<rowdy::Configuration<B>, String>
-    where B: auth::AuthenticatorConfiguration<auth::Basic>
+where
+    B: auth::AuthenticatorConfiguration<auth::Basic>,
 {
     use std::fs::File;
     use std::io::Read;
@@ -96,13 +101,16 @@ fn read_config<B>(path: &str) -> Result<rowdy::Configuration<B>, String>
     info_!("Reading configuration from '{}'", path);
     let mut file = File::open(&path).map_err(|e| format!("{:?}", e))?;
     let mut config_json = String::new();
-    file.read_to_string(&mut config_json).map_err(|e| format!("{:?}", e))?;
+    file.read_to_string(&mut config_json).map_err(
+        |e| format!("{:?}", e),
+    )?;
 
     deserialize_json(&config_json)
 }
 
 pub fn deserialize_json<T>(json: &str) -> Result<T, String>
-    where T: serde::de::DeserializeOwned
+where
+    T: serde::de::DeserializeOwned,
 {
     serde_json::from_str(json).map_err(|e| format!("{:?}", e))
 }

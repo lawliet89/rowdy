@@ -1459,8 +1459,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         let mut jwe = refresh_token.unwrap();
         {
-            let mut jws = jwe.payload_mut().unwrap();
-            let mut claims_set = jws.payload_mut().unwrap();
+            let jws = jwe.payload_mut().unwrap();
+            let claims_set = jws.payload_mut().unwrap();
             claims_set.registered.issuer = None;
         }
         let refresh_token = RefreshToken(jwe);
@@ -1479,8 +1479,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         let mut jwe = refresh_token.unwrap();
         {
-            let mut jws = jwe.payload_mut().unwrap();
-            let mut claims_set = jws.payload_mut().unwrap();
+            let jws = jwe.payload_mut().unwrap();
+            let claims_set = jws.payload_mut().unwrap();
             claims_set.registered.audience = None;
         }
         let refresh_token = RefreshToken(jwe);
@@ -1523,8 +1523,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         let mut jwe = refresh_token.unwrap();
         {
-            let mut jws = jwe.payload_mut().unwrap();
-            let mut claims_set = jws.payload_mut().unwrap();
+            let jws = jwe.payload_mut().unwrap();
+            let claims_set = jws.payload_mut().unwrap();
             claims_set.registered.audience = Some(jwt::SingleOrMultiple::Multiple(
                 vec![FromStr::from_str("https://www.invalid.com/").unwrap(),
                                                           FromStr::from_str("https://www.example.com/").unwrap(),
@@ -1547,8 +1547,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         let mut jwe = refresh_token.unwrap();
         {
-            let mut jws = jwe.payload_mut().unwrap();
-            let mut claims_set = jws.payload_mut().unwrap();
+            let jws = jwe.payload_mut().unwrap();
+            let claims_set = jws.payload_mut().unwrap();
             claims_set.registered.issuer = Some(FromStr::from_str("https://www.invalid.com/").unwrap());
         }
         let refresh_token = RefreshToken(jwe);
@@ -1567,8 +1567,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         let mut jwe = refresh_token.unwrap();
         {
-            let mut jws = jwe.payload_mut().unwrap();
-            let mut claims_set = jws.payload_mut().unwrap();
+            let jws = jwe.payload_mut().unwrap();
+            let claims_set = jws.payload_mut().unwrap();
             claims_set.registered.issued_at = None;
         }
         let refresh_token = RefreshToken(jwe);
@@ -1587,8 +1587,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         let mut jwe = refresh_token.unwrap();
         {
-            let mut jws = jwe.payload_mut().unwrap();
-            let mut claims_set = jws.payload_mut().unwrap();
+            let jws = jwe.payload_mut().unwrap();
+            let claims_set = jws.payload_mut().unwrap();
             claims_set.registered.not_before = None;
         }
         let refresh_token = RefreshToken(jwe);
@@ -1607,8 +1607,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         let mut jwe = refresh_token.unwrap();
         {
-            let mut jws = jwe.payload_mut().unwrap();
-            let mut claims_set = jws.payload_mut().unwrap();
+            let jws = jwe.payload_mut().unwrap();
+            let claims_set = jws.payload_mut().unwrap();
             claims_set.registered.expiry = None;
         }
         let refresh_token = RefreshToken(jwe);

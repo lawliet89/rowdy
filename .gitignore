@@ -1,3 +1,4 @@
 target
 config
 docker-compose.override.yml
+*.rs.fmt

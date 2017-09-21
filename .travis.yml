@@ -1,8 +1,7 @@
 sudo: false
 language: rust
 rust:
-  - nightly-2017-07-21
-  - nightly
+  - nightly-2017-09-21
 matrix:
   allow_failures:
     - rust: nightly
@@ -18,14 +17,14 @@ before_script:
   - |
     pip install 'travis-cargo<0.2' --user &&
     export PATH=$HOME/.local/bin:$PATH
-  - mysql -uroot < test/fixtures/travis.sql
+  - mysql -uroot < diesel/test/fixtures/mysql.sql
 script:
   - |
     travis-cargo build -- --all-features --all --locked &&
     travis-cargo test -- --all-features --all &&
-    travis-cargo --only nightly-2017-07-21 doc -- --no-deps --all-features --all
+    travis-cargo --only nightly-2017-09-21 doc -- --no-deps --all-features --all
 after_success:
-  - travis-cargo --only nightly-2017-07-21 doc-upload
+  - travis-cargo --only nightly-2017-09-21 doc-upload
 env:
   global:
     - TRAVIS_CARGO_NIGHTLY_FEATURE=""

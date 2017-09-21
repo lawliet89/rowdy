@@ -2,15 +2,14 @@
 use std::io::{Read, Write};
 use std::collections::HashMap;
 
-use argon2rs;
 use csv;
-use jwt::jwa::{self, SecureRandom};
 // FIXME: Remove dependency on `ring`.
 use ring::test;
 use ring::constant_time::verify_slices_are_equal;
 
 use {Error, JsonValue, JsonMap};
 use super::{Basic, AuthenticationResult};
+use super::util::{generate_salt, hex_dump, hash_password_digest};
 
 // Code for conversion to hex stolen from rustc-serialize:
 // https://doc.rust-lang.org/rustc-serialize/src/rustc_serialize/hex.rs.html
@@ -34,8 +33,6 @@ pub type Users = HashMap<String, (Vec<u8>, Vec<u8>)>;
 pub struct SimpleAuthenticator {
     users: Users,
 }
-
-static CHARS: &'static [u8] = b"0123456789abcdef";
 
 impl SimpleAuthenticator {
     /// Create a new `SimpleAuthenticator` with the provided a CSV Reader.
@@ -99,9 +96,7 @@ impl SimpleAuthenticator {
     /// Hash a password with the salt. See struct level documentation for the algorithm used.
     // TODO: Write an "example" tool to salt easily
     pub fn hash_password(password: &str, salt: &[u8]) -> Result<String, Error> {
-        Ok(hex_dump(
-            Self::hash_password_digest(password, salt)?.as_ref(),
-        ))
+        Ok(hex_dump(hash_password_digest(password, salt).as_ref()))
     }
 
     /// Verify that some user with the provided password exists in the CSV database, and the password is correct.
@@ -115,7 +110,7 @@ impl SimpleAuthenticator {
         match self.users.get(username) {
             None => Err(Error::Auth(super::Error::AuthenticationFailure)),
             Some(&(ref hash, ref salt)) => {
-                let actual_password_digest = Self::hash_password_digest(password, salt)?;
+                let actual_password_digest = hash_password_digest(password, salt);
                 if !verify_slices_are_equal(actual_password_digest.as_ref(), &*hash).is_ok() {
                     Err(Error::Auth(super::Error::AuthenticationFailure))
                 } else {
@@ -136,14 +131,6 @@ impl SimpleAuthenticator {
                 }
             }
         }
-    }
-
-    fn hash_password_digest(password: &str, salt: &[u8]) -> Result<Vec<u8>, Error> {
-        let bytes = password.as_bytes();
-        let mut out = vec![0; argon2rs::defaults::LENGTH];
-        let argon2 = argon2rs::Argon2::default(argon2rs::Variant::Argon2i);
-        argon2.hash(&mut out, bytes, salt, &[], &[]);
-        Ok(out)
     }
 }
 
@@ -225,18 +212,11 @@ impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfigurati
 pub fn hash_passwords(users: &HashMap<String, String>, salt_len: usize) -> Result<Users, Error> {
     let mut hashed: Users = HashMap::new();
     for (user, password) in users {
-        let salt = generate_salt(salt_len)?;
-        let hash = SimpleAuthenticator::hash_password_digest(password, &salt)?;
+        let salt = generate_salt(salt_len).map_err(|()| "Unspecified error".to_string() )?;
+        let hash = hash_password_digest(password, &salt);
         let _ = hashed.insert(user.to_string(), (hash, salt));
     }
     Ok(hashed)
-}
-
-/// Generate a new random salt based on the configured salt length
-pub fn generate_salt(salt_length: usize) -> Result<Vec<u8>, Error> {
-    let mut salt: Vec<u8> = vec![0; salt_length];
-    jwa::rng().fill(&mut salt).map_err(|e| e.to_string())?;
-    Ok(salt)
 }
 
 /// Convenience function to write `Users` to a Writer
@@ -247,16 +227,6 @@ pub fn write_csv<W: Write>(users: &Users, mut writer: W) -> Result<(), Error> {
         writer.write_all(b"\n")?;
     }
     Ok(())
-}
-
-fn hex_dump(bytes: &[u8]) -> String {
-    let mut v = Vec::with_capacity(bytes.len() * 2);
-    for &byte in bytes.iter() {
-        v.push(CHARS[(byte >> 4) as usize]);
-        v.push(CHARS[(byte & 0xf) as usize]);
-    }
-
-    unsafe { String::from_utf8_unchecked(v) }
 }
 
 #[cfg(test)]
