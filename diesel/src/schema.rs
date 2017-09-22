@@ -3,7 +3,7 @@
 table! {
     users (username) {
         username -> Varchar,
-        pw_hash -> Binary,
+        hash -> Binary,
         salt -> Varbinary,
     }
 }
