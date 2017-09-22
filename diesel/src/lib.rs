@@ -41,7 +41,7 @@ pub mod mysql;
 /// A connection pool for the Diesel backed authenticators
 ///
 /// Type `T` should implement
-/// [`diesel::connection::Connection`](http://docs.diesel.rs/diesel/connection/trait.Connection.html)
+/// [`Connection`](http://docs.diesel.rs/diesel/connection/trait.Connection.html)
 pub type ConnectionPool<T> = r2d2::Pool<r2d2_diesel::ConnectionManager<T>>;
 
 #[derive(Debug)]
@@ -85,15 +85,21 @@ impl From<r2d2::GetTimeout> for Error {
 impl From<Error> for rowdy::Error {
     fn from(error: Error) -> rowdy::Error {
         match error {
-            Error::ConnectionError(e) => rowdy::Error::Auth(rowdy::auth::Error::GenericError((e.to_string()))),
-            Error::DieselError(e) => rowdy::Error::Auth(rowdy::auth::Error::GenericError((e.to_string()))),
+            Error::ConnectionError(e) => {
+                rowdy::Error::Auth(rowdy::auth::Error::GenericError((e.to_string())))
+            }
+            Error::DieselError(e) => {
+                rowdy::Error::Auth(rowdy::auth::Error::GenericError((e.to_string())))
+            }
             Error::ConnectionTimeout => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
                 "Timed out connecting to the database".to_string(),
             )),
             Error::InitializationError => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
                 "Error initializing a database connection pool".to_string(),
             )),
-            Error::AuthenticationFailure => rowdy::Error::Auth(rowdy::auth::Error::AuthenticationFailure),
+            Error::AuthenticationFailure => {
+                rowdy::Error::Auth(rowdy::auth::Error::AuthenticationFailure)
+            }
         }
     }
 }
@@ -173,7 +179,10 @@ where
     }
 
     /// Build an `AuthenticationResult` for a `User`
-    fn build_authentication_result(user: &User, include_refresh_payload: bool) -> Result<AuthenticationResult, Error> {
+    fn build_authentication_result(
+        user: &User,
+        include_refresh_payload: bool,
+    ) -> Result<AuthenticationResult, Error> {
         let refresh_payload = if include_refresh_payload {
             Some(Self::serialize_refresh_token_payload(user)?)
         } else {
@@ -190,7 +199,9 @@ where
         })
     }
 
-    /// Verify that some user with the provided password exists in the database, and the password is correct.
+    /// Verify that some user with the provided password exists in the database, and the password
+    /// is correct.
+    ///
     /// Returns the payload to be included in a refresh token if successful
     pub fn verify(
         &self,
@@ -235,7 +246,10 @@ where
         Ok(self.verify(&username, &password, include_refresh_payload)?)
     }
 
-    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, rowdy::Error> {
+    fn authenticate_refresh_token(
+        &self,
+        refresh_payload: &JsonValue,
+    ) -> Result<AuthenticationResult, rowdy::Error> {
         let user = Self::deserialize_refresh_token_payload(refresh_payload.clone())?;
         Ok(Self::build_authentication_result(&user, false)?)
     }

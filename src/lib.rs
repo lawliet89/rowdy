@@ -7,7 +7,8 @@
 //! Documentation: [Stable](https://docs.rs/rowdy) | [Master](https://lawliet89.github.io/rowdy/)
 //!
 //! `rowdy` is a [Rocket](https://rocket.rs/)  based JSON Web token based authentication server
-//! based off Docker Registry's [authentication protocol](https://docs.docker.com/registry/spec/auth/).
+//! based off Docker Registry's
+//! [authentication protocol](https://docs.docker.com/registry/spec/auth/).
 //!
 //! # Features
 //!
@@ -18,84 +19,94 @@
 //!
 //! # `rowdy` Authentication Flow
 //!
-//! The authentication flow is inspired by [Docker Registry](https://docs.docker.com/registry/spec/auth/)
-//! authentication specification.
+//! The authentication flow is inspired by
+//! [Docker Registry](https://docs.docker.com/registry/spec/auth/) authentication specification.
 //!
 //! ## JSON Web Tokens
 //!
-//! Authentication makes use of two types of [JSON Web Tokens (JWT)](https://jwt.io/): Access and Refresh tokens.
+//! Authentication makes use of two types of [JSON Web Tokens (JWT)](https://jwt.io/):
+//! Access and Refresh tokens.
 //!
 //! ### Access Token
 //!
-//! The access token is a short lived JWT that allows users to access resources within the scope that they are allowed
-//! to. The access token itself contains enough information for services to verify the user and their permissions
-//! in a stateless manner.
+//! The access token is a short lived JWT that allows users to access resources within the scope
+//! that they are allowed to. The access token itself contains enough information for services
+//! to verify the user and their permissions in a stateless manner.
 //!
 //! ### Refresh Token
 //!
-//! The refresh token allows users to retrieve a new access token without needing to re-authenticate. As such, the
-//! refresh token is longer lived, but can be revoked.
+//! The refresh token allows users to retrieve a new access token without needing to
+//! re-authenticate. As such, the refresh token is longer lived, but can be revoked.
 //!
 //! ## Authentication Flow
 //!
 //! 1. Client attempts to access a resource on a protected service.
-//! 1. Service responds with a `401 Unauthorized` authentication challenge with information on how to authenticate
+//! 1. Service responds with a `401 Unauthorized` authentication challenge with information on
+//!  how to authenticate
 //! provided in the `WWW-Authenticate` response header.
-//! 1. Using the information from the previous step, the client authenticates with the authentication server. The client
+//! 1. Using the information from the previous step, the client authenticates with the
+//! authentication server. The client
 //! will receive, among other information, opaque access and refresh tokens.
-//! 1. The client retries the original request with the Bearer token embedded in the request’s Authorization header.
-//! 1. The service authorizes the client by validating the Bearer token and the claim set embedded within it and
+//! 1. The client retries the original request with the Bearer token embedded in the request’s
+//! Authorization header.
+//! 1. The service authorizes the client by validating the Bearer token and the claim set
+//! embedded within it and
 //! proceeds as usual.
 //!
 //! ### Authentication Challenge
 //!
-//! Services will challenge users who do not provide a valid token via the HTTP response `401 Unauthorized`. Details for
+//! Services will challenge users who do not provide a valid token via the HTTP response
+//! `401 Unauthorized`. Details for
 //! authentication is provided in the `WWW-Authenticate` header.
 //!
 //! ```text
 //! Www-Authenticate: Bearer realm="https://www.auth.com",service="https://www.example.com",scope="all"
 //! ```
 //!
-//! The `realm` field indicates the authentcation server endpoint which clients should proceed to authenticate against.
+//! The `realm` field indicates the authentcation server endpoint which clients should proceed to
+//! authenticate against.
 //!
-//! The `service` field indicates the `service` value that clients should use when attempting to authenticate at
-//! `realm`.
+//! The `service` field indicates the `service` value that clients should use when attempting to
+//! authenticate at `realm`.
 //!
-//! The `scope` field indicates the `scope` value that clients should use when attempting to authenticate at `realm`.
+//! The `scope` field indicates the `scope` value that clients should use when attempting to
+//! authenticate at `realm`.
 //!
 //! ### Retrieving an Access Token (and optionally Refresh Token) from the Authentication Server
 //!
-//! A HTTP `GET` request should be made to the `realm` endpoint provided above. The endpoint will support the following
-//! query paremeters:
+//! A HTTP `GET` request should be made to the `realm` endpoint provided above. The endpoint will
+//! support the following uery paremeters:
 //!
-//! - `service`: The service that the client is authenticating for. This should be the same as the `service` value in
-//! the previous step
-//! - `scope`: The scope that the client wishes to authenticate for. This should be the same as the `scope` value in the
-//! previous step.
-//! - `offline_token`: Set to `true` if a refresh token is also required. Defaults to `false`. Cannot be set to `true`
-//! when using a refresh token to retrieve a new access token.
+//! - `service`: The service that the client is authenticating for. This should be the same as
+//! the `service` value in the previous step
+//! - `scope`: The scope that the client wishes to authenticate for.
+//! This should be the same as the `scope` value in the previous step.
+//! - `offline_token`: Set to `true` if a refresh token is also required. Defaults to `false`.
+//! Cannot be set to `true` when using a refresh token to retrieve a new access token.
 //!
-//! When authenticating for the first time, clients should send the user's username and passwords in the form of
-//! `Basic` authentication. If the client already has a prior refresh token and would like to obtain a new access token,
-//! the client should send the refresh token in the form of `Bearer` authentication.
+//! When authenticating for the first time, clients should send the user's username and passwords
+//! in the form of `Basic` authentication. If the client already has a prior refresh token and
+//! would like to obtain a new access token, the client should send the refresh token in the form
+//! of `Bearer` authentication.
 //!
-//! If successful, the authentcation server will return a `200 OK` response with a JSON body containing the following
-//! fields:
+//! If successful, the authentcation server will return a `200 OK` response with a
+//! JSON body containing the following fields:
 //!
-//! - `token`: An opaque Access (`Bearer`) token that clients should supply to subsequent requests in the
-//! `Authorization` header.
+//! - `token`: An opaque Access (`Bearer`) token that clients should supply to subsequent requests
+//! in the `Authorization` header.
 //! - `expires_in`: The duration in seconds since the token was issued that it will remain valid.
 //! - `issued_at`: RFC3339-serialized UTC standard time at which a given token was issued.
-//! - `refresh_token`: An opaque `Refresh` token which can be used to get additional access tokens for the same subject
-//! with different scopes. This token should be kept secure by the client and only sent to the authorization server
-//! which issues access tokens. This field will only be set when `offline_token=true` is provided in the request.
+//! - `refresh_token`: An opaque `Refresh` token which can be used to get additional access
+//! tokens for the same subject with different scopes. This token should be kept secure by
+//! the client and only sent to the authorization server which issues access tokens.
+//! This field will only be set when `offline_token=true` is provided in the request.
 //!
 //! If this fails, the server will return with the appropriate `4xx` response.
 //!
 //! ### Using the Access Token
 //!
-//! Once the client has a token, it will try the request again with the token placed in the HTTP Authorization header
-//! like so:
+//! Once the client has a token, it will try the request again with the token placed in the
+//! HTTP Authorization header like so:
 //!
 //! ```text
 //! Authorization: Bearer <token>
@@ -103,24 +114,26 @@
 //!
 //! ### Using the Refresh Token to Retrieve a New Access Token
 //!
-//! When the client's Access token expires, and it has previously asked for a Refresh Token, the client can make a `GET`
-//! request to the same endpoint that the client used to retrieve the access token (the `realm` URL in an authentication
-//! challenge).
+//! When the client's Access token expires, and it has previously asked for a Refresh Token,
+//! the client can make a `GET` request to the same endpoint that the client used to retrieve the
+//! access token (the `realm` URL in an authentication challenge).
 //!
-//! The steps are described in the section "Retrieving an Access Token" above. The process is the same as the initial
-//! authentication except that instead of using `Basic` authentication, the client should instead send the refresh token
-//! retrieved prior as `Bearer` authentication. Also, `offline_token` cannot be requested for when requesting for
-//! a new access token using a refresh token. (HTTP 401 will be returned if this happens.)
+//! The steps are described in the section "Retrieving an Access Token" above. The process is the
+//! same as the initial authentication except that instead of using `Basic` authentication,
+//! the client should instead send the refresh token retrieved prior as `Bearer` authentication.
+//! Also, `offline_token` cannot be requested for when requesting for a new access token using a
+//! refresh token. (HTTP 401 will be returned if this happens.)
 //!
 //! ### Example
 //!
-//! This example uses `curl` to make request to the some (hypothetical) protected endpoint. It requires
-//! [`jq`](https://stedolan.github.io/jq/) to parse JSON.
+//! This example uses `curl` to make request to the some (hypothetical) protected endpoint.
+//! It requires [`jq`](https://stedolan.github.io/jq/) to parse JSON.
 //!
 //! ```bash
 //! PROTECTED_RESOURCE="https://www.example.com/protected/resource/"
 //!
-//! # Save the response headers of our first request to the endpoint to get the Www-Authenticate header
+//! # Save the response headers of our first request to the endpoint to get the Www-Authenticate
+//! # header
 //! RESPONSE_HEADER=$(tempfile);
 //! curl --dump-header "${RESPONSE_HEADER}" "${PROTECTED_RESOURCE}"
 //!
@@ -163,16 +176,18 @@
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
 // See https://github.com/rust-unofficial/patterns/blob/master/anti_patterns/deny-warnings.md
-#![allow(legacy_directory_ownership, missing_copy_implementations, missing_debug_implementations, unknown_lints,
-        unsafe_code)]
-#![deny(const_err, dead_code, deprecated, exceeding_bitshifts, fat_ptr_transmutes, improper_ctypes, missing_docs,
-       mutable_transmutes, no_mangle_const_items, non_camel_case_types, non_shorthand_field_patterns,
-       non_upper_case_globals, overflowing_literals, path_statements, plugin_as_library, private_no_mangle_fns,
-       private_no_mangle_statics, stable_features, trivial_casts, trivial_numeric_casts, unconditional_recursion,
-       unknown_crate_types, unreachable_code, unused_allocation, unused_assignments, unused_attributes,
-       unused_comparisons, unused_extern_crates, unused_features, unused_imports, unused_import_braces,
-       unused_qualifications, unused_must_use, unused_mut, unused_parens, unused_results, unused_unsafe,
-       unused_variables, variant_size_differences, warnings, while_true)]
+#![allow(legacy_directory_ownership, missing_copy_implementations, missing_debug_implementations,
+        unknown_lints, unsafe_code)]
+#![deny(const_err, dead_code, deprecated, exceeding_bitshifts, fat_ptr_transmutes, improper_ctypes,
+       missing_docs, mutable_transmutes, no_mangle_const_items, non_camel_case_types,
+       non_shorthand_field_patterns, non_upper_case_globals, overflowing_literals,
+       path_statements, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
+       stable_features, trivial_casts, trivial_numeric_casts, unconditional_recursion,
+       unknown_crate_types, unreachable_code, unused_allocation, unused_assignments,
+       unused_attributes, unused_comparisons, unused_extern_crates, unused_features,
+       unused_imports, unused_import_braces, unused_qualifications, unused_must_use, unused_mut,
+       unused_parens, unused_results, unused_unsafe, unused_variables, variant_size_differences,
+       warnings, while_true)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
 extern crate biscuit as jwt;
@@ -275,7 +290,9 @@ impl error::Error for Error {
             Error::CORS(ref e) => Some(e),
             Error::Token(ref e) => Some(e),
             Error::IOError(ref e) => Some(e),
-            Error::UnsupportedOperation | Error::GenericError(_) | Error::BadRequest(_) => Some(self),
+            Error::UnsupportedOperation | Error::GenericError(_) | Error::BadRequest(_) => {
+                Some(self)
+            }
         }
     }
 }

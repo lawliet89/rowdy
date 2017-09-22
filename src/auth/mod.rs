@@ -1,4 +1,5 @@
-//! Authentication module, including traits for identity provider and `Responder`s for authentication.
+//! Authentication module, including traits for identity provider and `Responder`s for
+//! authentication.
 use std::error;
 use std::fmt;
 use std::ops::Deref;
@@ -50,13 +51,15 @@ pub type StringAuthenticator = Authenticator<String>;
 /// Authentication errors
 #[derive(Debug)]
 pub enum Error {
-    /// Authentication was attempted successfully, but failed because of bad user credentials, or other reasons.
+    /// Authentication was attempted successfully, but failed because of bad user credentials,
+    /// or other reasons.
     AuthenticationFailure,
     /// A generic error
     GenericError(String),
     /// An error due to `hyper`, such as header parsing failure
     HyperError(hyper::error::Error),
-    /// The `Authorization` HTTP request header was required but was missing. This variant will `respond` with the
+    /// The `Authorization` HTTP request header was required but was missing. This variant will
+    /// `respond` with the
     /// appropriate `WWW-Authenticate` header.
     MissingAuthorization {
         /// The HTTP basic authentication realm
@@ -71,7 +74,9 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::AuthenticationFailure => "Authentication has failed",
-            Error::MissingAuthorization { .. } => "The request header `Authorization` is required but is missing",
+            Error::MissingAuthorization { .. } => {
+                "The request header `Authorization` is required but is missing"
+            }
             Error::GenericError(ref e) => &**e,
             Error::HyperError(ref e) => e.description(),
         }
@@ -100,7 +105,8 @@ impl<'r> response::Responder<'r> for Error {
         match self {
             Error::MissingAuthorization { ref realm } => {
                 // TODO: Support other schemes!
-                let www_header = rocket::http::Header::new("WWW-Authenticate", format!("Basic realm={}", realm));
+                let www_header =
+                    rocket::http::Header::new("WWW-Authenticate", format!("Basic realm={}", realm));
 
                 Ok(
                     response::Response::build()
@@ -206,49 +212,61 @@ impl<S: header::Scheme + 'static> Deref for Authorization<S> {
     }
 }
 
-/// Authenticator trait to be implemented by identity provider (idp) adapters to provide authentication.
-/// Each idp may support all the [schemes](https://hyper.rs/hyper/v0.10.5/hyper/header/trait.Scheme.html)
+/// Authenticator trait to be implemented by identity provider (idp) adapters to
+/// provide authentication.
+/// Each idp may support all the
+/// [schemes](https://hyper.rs/hyper/v0.10.5/hyper/header/trait.Scheme.html)
 /// supported, or just one.
 ///
 /// Usually, you will want to include an `Authenticator` trait object as part of Rocket's
-/// [managed state](https://rocket.rs/guide/state/). Before you can do that, however, you will need to `Box` it up.
+/// [managed state](https://rocket.rs/guide/state/). Before you can do that, however,
+/// you will need to `Box` it up.
 /// See example below.
 ///
 /// # Examples
 ///
 /// # No-op authenticator
-/// You can refer to the [source code](../../src/rowdy/auth/noop.rs.html) for the `NoOp` authenticator for a simple
-/// implementation.
+/// You can refer to the [source code](../../src/rowdy/auth/noop.rs.html) for the `NoOp`
+/// authenticator for a simple implementation.
 ///
 /// ## Simple Authenticator
 ///
-/// Refer to the `MockAuthenticator`[../../src/rowdy/auth/mod.rs.html] implemented in the test code for this module.
-/// ```
+/// Refer to the `MockAuthenticator`[../../src/rowdy/auth/mod.rs.html] implemented
+///  in the test code for this module.
 pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
-    /// Verify the credentials provided in the headers with the authenticator for the initial issuing of Access Tokens.
-    /// If the Authenticator supports re-issuing of access tokens subsequently using refresh tokens, and it is requested
-    /// for, the function should return a `JsonValue` containing the payload to include with the refresh token.
+    /// Verify the credentials provided in the headers with the authenticator for
+    /// the initial issuing of Access Tokens.
     ///
-    /// Users should not user `authenticate` directly and use `prepare_authentication_response` instead.
+    /// If the Authenticator supports re-issuing of access tokens subsequently using refresh tokens,
+    /// and it is requested for, the function should return a `JsonValue`
+    /// containing the payload to include with the refresh token.
+    ///
+    /// Users should not user`authenticate` directly and use `prepare_authentication_response`
+    /// instead.
     fn authenticate(
         &self,
         authorization: &Authorization<S>,
         include_refresh_payload: bool,
     ) -> Result<AuthenticationResult, ::Error>;
 
-    /// Verify the credentials provided with the refresh token payload, if supported by the authenticator.
+    /// Verify the credentials provided with the refresh token payload, if supported by the
+    /// authenticator.
+    ///
     /// A default implementation that returns an `Err(::Error::UnsupportedOperation)` is provided.
     ///
     /// Users should not user `authenticate` directly and use `prepare_refresh_response` instead.
-    fn authenticate_refresh_token(&self, _payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(
+        &self,
+        _payload: &JsonValue,
+    ) -> Result<AuthenticationResult, ::Error> {
         Err(::Error::UnsupportedOperation)
     }
 
     /// Prepare a response to an authentication request
     /// by first verifying credentials. If validation fails, will return an `Err` with the response
     /// to be sent. Otherwise, the unwrapped authentication result will be returned in an `Ok`.
-    /// This function will also check that the authenticator behaves correctly by checking that it does not
-    /// return a refresh token payload when it is not requested for
+    /// This function will also check that the authenticator behaves correctly by checking that
+    /// it does not return a refresh token payload when it is not requested for
     fn prepare_authentication_response(
         &self,
         authorization: &Authorization<S>,
@@ -265,12 +283,16 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
         Ok(result)
     }
 
-    /// Prepare a response to a refresh request
-    /// by first verifying the refresh payload. If validation fails, will return an `Err` with the response
+    /// Prepare a response to a refresh request by first verifying the refresh payload.
+    ///
+    /// If validation fails, will return an `Err` with the response
     /// to be sent. Otherwise, the unwrapped authentication result will be returned in an `Ok`.
-    /// This function will also check that the authenticator behaves correctly by checking that it does not
-    /// return a refresh token payload
-    fn prepare_refresh_response(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    /// This function will also check that the authenticator behaves correctly by checking that
+    /// it does not return a refresh token payload
+    fn prepare_refresh_response(
+        &self,
+        refresh_payload: &JsonValue,
+    ) -> Result<AuthenticationResult, ::Error> {
         let result = self.authenticate_refresh_token(refresh_payload)?;
         if result.refresh_payload.is_some() {
             Err(Error::GenericError(
@@ -290,8 +312,10 @@ pub fn missing_authorization<T>(realm: &str) -> Result<T, ::Error> {
     })?
 }
 
-/// Configuration for the associated type `Authenticator`. [`rowdy::Configuration`] expects its `authenticator` field
-/// to implement this trait. Before launching, `rowdy` will attempt to make an `Authenticator` based off the
+/// Configuration for the associated type `Authenticator`. [`rowdy::Configuration`] expects its
+/// `authenticator` field to implement this trait.
+///
+/// Before launching, `rowdy` will attempt to make an `Authenticator` based off the
 /// configuration by calling the `make_authenticator` method.
 pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>
     : Send + Sync + Serialize + DeserializeOwned + 'static {
@@ -357,13 +381,15 @@ pub mod tests {
         /// From a refresh token payload, get the header back
         ///
         /// # Panics
-        /// Panics if the refresh token payload is not in the right shape, or if the content is invalid
+        /// Panics if the refresh token payload is not in the right shape,
+        /// or if the content is invalid
         fn deserialize_refresh_token_payload<S: header::Scheme + 'static>(
             refresh_payload: &JsonValue,
         ) -> header::Authorization<S> {
             match *refresh_payload {
                 JsonValue::Object(ref map) => {
-                    let header = map["header"].as_str().unwrap(); // will panic if the shape is incorrect
+                    // will panic if the shape is incorrect
+                    let header = map["header"].as_str().unwrap();
                     let header = header.as_bytes().to_vec();
                     header::Authorization::parse_header(&[header]).unwrap()
                 }
@@ -397,8 +423,12 @@ pub mod tests {
             }
         }
 
-        fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-            let header: header::Authorization<Basic> = Self::deserialize_refresh_token_payload(refresh_payload);
+        fn authenticate_refresh_token(
+            &self,
+            refresh_payload: &JsonValue,
+        ) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<Basic> =
+                Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
         }
     }
@@ -427,8 +457,12 @@ pub mod tests {
             }
         }
 
-        fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-            let header: header::Authorization<Bearer> = Self::deserialize_refresh_token_payload(refresh_payload);
+        fn authenticate_refresh_token(
+            &self,
+            refresh_payload: &JsonValue,
+        ) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<Bearer> =
+                Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
         }
     }
@@ -457,8 +491,12 @@ pub mod tests {
             }
         }
 
-        fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
-            let header: header::Authorization<String> = Self::deserialize_refresh_token_payload(refresh_payload);
+        fn authenticate_refresh_token(
+            &self,
+            refresh_payload: &JsonValue,
+        ) -> Result<AuthenticationResult, ::Error> {
+            let header: header::Authorization<String> =
+                Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
         }
     }
@@ -467,8 +505,9 @@ pub mod tests {
     #[derive(Serialize, Deserialize, Debug)]
     pub struct MockAuthenticatorConfiguration {}
 
-    impl<S: header::Scheme + 'static> AuthenticatorConfiguration<S> for MockAuthenticatorConfiguration
+    impl<S> AuthenticatorConfiguration<S> for MockAuthenticatorConfiguration
     where
+        S: header::Scheme + 'static,
         MockAuthenticator: Authenticator<S>,
     {
         type Authenticator = MockAuthenticator;
@@ -557,7 +596,8 @@ pub mod tests {
 
         let header = HeaderFormatter(&auth).to_string();
         let parsed_header = not_err!(::auth::Authorization::new(&header));
-        let ::auth::Authorization(header::Authorization(Basic { username, password })) = parsed_header;
+        let ::auth::Authorization(header::Authorization(Basic { username, password })) =
+            parsed_header;
         assert_eq!(username, "Aladdin");
         assert_eq!(password, Some("open sesame".to_string()));
     }
@@ -579,7 +619,8 @@ pub mod tests {
     fn parses_string_auth_correctly() {
         let auth = header::Authorization("hello".to_string());
         let header = HeaderFormatter(&auth).to_string();
-        let parsed_header: ::auth::Authorization<String> = not_err!(::auth::Authorization::new(&header));
+        let parsed_header: ::auth::Authorization<String> =
+            not_err!(::auth::Authorization::new(&header));
         let ::auth::Authorization(header::Authorization(ref s)) = parsed_header;
         assert_eq!(s, "hello");
     }
@@ -595,7 +636,8 @@ pub mod tests {
             username: "mei".to_owned(),
             password: Some("冻住，不许走!".to_string()),
         });
-        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
+        let auth_header =
+            http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);
         let response = req.dispatch();
@@ -614,7 +656,8 @@ pub mod tests {
         let auth_header = hyper::header::Authorization(Bearer {
             token: "这样可以挡住他们。".to_string(),
         });
-        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
+        let auth_header =
+            http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);
         let response = req.dispatch();
@@ -631,7 +674,8 @@ pub mod tests {
 
         // Make headers
         let auth_header = hyper::header::Authorization("哦，对不起啦。".to_string());
-        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
+        let auth_header =
+            http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);
         let response = req.dispatch();
@@ -652,7 +696,8 @@ pub mod tests {
             username: "Aladin".to_owned(),
             password: Some("let me in".to_string()),
         });
-        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
+        let auth_header =
+            http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);
         let response = req.dispatch();
@@ -672,7 +717,8 @@ pub mod tests {
         let auth_header = hyper::header::Authorization(Bearer {
             token: "bad".to_string(),
         });
-        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
+        let auth_header =
+            http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);
         let response = req.dispatch();
@@ -690,7 +736,8 @@ pub mod tests {
 
         // Make headers
         let auth_header = hyper::header::Authorization("bad".to_string());
-        let auth_header = http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
+        let auth_header =
+            http::Header::new("Authorization", HeaderFormatter(&auth_header).to_string());
         // Make and dispatch request
         let req = client.get("/").header(auth_header);
         let response = req.dispatch();

@@ -1,4 +1,5 @@
-//! Custom serializer and deserializer for `std::time::Duration`. Serializes to seconds, and deserializes from seconds.
+//! Custom serializer and deserializer for `std::time::Duration`. Serializes to seconds,
+//! and deserializes from seconds.
 use std::time::Duration;
 use serde::{Deserialize, Deserializer, Serializer};
 

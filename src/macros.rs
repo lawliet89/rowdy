@@ -20,12 +20,14 @@ macro_rules! impl_deref {
     }
 }
 
-/// Extract some value from an expression via pattern matching. This is the cousin to `assert_matches!`.
+/// Extract some value from an expression via pattern matching. T
+/// his is the cousin to `assert_matches!`.
 macro_rules! match_extract {
     ($e: expr, $p: pat, $f: expr) => (match $e {
         $p => Ok($f),
         _ => {
-            Err(format!("{}: Expected pattern {} \ndid not match", stringify!($e), stringify!($p)).to_string())
+            Err(format!("{}: Expected pattern {} \ndid not match",
+                        stringify!($e), stringify!($p)).to_string())
         }
     })
 }

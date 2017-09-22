@@ -27,8 +27,9 @@ Usage:
   rowdy mysql <configuration-json>
   rowdy (-h | --help)
 
-Provide a configuration JSON file to run `rowdy` with. For available fields and examples for the JSON
-configuration, refer to the documentation at https://lawliet89.github.io/rowdy/rowdy/struct.Configuration.html
+Provide a configuration JSON file to run `rowdy` with. For available fields and examples for the
+JSON configuration, refer to the documentation at
+https://lawliet89.github.io/rowdy/rowdy/struct.Configuration.html
 
 You can also, additionally, configure Rocket by using `Rocket.toml` file.
 See https://rocket.rs/guide/overview#configuration
@@ -39,7 +40,8 @@ https://lawliet89.github.io/rowdy/rowdy/auth/simple/index.html for the database 
 The `mysql` subcommand uses a MySQL database for usernames. See
 https://lawliet89.github.io/rowdy/rowdy/auth/mysql/index.html for the database format.
 
-The subcommands will change the format expected by the `basic_authenticator` key of the configuration JSON.
+The subcommands will change the format expected by the `basic_authenticator` key of the
+configuration JSON.
   - noop: The key is expected to be simply an empty map: i.e. `{}`
   - csv: The key should behave according to the format documented at
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.SimpleAuthenticatorConfiguration.html

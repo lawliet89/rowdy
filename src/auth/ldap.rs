@@ -16,7 +16,8 @@ impl From<FmtError> for Error {
     }
 }
 
-/// A "User" returned from LDAP. This is the same as `ldap3::SearchEntry`, but with additional traits implemented
+/// A "User" returned from LDAP. This is the same as `ldap3::SearchEntry`,
+/// but with additional traits implemented
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct User {
     dn: String,
@@ -66,16 +67,17 @@ pub struct LdapAuthenticator {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search_filter: Option<String>,
     /// List of attributes from the LDAP Search Result Entry to be included in the JWT. The values
-    /// will be placed under the `attributes_namespace` key in the JWT. Missing keys are silently ignored.
+    /// will be placed under the `attributes_namespace` key in the JWT.
+    /// Missing keys are silently ignored.
     ///
     /// When a search with LDAP is performed, a
     /// [`SearchEntry`](https://docs.rs/ldap3/0.4.4/ldap3/struct.SearchEntry.html) is returned.
-    /// You can use this to configure the list of attributes that should be included in the JSON Web Token
-    /// that will be provided to your applications.
+    /// You can use this to configure the list of attributes that should be included in the
+    /// JSON Web Token that will be provided to your applications.
     #[serde(default)]
     pub include_attributes: Vec<String>,
-    /// Namespace or Key in the returned JSON Web Token to return `include_attributes` attributes in.
-    /// See the documentation for the `include_attributes` for more information.
+    /// Namespace or Key in the returned JSON Web Token to return `include_attributes` attributes
+    /// in. See the documentation for the `include_attributes` for more information.
     ///
     /// If set to `None`, the keys from the LDAP attributes will be merged with that of the JWT,
     /// and any duplicate keys will result in errors as described
@@ -124,7 +126,8 @@ impl LdapAuthenticator {
     /// Search for the specified account in the directory
     fn search(&self, connection: &LdapConn, account: &str) -> Result<Vec<SearchEntry>, Error> {
         let account = ldap_escape(account).into();
-        let account: HashMap<String, String> = [("account".to_string(), account)].iter().cloned().collect();
+        let account: HashMap<String, String> =
+            [("account".to_string(), account)].iter().cloned().collect();
         let search_base = strfmt(&self.search_base, &account)?;
         let search_filter = match self.search_filter {
             None => "".to_string(),
@@ -216,8 +219,9 @@ impl LdapAuthenticator {
         let private_claims = match attributes_namespace {
             None => JsonValue::Object(map),
             Some(namespace) => {
-                let outer_map: JsonMap<_, _> = vec![(namespace.to_string(), JsonValue::Object(map))]
-                    .into_iter()
+                let outer_map: JsonMap<_, _> = vec![
+                    (namespace.to_string(), JsonValue::Object(map)),
+                ].into_iter()
                     .collect();
                 JsonValue::Object(outer_map)
             }
@@ -310,7 +314,10 @@ impl super::Authenticator<Basic> for LdapAuthenticator {
     }
 
     // TODO: Implement retrieving updated information from LDAP server
-    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(
+        &self,
+        refresh_payload: &JsonValue,
+    ) -> Result<AuthenticationResult, ::Error> {
         let user = Self::deserialize_refresh_token_payload(refresh_payload.clone())?;
         Self::build_authentication_result(
             &user,
@@ -343,7 +350,8 @@ mod tests {
     use auth::Authenticator;
     use super::*;
 
-    /// Test LDAP server: http://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/
+    /// Test LDAP server:
+    /// http://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/
     fn make_authenticator() -> LdapAuthenticator {
         LdapAuthenticator {
             address: "ldap://ldap.forumsys.com".to_string(),
@@ -433,8 +441,9 @@ mod tests {
         assert!(result.refresh_payload.is_some());
         assert_eq!(result.private_claims, expected_private_claim);
 
-        let refresh_result =
-            not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),));
+        let refresh_result = not_err!(
+            authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),)
+        );
         assert!(refresh_result.refresh_payload.is_none());
 
         assert_eq!(result.subject, refresh_result.subject);
@@ -507,8 +516,9 @@ mod tests {
             None,
             false,
         ));
-        let expected_attributes: JsonMap<_, _> = vec![("cn".to_string(), vec!["John Doe".to_string()])]
-            .into_iter()
+        let expected_attributes: JsonMap<_, _> = vec![
+            ("cn".to_string(), vec!["John Doe".to_string()]),
+        ].into_iter()
             .map(|(key, value)| (key, value::to_value(value).unwrap()))
             .collect();
 

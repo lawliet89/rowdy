@@ -2,7 +2,8 @@
 use hyper::header::{self, Header};
 
 use {Error, JsonMap, JsonValue};
-use super::{AuthenticationResult, Authenticator, AuthenticatorConfiguration, Authorization, Basic, Bearer};
+use super::{AuthenticationResult, Authenticator, AuthenticatorConfiguration, Authorization, Basic,
+            Bearer};
 
 /// A "no-op" authenticator that lets everything through. _DO NOT USE THIS IN PRODUCTION_.
 #[derive(Debug)]
@@ -35,8 +36,9 @@ impl NoOp {
                     .as_str()
                     .ok_or_else(|| Error::Auth(super::Error::AuthenticationFailure))?;
                 let header = header.as_bytes().to_vec();
-                let header: header::Authorization<S> = header::Authorization::parse_header(&[header])
-                    .map_err(|_| Error::Auth(super::Error::AuthenticationFailure))?;
+                let header: header::Authorization<S> =
+                    header::Authorization::parse_header(&[header])
+                        .map_err(|_| Error::Auth(super::Error::AuthenticationFailure))?;
                 Ok(header)
             }
             _ => Err(Error::Auth(super::Error::AuthenticationFailure)),
@@ -63,9 +65,13 @@ impl Authenticator<Basic> for NoOp {
         })
     }
 
-    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(
+        &self,
+        refresh_payload: &JsonValue,
+    ) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let header: header::Authorization<Basic> = Self::deserialize_refresh_token_payload(refresh_payload)?;
+        let header: header::Authorization<Basic> =
+            Self::deserialize_refresh_token_payload(refresh_payload)?;
         self.authenticate(&Authorization(header), false)
     }
 }
@@ -89,9 +95,13 @@ impl Authenticator<Bearer> for NoOp {
         })
     }
 
-    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(
+        &self,
+        refresh_payload: &JsonValue,
+    ) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let header: header::Authorization<Bearer> = Self::deserialize_refresh_token_payload(refresh_payload)?;
+        let header: header::Authorization<Bearer> =
+            Self::deserialize_refresh_token_payload(refresh_payload)?;
         self.authenticate(&Authorization(header), false)
     }
 }
@@ -115,9 +125,13 @@ impl Authenticator<String> for NoOp {
         })
     }
 
-    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(
+        &self,
+        refresh_payload: &JsonValue,
+    ) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the NoOp authenticator in production");
-        let header: header::Authorization<String> = Self::deserialize_refresh_token_payload(refresh_payload)?;
+        let header: header::Authorization<String> =
+            Self::deserialize_refresh_token_payload(refresh_payload)?;
         self.authenticate(&Authorization(header), false)
     }
 }

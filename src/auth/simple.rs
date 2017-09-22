@@ -14,8 +14,8 @@ use super::util::{generate_salt, hash_password_digest, hex_dump};
 // Code for conversion to hex stolen from rustc-serialize:
 // https://doc.rust-lang.org/rustc-serialize/src/rustc_serialize/hex.rs.html
 
-/// Typedef for the internal representation of a users database. The keys are the usernames, and the values
-/// are a tuple of the password hash and salt.
+/// Typedef for the internal representation of a users database. The keys are the usernames,
+/// and the values are a tuple of the password hash and salt.
 pub type Users = HashMap<String, (Vec<u8>, Vec<u8>)>;
 
 /// A simple authenticator that uses a CSV backed user database. _DO NOT USE THIS IN PRODUCTION_
@@ -24,12 +24,13 @@ pub type Users = HashMap<String, (Vec<u8>, Vec<u8>)>;
 ///
 /// The user database should be a CSV file, or a "CSV-like" file
 /// (meaning you can choose to use some other character as field delimiter instead of comma)
-/// where the first column is the username, the second column is a hashed password, and the third column is the salt.
+/// where the first column is the username, the second column is a hashed password, and
+/// the third column is the salt.
 ///
 /// # Password Hashing
 /// See `SimpleAuthenticator::hash_password` for the implementation of password hashing.
-/// The password is hashed using the [`argon2i`](https://github.com/p-h-c/phc-winner-argon2) algorithm with
-/// a randomly generated salt.
+/// The password is hashed using the [`argon2i`](https://github.com/p-h-c/phc-winner-argon2)
+/// algorithm with a randomly generated salt.
 pub struct SimpleAuthenticator {
     users: Users,
 }
@@ -101,7 +102,9 @@ impl SimpleAuthenticator {
         Ok(hex_dump(hash_password_digest(password, salt).as_ref()))
     }
 
-    /// Verify that some user with the provided password exists in the CSV database, and the password is correct.
+    /// Verify that some user with the provided password exists in the CSV database,
+    /// and the password is correct.
+    ///
     /// Returns the payload to be included in a refresh token if successful
     pub fn verify(
         &self,
@@ -148,7 +151,10 @@ impl super::Authenticator<Basic> for SimpleAuthenticator {
         self.verify(&username, &password, include_refresh_payload)
     }
 
-    fn authenticate_refresh_token(&self, refresh_payload: &JsonValue) -> Result<AuthenticationResult, ::Error> {
+    fn authenticate_refresh_token(
+        &self,
+        refresh_payload: &JsonValue,
+    ) -> Result<AuthenticationResult, ::Error> {
         warn_!("Do not use the Simple authenticator in production");
         match *refresh_payload {
             JsonValue::Object(ref map) => {
@@ -186,9 +192,9 @@ pub struct SimpleAuthenticatorConfiguration {
     #[serde(default)]
     pub has_headers: bool,
     /// The delimiter char. By default, this is ','.
-    /// Because of the limitation of the `CSV` crate which elects to only allow delimiters with one byte,
-    /// the `char` will be truncated to only one byte. This means you should only use delimiters that
-    /// are ASCII.
+    /// Because of the limitation of the `CSV` crate which elects to only allow delimiters with
+    /// one byte, the `char` will be truncated to only one byte.
+    /// This means you should only use delimiters that are ASCII.
     #[serde(default = "default_delimiter")]
     pub delimiter: char,
 }
@@ -281,10 +287,11 @@ mod tests {
     fn csv_generation_round_trip() {
         use std::io::Cursor;
 
-        let users: HashMap<String, String> = [("foobar", "password"), ("mei", "冻住，不许走!")]
-            .into_iter()
-            .map(|&(u, p)| (u.to_string(), p.to_string()))
-            .collect();
+        let users: HashMap<String, String> =
+            [("foobar", "password"), ("mei", "冻住，不许走!")]
+                .into_iter()
+                .map(|&(u, p)| (u.to_string(), p.to_string()))
+                .collect();
         let users = not_err!(hash_passwords(&users, 32));
 
         let mut cursor: Cursor<Vec<u8>> = Cursor::new(vec![]);
@@ -305,7 +312,8 @@ mod tests {
         let _ = not_err!(authenticator.verify("foobar", "password", false));
 
         let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
-        assert!(result.refresh_payload.is_none()); // refresh refresh_payload is not provided when not requested
+        // refresh refresh_payload is not provided when not requested
+        assert!(result.refresh_payload.is_none());
     }
 
     #[test]
@@ -319,7 +327,8 @@ mod tests {
         let _ = not_err!(authenticator.verify("foobar", "password", false));
 
         let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
-        assert!(result.refresh_payload.is_none()); // refresh refresh_payload is not provided when not requested
+        // refresh refresh_payload is not provided when not requested
+        assert!(result.refresh_payload.is_none());
     }
 
     #[test]
@@ -327,9 +336,12 @@ mod tests {
         let authenticator = make_authenticator();
 
         let result = not_err!(authenticator.verify("foobar", "password", true));
-        assert!(result.refresh_payload.is_some()); // refresh refresh_payload is provided when requested
+        // refresh refresh_payload is provided when requested
+        assert!(result.refresh_payload.is_some());
 
-        let result = not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),));
+        let result = not_err!(
+            authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),)
+        );
         assert!(result.refresh_payload.is_none());
     }
 

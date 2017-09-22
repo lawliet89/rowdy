@@ -13,7 +13,8 @@ use {ConnectionPool, Error};
 pub type Authenticator = ::Authenticator<MysqlConnection>;
 
 impl Authenticator {
-    /// Using a database connection string of the form `mysql://[user[:password]@]host/database_name`,
+    /// Using a database connection string of the form
+    /// `mysql://[user[:password]@]host/database_name`,
     /// create an authenticator that is backed by a connection pool to a MySQL database
     pub fn with_uri(uri: &str) -> Result<Self, Error> {
         // Attempt a test connection with diesel
@@ -28,7 +29,13 @@ impl Authenticator {
 
     /// Create a new `Authenticator` with a database config
     ///
-    pub fn with_configuration(host: &str, port: u16, database: &str, user: &str, pass: &str) -> Result<Self, Error> {
+    pub fn with_configuration(
+        host: &str,
+        port: u16,
+        database: &str,
+        user: &str,
+        pass: &str,
+    ) -> Result<Self, Error> {
         let database_uri = format!("mysql://{}:{}@{}:{}/{}", user, pass, host, port, database);
         Self::with_uri(&database_uri)
     }
@@ -141,7 +148,9 @@ mod tests {
         let _ = not_err!(authenticator.verify("foobar", "password", false));
 
         let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
-        assert!(result.refresh_payload.is_none()); // refresh refresh_payload is not provided when not requested
+
+        // refresh refresh_payload is not provided when not requested
+        assert!(result.refresh_payload.is_none());
     }
 
     #[test]
@@ -149,9 +158,12 @@ mod tests {
         let authenticator = make_authenticator();
 
         let result = not_err!(authenticator.verify("foobar", "password", true));
-        assert!(result.refresh_payload.is_some()); // refresh refresh_payload is provided when requested
+        // refresh refresh_payload is provided when requested
+        assert!(result.refresh_payload.is_some());
 
-        let result = not_err!(authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),));
+        let result = not_err!(
+            authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),)
+        );
         assert!(result.refresh_payload.is_none());
     }
 

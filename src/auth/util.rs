@@ -25,7 +25,7 @@ pub fn hash_password_digest(password: &str, salt: &[u8]) -> Vec<u8> {
 /// For argon2i, you should use a salt between 8 and 2^32-1 bytes
 ///
 /// If this function fails, no extra details can be provided.
-/// See [`ring::error::Unspecified`](https://briansmith.org/rustdoc/ring/error/struct.Unspecified.html)
+/// See [`Unspecified`](https://briansmith.org/rustdoc/ring/error/struct.Unspecified.html)
 pub fn generate_salt(salt_length: usize) -> Result<Vec<u8>, ()> {
     let mut salt: Vec<u8> = vec![0; salt_length];
     jwa::rng().fill(&mut salt).map_err(|_| ())?;

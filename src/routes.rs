@@ -17,15 +17,16 @@ struct AuthParam {
 }
 
 impl AuthParam {
-    /// Verify the params are correct for the authentication type, that is if the authorization is a bearer token,
-    /// then an offline token cannot be requested.
+    /// Verify the params are correct for the authentication type, that is if the authorization
+    /// is a bearer token, then an offline token cannot be requested.
     fn verify<S: hyper::header::Scheme + 'static>(
         &self,
         authorization: &auth::Authorization<S>,
     ) -> Result<(), ::Error> {
         if authorization.is_bearer() && self.offline_token.is_some() {
             Err(::Error::BadRequest(
-                "Offline token cannot be requested for when authenticating with a refresh token".to_string(),
+                "Offline token cannot be requested for when authenticating with a refresh token"
+                    .to_string(),
             ))?
         }
         Ok(())
@@ -154,7 +155,9 @@ mod tests {
         let token_configuration = Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
             allowed_origins: allowed_origins,
-            audience: jwt::SingleOrMultiple::Single(not_err!(FromStr::from_str("https://www.example.com"))),
+            audience: jwt::SingleOrMultiple::Single(
+                not_err!(FromStr::from_str("https://www.example.com")),
+            ),
             signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
             secret: Secret::ByteSequence(ByteSequence::String("secret".to_string())),
             expiry_duration: Duration::from_secs(120),
@@ -198,8 +201,9 @@ mod tests {
         let method_header = Header::from(hyper::header::AccessControlRequestMethod(
             hyper::method::Method::Get,
         ));
-        let request_headers =
-            hyper::header::AccessControlRequestHeaders(vec![FromStr::from_str("Authorization").unwrap()]);
+        let request_headers = hyper::header::AccessControlRequestHeaders(
+            vec![FromStr::from_str("Authorization").unwrap()],
+        );
         let request_headers = Header::from(request_headers);
 
         // Make and dispatch request
@@ -382,7 +386,8 @@ mod tests {
         assert_eq!("https://www.example.com", origin_header);
     }
 
-    /// Tests that we can request a refresh token and then get a new access token with the issued refresh token
+    /// Tests that we can request a refresh token and then get a new access token with the
+    /// issued refresh token
     #[test]
     #[allow(deprecated)]
     fn token_getter_with_refresh_token_round_trip() {
@@ -481,7 +486,8 @@ mod tests {
         );
     }
 
-    /// Requesting for a refresh token when using a refresh token to authenticate should result in Bad Request
+    /// Requesting for a refresh token when using a refresh token to authenticate should
+    /// result in Bad Request
     #[test]
     #[allow(deprecated)]
     fn token_refresh_with_offline_token_should_return_bad_request() {

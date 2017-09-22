@@ -1,8 +1,9 @@
 //! Authentication token structs, and methods
 //!
 //! This module provides the `Token` struct which encapsulates a JSON Web Token or `JWT`.
-//! Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
-//! to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
+//! Clients will pass the encapsulated JWT to services that require it.
+//! The JWT should be considered opaque to clients.
+//! The `Token` struct contains enough information for the client to act on, including expiry times.
 use std::collections::HashSet;
 use std::borrow::Borrow;
 use std::error;
@@ -37,7 +38,8 @@ pub enum Error {
     TokenNotEncoded,
     /// Raised when attempting to use an encoded token when an decoded one is expected
     TokenNotDecoded,
-    /// Raised when attempting to perform an operation on the refresh token, but the refresh token is not present
+    /// Raised when attempting to perform an operation on the refresh token,
+    /// but the refresh token is not present
     NoRefreshToken,
     /// Raised when attempting to encrypt and sign an already encrypted and signed refresh token
     RefreshTokenAlreadyEncrypted,
@@ -84,9 +86,15 @@ impl error::Error for Error {
             Error::TokenNotDecoded => "Token is not decoded and cannot be used in this context",
             Error::NoRefreshToken => "Refresh token is not present",
             Error::RefreshTokenAlreadyEncrypted => "Refresh token is already encrypted and signed",
-            Error::RefreshTokenAlreadyDecrypted => "Refresh token is already decrypted and verified",
-            Error::RefreshTokenNotDecrypted => "Refresh token is not decrypted and cannot be used in this context",
-            Error::RefreshTokenNotEncrypted => "Refresh token is not encrypted and cannot be used in this context",
+            Error::RefreshTokenAlreadyDecrypted => {
+                "Refresh token is already decrypted and verified"
+            }
+            Error::RefreshTokenNotDecrypted => {
+                "Refresh token is not decrypted and cannot be used in this context"
+            }
+            Error::RefreshTokenNotEncrypted => {
+                "Refresh token is not encrypted and cannot be used in this context"
+            }
             Error::InvalidService => "Service requested is not in the list of intended audiences",
             Error::InvalidIssuer => "The token has an invalid issuer",
             Error::InvalidAudience => "The token has invalid audience",
@@ -123,14 +131,18 @@ impl<'r> Responder<'r> for Error {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
         error_!("Token Error: {:?}", self);
         match self {
-            Error::InvalidService | Error::InvalidIssuer | Error::InvalidAudience => Err(Status::Forbidden),
+            Error::InvalidService | Error::InvalidIssuer | Error::InvalidAudience => {
+                Err(Status::Forbidden)
+            }
             Error::JWTError(ref e) => {
                 use jwt::errors::Error::*;
 
                 let status = match *e {
-                    ValidationError(_) | JsonError(_) | DecodeBase64(_) | Utf8(_) | UnspecifiedCryptographicError => {
-                        Status::Unauthorized
-                    }
+                    ValidationError(_) |
+                    JsonError(_) |
+                    DecodeBase64(_) |
+                    Utf8(_) |
+                    UnspecifiedCryptographicError => Status::Unauthorized,
                     _ => Status::InternalServerError,
                 };
                 Err(status)
@@ -192,7 +204,8 @@ fn make_token<P: Serialize + DeserializeOwned + 'static>(
     now: DateTime<Utc>,
 ) -> Result<jwt::JWT<P, jwt::Empty>, ::Error> {
     let header = make_header(signature_algorithm);
-    let registered_claims = make_registered_claims(subject, now, expiry_duration, issuer, audience)?;
+    let registered_claims =
+        make_registered_claims(subject, now, expiry_duration, issuer, audience)?;
 
     Ok(jwt::JWT::new_decoded(
         header,
@@ -222,7 +235,10 @@ fn verify_issuer(config: &Configuration, issuer: &jwt::StringOrUri) -> Result<()
 }
 
 /// Verify that the requested audience is a strict subset of the audience configured
-fn verify_audience(config: &Configuration, audience: &jwt::SingleOrMultiple<jwt::StringOrUri>) -> Result<(), Error> {
+fn verify_audience(
+    config: &Configuration,
+    audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
+) -> Result<(), Error> {
     let allowed_audience: HashSet<jwt::StringOrUri> = config.audience.iter().cloned().collect();
     let audience: HashSet<jwt::StringOrUri> = audience.iter().cloned().collect();
 
@@ -288,31 +304,36 @@ const TOKEN_GETTER_HEADERS: &[&str] = &[
 /// # }
 /// ```
 ///
-/// Variations for the fields `allowed_origins`, `audience` and `secret` exist. Refer to their type documentation for
-/// examples.
+/// Variations for the fields `allowed_origins`, `audience` and `secret` exist.
+/// Refer to their type documentation for examples.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
     /// The issuer of the token. Usually the URI of the authentication server.
-    /// The issuer URI will also be used in the UUID generation of the tokens, and is also the `realm` for
-    /// authentication purposes.
+    /// The issuer URI will also be used in the UUID generation of the tokens,
+    /// and is also the `realm` for authentication purposes.
     pub issuer: jwt::StringOrUri,
     /// Origins that are allowed to issue CORS request. This is needed for browser
-    /// access to the authentication server, but tools like `curl` do not obey nor enforce the CORS convention.
-    ///
+    /// access to the authentication server, but tools like `curl` do not obey nor
+    /// enforce the CORS convention.
     pub allowed_origins: cors::AllOrSome<HashSet<cors::headers::Url>>,
-    /// The audience intended for your tokens. The `service` request paremeter will be validated against this
+    /// The audience intended for your tokens. The `service` request paremeter will be
+    /// validated against this
     pub audience: jwt::SingleOrMultiple<jwt::StringOrUri>,
     /// Defaults to `none`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_algorithm: Option<jwa::SignatureAlgorithm>,
     /// Secrets for use in signing a JWT.
-    /// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+    /// This enum (de)serialized as an
+    /// [untagged](https://serde.rs/enum-representations.html) enum variant.
+    ///
     /// Defaults to `None`.
     ///
     /// See [`token::Secret`] for serialization examples
     #[serde(default)]
     pub secret: Secret,
-    /// Expiry duration of tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
+    /// Expiry duration of tokens, in seconds.
+    ///
+    /// Defaults to 24 hours when deserialized and left unfilled
     #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
     pub expiry_duration: Duration,
     /// Customise refresh token options. Set to `None` to disable refresh tokens
@@ -379,15 +400,18 @@ impl Configuration {
 
 /// Configuration for Refresh Tokens
 ///
-/// Refresh Tokens are encrypted JWS, signed with the same algorithm as access tokens. There are two algorithms used.
+/// Refresh Tokens are encrypted JWS, signed with the same algorithm as access tokens.
+/// There are two algorithms used.
 ///
-/// A content encryption algorithm is used to encrypt the payload of the token, and provided some integrity protection.
+/// A content encryption algorithm is used to encrypt the payload of the token,
+/// and provided some integrity protection.
 /// The algorithm used is symmetric. The list of supported algorithm can be found
-/// [here](https://lawliet89.github.io/biscuit/biscuit/jwa/enum.ContentEncryptionAlgorithm.html). The key used to
-/// encrypt the content is called the Content Encryption Key (CEK).
+/// [here](https://lawliet89.github.io/biscuit/biscuit/jwa/enum.ContentEncryptionAlgorithm.html).
+/// The key used to encrypt the content is called the Content Encryption Key (CEK).
 ///
-/// Another algorithm is employed to determine and/or encrypt the CEK. The list of supported algorithms
-/// can be found [here](https://lawliet89.github.io/biscuit/biscuit/jwa/enum.KeyManagementAlgorithm.html).
+/// Another algorithm is employed to determine and/or encrypt the CEK.
+/// The list of supported algorithms  can be found
+/// [here](https://lawliet89.github.io/biscuit/biscuit/jwa/enum.KeyManagementAlgorithm.html).
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RefreshTokenConfiguration {
     /// Algorithm used to determine and/or encrypt the CEK
@@ -396,10 +420,13 @@ pub struct RefreshTokenConfiguration {
     /// Algorithm used to encrypt the content using the CEK
     pub enc_algorithm: jwa::ContentEncryptionAlgorithm,
 
-    /// Key used in determining the CEK, or directly encrypt the content depending on the `cek_algorithm`
+    /// Key used in determining the CEK, or
+    /// directly encrypt the content depending on the `cek_algorithm`
     pub key: Secret,
 
-    /// Expiry duration of refresh tokens, in seconds. Defaults to 24 hours when deserialized and left unfilled
+    /// Expiry duration of refresh tokens, in seconds.
+    ///
+    /// Defaults to 24 hours when deserialized and left unfilled
     #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
     pub expiry_duration: Duration,
 }
@@ -407,31 +434,33 @@ pub struct RefreshTokenConfiguration {
 /// Private claims that will be included in the JWT.
 pub type PrivateClaim = JsonValue;
 
-/// Convenient typedef for the type of the Refresh Token Payload. This is a signed JWS which contains a JWT Claims set.
+/// Convenient typedef for the type of the Refresh Token Payload.
+/// This is a signed JWS which contains a JWT Claims set.
 pub type RefreshTokenPayload = jwt::JWT<JsonValue, jwt::Empty>;
 
-/// Convenient typedef for the type of the encrypted JWE wrapping `RefreshTokenPayload`. This is a JWE which contains
-/// a JWS that contains a JWT Claims set.
+/// Convenient typedef for the type of the encrypted JWE wrapping `RefreshTokenPayload`.
+/// This is a JWE which contains a JWS that contains a JWT Claims set.
 pub type RefreshTokenJWE = jwt::jwe::Compact<RefreshTokenPayload, jwt::Empty>;
 
-/// A Refresh Token containing the payload (called refresh payload) used by an authenticator to issue new access
-/// tokens without needing the user to re-authenticate.
+/// A Refresh Token containing the payload (called refresh payload) used by an
+/// authenticator to issue new access tokens without needing the user to re-authenticate.
 ///
-/// Internally, this is a newtype struct wrapping an encrypted JWE containing the `RefreshTokenPayload`. In other
-/// words, this is an encrypted token (JWE) containing a payload. The payload is a signed token (JWS) which contains
-/// a set of values (JWT Claims Set).
+/// Internally, this is a newtype struct wrapping an encrypted JWE containing the
+/// `RefreshTokenPayload`. In other words, this is an encrypted token (JWE) containing a payload.
+/// The payload is a signed token (JWS) which contains a set of values (JWT Claims Set).
 ///
 /// Usually, the semantics and inner workings of the refresh token is, and should be, opaque to any
-/// user. Thus, some of the methods to manipulate the inner details of the refresh tokens are not public.
+/// user. Thus, some of the methods to manipulate the inner details of the refresh tokens are not
+/// public.
 ///
 /// This struct is serialized and deserialized to a string, which is the
 /// [Compact serialization of a JWE](https://tools.ietf.org/html/rfc7516#section-3.1).
 ///
-/// Before you can serialize the struct, you will need to call `encrypt` to first sign the embedded JWS, and then
-/// encrypt it. If you do not do so, `serde` will refuse to serialize.
+/// Before you can serialize the struct, you will need to call `encrypt` to first sign the embedded
+/// JWS, and then encrypt it. If you do not do so, `serde` will refuse to serialize.
 ///
-/// Conversely, only an encrypted token can be deserialized. `serde` will refuse to deserialize a decrypted token
-/// similarly. You will need to call `decrypt` to decrypt the deserialized token.
+/// Conversely, only an encrypted token can be deserialized. `serde` will refuse to deserialize a
+/// decrypted token similarly. You will need to call `decrypt` to decrypt the deserialized token.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct RefreshToken(RefreshTokenJWE);
 
@@ -477,7 +506,8 @@ impl RefreshToken {
         RefreshToken(jwt::JWE::new_encrypted(token))
     }
 
-    /// Unwrap and consumes self, producing the wrapped JWE. You generally should not, and do not need to call this.
+    /// Unwrap and consumes self, producing the wrapped JWE. You generally should not,
+    ///  and do not need to call this.
     pub fn unwrap(self) -> RefreshTokenJWE {
         self.0
     }
@@ -619,9 +649,10 @@ impl From<RefreshTokenJWE> for RefreshToken {
     }
 }
 
-/// A token that will be serialized into JSON and passed to clients. This encapsulates a JSON Web Token or `JWT`.
-/// Clients will pass the encapsulated JWT to services that require it. The JWT should be considered opaque
-/// to clients. The `Token` struct contains enough information for the client to act on, including expiry times.
+/// A token that will be serialized into JSON and passed to clients.
+/// This encapsulates a JSON Web Token or `JWT`. Clients will pass the encapsulated JWT to services
+/// that require it. The JWT should be considered opaque to clients. The `Token` struct contains
+/// enough information for the client to act on, including expiry times.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Token<T> {
     /// Tne encapsulated JWT.
@@ -738,7 +769,11 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
 
     /// Consumes self and decode the embedded JWT with signature verification
     /// If the JWT is already decoded, this returns an error
-    pub fn decode(mut self, secret: &jws::Secret, algorithm: jwa::SignatureAlgorithm) -> Result<Self, Error> {
+    pub fn decode(
+        mut self,
+        secret: &jws::Secret,
+        algorithm: jwa::SignatureAlgorithm,
+    ) -> Result<Self, Error> {
         match self.token {
             jwt @ jwt::jws::Compact::Encoded(_) => {
                 self.token = jwt.into_decoded(secret, algorithm)?;
@@ -827,7 +862,11 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     }
 
     /// Consumes self, and encrypt and sign the embedded refresh token
-    pub fn encrypt_refresh_token(mut self, secret: &jws::Secret, key: &jwk::JWK<jwt::Empty>) -> Result<Self, Error> {
+    pub fn encrypt_refresh_token(
+        mut self,
+        secret: &jws::Secret,
+        key: &jwk::JWK<jwt::Empty>,
+    ) -> Result<Self, Error> {
         let refresh_token = self.refresh_token.ok_or_else(|| Error::NoRefreshToken)?;
         let refresh_token = refresh_token.encrypt(secret, key)?;
         self.refresh_token = Some(refresh_token);
@@ -844,7 +883,8 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         enc_algorithm: jwa::ContentEncryptionAlgorithm,
     ) -> Result<Self, Error> {
         let refresh_token = self.refresh_token.ok_or_else(|| Error::NoRefreshToken)?;
-        let refresh_token = refresh_token.decrypt(secret, key, signing_algorithm, cek_algorithm, enc_algorithm)?;
+        let refresh_token =
+            refresh_token.decrypt(secret, key, signing_algorithm, cek_algorithm, enc_algorithm)?;
         self.refresh_token = Some(refresh_token);
         Ok(self)
     }
@@ -865,7 +905,9 @@ impl<'r, T: Serialize + DeserializeOwned + 'static> Responder<'r> for Token<T> {
 }
 
 /// Secrets for use in signing and encrypting a JWT.
-/// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum variant.
+/// This enum (de)serialized as an [untagged](https://serde.rs/enum-representations.html) enum
+/// variant.
+///
 /// Defaults to `None`.
 ///
 /// # Serialization Examples
@@ -989,7 +1031,9 @@ impl Secret {
             Secret::None => Ok(jws::Secret::None),
             Secret::ByteSequence(ref bytes) => Ok(jws::Secret::Bytes(bytes.as_bytes())),
             Secret::Bytes { ref path } => Ok(jws::Secret::Bytes(Self::read_file_to_bytes(path)?)),
-            Secret::RSAKeyPair { ref rsa_public, .. } => Ok(jws::Secret::public_key_from_file(rsa_public)?),
+            Secret::RSAKeyPair { ref rsa_public, .. } => {
+                Ok(jws::Secret::public_key_from_file(rsa_public)?)
+            }
         }
     }
 
@@ -1025,9 +1069,11 @@ impl Secret {
     }
 }
 
-/// Keys prepared in a form directly usable for cryptographic operations. This prevents us from having to
-/// repeatedly read keys from the file system. Users should prepare the keys from `Configuration` using
-/// `Configuration::keys()` and then use this struct to retrieve keys from instead of the functions from `Secret`.
+/// Keys prepared in a form directly usable for cryptographic operations.
+/// This prevents us from having to repeatedly read keys from the file system.
+///  Users should prepare the keys from `Configuration` using
+/// `Configuration::keys()` and then use this struct to retrieve keys from instead of the
+/// functions from `Secret`.
 pub struct Keys {
     /// Key used to signed tokens
     pub signing: jws::Secret,
@@ -1084,7 +1130,9 @@ mod tests {
         Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
             allowed_origins: allowed_origins,
-            audience: jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.example.com/").unwrap()),
+            audience: jwt::SingleOrMultiple::Single(
+                FromStr::from_str("https://www.example.com/").unwrap(),
+            ),
             signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
             secret: Secret::ByteSequence(ByteSequence::String("secret".to_string())),
             expiry_duration: Duration::from_secs(120),
@@ -1141,7 +1189,8 @@ mod tests {
         let refresh_token = make_refresh_token();
         assert!(refresh_token.decrypted());
 
-        let encrypted_refresh_token = not_err!(refresh_token.clone().encrypt(&signing_secret, &key));
+        let encrypted_refresh_token =
+            not_err!(refresh_token.clone().encrypt(&signing_secret, &key));
         assert!(encrypted_refresh_token.encrypted());
 
         let decrypted_refresh_token = not_err!(encrypted_refresh_token.decrypt(
@@ -1557,13 +1606,14 @@ mod tests {
             .unwrap();
     }
 
-    /// Configuration has the right audience request configured, but the token does not indicate that it is for the
-    /// audience requested
+    /// Configuration has the right audience request configured,
+    /// but the token does not indicate that it is for the audience requested
     #[test]
     #[should_panic(expected = "InvalidAudience")]
     fn refresh_token_validates_mismatch_service_and_audience() {
         let mut configuration = make_config(true);
-        configuration.audience = jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.invalid.com/").unwrap());
+        configuration.audience =
+            jwt::SingleOrMultiple::Single(FromStr::from_str("https://www.invalid.com/").unwrap());
         let refresh_token = make_refresh_token();
         refresh_token
             .validate("https://www.invalid.com/", &configuration, None)
@@ -1604,7 +1654,8 @@ mod tests {
         {
             let jws = jwe.payload_mut().unwrap();
             let claims_set = jws.payload_mut().unwrap();
-            claims_set.registered.issuer = Some(FromStr::from_str("https://www.invalid.com/").unwrap());
+            claims_set.registered.issuer =
+                Some(FromStr::from_str("https://www.invalid.com/").unwrap());
         }
         let refresh_token = RefreshToken(jwe);
 
