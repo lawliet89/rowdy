@@ -1,5 +1,4 @@
 FROM japaric/x86_64-unknown-linux-musl:v0.1.10 as builder
-MAINTAINER Yong Wen Chua <me@yongwen.xyz>
 ENV PATH "/root/.cargo/bin:${PATH}"
 
 ARG RUST_VERSION=nightly-2017-09-21
@@ -15,6 +14,7 @@ RUN set -x \
                                           file \
                                           libssl-dev \
                                           pkg-config \
+                                          libmysqlclient-dev \
     && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain ${RUST_VERSION} \
     && rustup target add "${ARCHITECTURE}" \
     && apt-get remove -y --auto-remove curl \
@@ -24,6 +24,7 @@ RUN set -x \
 WORKDIR /app/src
 COPY Cargo.toml Cargo.lock ./
 COPY cli/Cargo.toml ./cli/Cargo.toml
+COPY diesel/Cargo.toml ./diesel/Cargo.toml
 RUN cargo fetch --locked -v
 
 COPY ./ ./
