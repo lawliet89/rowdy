@@ -94,7 +94,7 @@ pub struct LdapAuthenticator {
 
 impl LdapAuthenticator {
     /// Connects to the LDAP server
-    fn connect(&self) -> Result<LdapConn, Error> {
+    pub fn connect(&self) -> Result<LdapConn, Error> {
         debug_!("Connecting to LDAP {}", self.address);
         let connection = LdapConn::new(&self.address)?;
         Ok(connection)
@@ -113,8 +113,26 @@ impl LdapAuthenticator {
         self.bind(connection, &self.bind_dn, &self.bind_password)
     }
 
-    /// Bind the connection to some dn
-    fn bind(&self, connection: &LdapConn, dn: &str, password: &str) -> Result<(), Error> {
+    /// Bind a connection to some dn
+    ///
+    /// # Example
+    /// ```rust
+    /// use rowdy::auth::LdapAuthenticator;
+    /// let authenticator = LdapAuthenticator {
+    ///     address: "ldap://ldap.forumsys.com".to_string(),
+    ///     bind_dn: "cn=read-only-admin,dc=example,dc=com".to_string(),
+    ///     bind_password: "password".to_string(),
+    ///     search_base: "dc=example,dc=com".to_string(),
+    ///     search_filter: Some("(uid={account})".to_string()),
+    ///     include_attributes: vec!["cn".to_string()],
+    ///     attributes_namespace: Some("user".to_string()),
+    ///     subject_attribute: Some("uid".to_string()),
+    /// };
+    /// let connection = authenticator.connect().unwrap();
+    /// authenticator.bind(&connection, "cn=read-only-admin,dc=example,dc=com", "password")
+    ///     .expect("To bind successfully");
+    /// ```
+    pub fn bind(&self, connection: &LdapConn, dn: &str, password: &str) -> Result<(), Error> {
         debug_!("Binding to DN {}", dn);
         let _s = connection
             .simple_bind(dn, password)?

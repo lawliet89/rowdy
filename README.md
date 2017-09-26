@@ -17,7 +17,7 @@ based off Docker Registry's [authentication protocol](https://docs.docker.com/re
 Rocket requires nightly Rust. You should probably install Rust with [rustup](https://www.rustup.rs/), then override the code directory to use nightly instead of stable. See
 [installation instructions](https://rocket.rs/guide/getting-started/#installing-rust).
 
-In particular, `rowdy` is currently targetted for `nightly-2017-07-21`.
+In particular, `rowdy` is currently targetted for `nightly-2017-09-26`.
 
 ## Testing
 
