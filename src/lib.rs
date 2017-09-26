@@ -447,7 +447,7 @@ impl ByteSequence {
 /// // then `rocket.launch()`!
 /// # }
 /// ```
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Configuration<B> {
     /// Token configuration. See the type documentation for deserialization examples
     pub token: token::Configuration,
@@ -459,7 +459,7 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
     /// Ignites the rocket with various configuration objects, but does not mount any routes.
     /// Remember to mount routes and call `launch` on the returned Rocket object.
     /// See the struct documentation for an example.
-    pub fn ignite(self) -> Result<rocket::Rocket, Error> {
+    pub fn ignite(&self) -> Result<rocket::Rocket, Error> {
         let token_getter_cors_options = self.token.cors_option();
 
         let basic_authenticator = self.basic_authenticator.make_authenticator()?;
@@ -470,7 +470,7 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
 
         Ok(
             rocket::ignite()
-                .manage(self.token)
+                .manage(self.token.clone())
                 .manage(basic_authenticator)
                 .manage(keys)
                 .attach(token_getter_cors_options),

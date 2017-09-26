@@ -306,7 +306,7 @@ const TOKEN_GETTER_HEADERS: &[&str] = &[
 ///
 /// Variations for the fields `allowed_origins`, `audience` and `secret` exist.
 /// Refer to their type documentation for examples.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Configuration {
     /// The issuer of the token. Usually the URI of the authentication server.
     /// The issuer URI will also be used in the UUID generation of the tokens,
@@ -412,7 +412,7 @@ impl Configuration {
 /// Another algorithm is employed to determine and/or encrypt the CEK.
 /// The list of supported algorithms  can be found
 /// [here](https://lawliet89.github.io/biscuit/biscuit/jwa/enum.KeyManagementAlgorithm.html).
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RefreshTokenConfiguration {
     /// Algorithm used to determine and/or encrypt the CEK
     pub cek_algorithm: jwa::KeyManagementAlgorithm,
@@ -984,7 +984,7 @@ impl<'r, T: Serialize + DeserializeOwned + 'static> Responder<'r> for Token<T> {
 /// # }
 /// ```
 // Note: A "smoke test"-ish of (de)serialization is tested in the documentation code above.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Secret {
     /// No secret -- used when no signature or encryption is required.
