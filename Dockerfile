@@ -34,5 +34,11 @@ RUN cargo build --release --package rowdy-cli --target "${ARCHITECTURE}" -v --fr
 
 FROM alpine:3.5
 ARG ARCHITECTURE=x86_64-unknown-linux-musl
+
+# See https://github.com/japaric/cross/issues/119
+RUN apk add --update ca-certificates \
+    && rm -rf /var/cache/apk/* /tmp/*
+ENV SSL_CERT_DIR /etc/ssl/certs
+
 WORKDIR /app
 COPY --from=builder /app/src/target/${ARCHITECTURE}/release/rowdy-cli .
