@@ -10,9 +10,15 @@ test = true
 doctest = true
 doc = true
 
+[features]
+default = []
+
+# Support MySQL
+mysql = ["diesel/mysql", "diesel_codegen/mysql"]
+
 [dependencies]
-diesel = { version = "0.16", features = ["mysql"] }
-diesel_codegen = { version = "0.16", features = ["mysql"] }
+diesel = "0.16"
+diesel_codegen = "0.16"
 log = "0.3"
 r2d2 = "0.7.4"
 r2d2-diesel = "0.16.0"

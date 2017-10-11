@@ -1,8 +1,22 @@
 //! Diesel Support for Rowdy
 //!
-//! Allows you to use a Database table as the authentication soruce for Rowdy
+//! Allows you to use a Database table as the authentication soruce for Rowdy via the
+//! the [diesel](https://diesel.rs) ORM.
 //!
-//! TODO: Document How Argon2i is used: 32 bytes hash, 32 bytes salt
+//! ## Features
+//! By default, this crate does not have any default feature enabled. To support one or more
+//! of the databases supported by diesel, you will have to enable the following feature flags:
+//!
+//! - `mysql`
+//! - `postgres`
+//! - `sqlite`
+//!
+//! For example,
+//!
+//! ```toml
+//! [dependencies]
+//! rowdy_diesel = { version = "0.0.1", features = ["mysql"] }
+//! ```
 
 #[macro_use]
 extern crate diesel;
@@ -30,12 +44,9 @@ use rowdy::{JsonMap, JsonValue};
 use rowdy::auth::{self, AuthenticationResult, Authorization, Basic};
 use rowdy::auth::util::{hash_password_digest, hex_dump};
 
-
-#[cfg(test)]
-#[macro_use]
-mod test;
-
 pub mod schema;
+
+#[cfg(feature = "mysql")]
 pub mod mysql;
 
 /// A connection pool for the Diesel backed authenticators
@@ -110,7 +121,7 @@ impl From<Error> for rowdy::Error {
 
 /// A user record in the database
 #[derive(Queryable, Serialize, Deserialize)]
-pub struct User {
+pub(crate) struct User {
     username: String,
     hash: Vec<u8>,
     salt: Vec<u8>,

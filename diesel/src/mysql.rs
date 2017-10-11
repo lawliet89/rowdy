@@ -1,4 +1,6 @@
-//! MySql authenticator module
+//! MySQL authenticator module
+//!
+//! Requires `features = ["mysql"]` in your `Cargo.toml`
 use diesel::prelude::*;
 use diesel::mysql::MysqlConnection;
 use r2d2::Config;
@@ -129,13 +131,9 @@ mod tests {
 
 
     fn make_authenticator() -> super::Authenticator {
-        let authenticator = not_err!(super::Authenticator::with_configuration(
-            "127.0.0.1",
-            3306,
-            "rowdy",
-            "root",
-            "",
-        ));
+        let authenticator =
+            super::Authenticator::with_configuration("127.0.0.1", 3306, "rowdy", "root", "")
+                .expect("To be constructed successfully");
         reset_and_seed(&authenticator);
         authenticator
     }
@@ -154,7 +152,8 @@ mod tests {
 
     #[test]
     fn hashing_is_done_correctly() {
-        let hashed_password = not_err!(super::Authenticator::hash_password("password", &[0; 32]));
+        let hashed_password = super::Authenticator::hash_password("password", &[0; 32])
+            .expect("to hash successfully");
         assert_eq!(
             "e6e1111452a5574d8d64f6f4ba6fabc86af5c45c341df1eb23026373c41d24b8",
             hashed_password
@@ -163,10 +162,8 @@ mod tests {
 
     #[test]
     fn hashing_is_done_correctly_for_unicode() {
-        let hashed_password = not_err!(super::Authenticator::hash_password(
-            "冻住，不许走!",
-            &[0; 32],
-        ));
+        let hashed_password = super::Authenticator::hash_password("冻住，不许走!", &[0; 32])
+            .expect("to hash successfully");
         assert_eq!(
             "b400a5eea452afcc67a81602f28012e5634404ddf1e043d6ff1df67022c88cd2",
             hashed_password
@@ -186,9 +183,13 @@ mod tests {
     fn authentication_with_username_and_password() {
         let authenticator = make_authenticator();
 
-        let _ = not_err!(authenticator.verify("foobar", "password", false));
+        let _ = authenticator
+            .verify("foobar", "password", false)
+            .expect("To verify correctly");
 
-        let result = not_err!(authenticator.verify("mei", "冻住，不许走!", false));
+        let result = authenticator
+            .verify("mei", "冻住，不许走!", false)
+            .expect("to be verified");
 
         // refresh refresh_payload is not provided when not requested
         assert!(result.refresh_payload.is_none());
@@ -198,13 +199,15 @@ mod tests {
     fn authentication_with_refresh_payload() {
         let authenticator = make_authenticator();
 
-        let result = not_err!(authenticator.verify("foobar", "password", true));
+        let result = authenticator
+            .verify("foobar", "password", true)
+            .expect("To verify correctly");
         // refresh refresh_payload is provided when requested
         assert!(result.refresh_payload.is_some());
 
-        let result = not_err!(
-            authenticator.authenticate_refresh_token(result.refresh_payload.as_ref().unwrap(),)
-        );
+        let result = authenticator
+            .authenticate_refresh_token(result.refresh_payload.as_ref().unwrap())
+            .expect("to be successful");
         assert!(result.refresh_payload.is_none());
     }
 
@@ -221,7 +224,8 @@ mod tests {
             "password": ""
         }"#;
 
-        let deserialized: Configuration = not_err!(serde_json::from_str(json));
+        let deserialized: Configuration =
+            serde_json::from_str(json).expect("to deserialize successfully");
         let expected_config = Configuration {
             host: "127.0.0.1".to_string(),
             port: 3306,
@@ -231,6 +235,8 @@ mod tests {
         };
         assert_eq!(deserialized, expected_config);
 
-        let _ = not_err!(expected_config.make_authenticator());
+        let _ = expected_config
+            .make_authenticator()
+            .expect("to be constructed correctly");
     }
 }
