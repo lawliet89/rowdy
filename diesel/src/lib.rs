@@ -18,6 +18,20 @@
 //! rowdy_diesel = { version = "0.0.1", features = ["mysql"] }
 //! ```
 
+#![allow(legacy_directory_ownership, missing_copy_implementations, missing_debug_implementations,
+        unknown_lints, unsafe_code)]
+#![deny(const_err, dead_code, deprecated, exceeding_bitshifts, fat_ptr_transmutes, improper_ctypes,
+       missing_docs, mutable_transmutes, no_mangle_const_items, non_camel_case_types,
+       non_shorthand_field_patterns, non_upper_case_globals, overflowing_literals,
+       path_statements, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
+       stable_features, trivial_casts, trivial_numeric_casts, unconditional_recursion,
+       unknown_crate_types, unreachable_code, unused_allocation, unused_assignments,
+       unused_attributes, unused_comparisons, unused_extern_crates, unused_features,
+       unused_imports, unused_import_braces, unused_qualifications, unused_must_use, unused_mut,
+       unused_parens, unused_results, unused_unsafe, unused_variables, variant_size_differences,
+       warnings, while_true)]
+#![doc(test(attr(allow(unused_variables), deny(warnings))))]
+
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -53,7 +67,7 @@ pub mod mysql;
 ///
 /// Type `T` should implement
 /// [`Connection`](http://docs.diesel.rs/diesel/connection/trait.Connection.html)
-pub type ConnectionPool<T> = r2d2::Pool<r2d2_diesel::ConnectionManager<T>>;
+pub(crate) type ConnectionPool<T> = r2d2::Pool<ConnectionManager<T>>;
 
 /// Errors from using `rowdy-diesel`.
 ///
@@ -131,6 +145,8 @@ pub(crate) struct User {
 ///
 /// Instead of using this, you should use the "specialised" authenticators defined in the
 /// `mysql`, `pg`, or `sqlite` modules for your database.
+///
+/// Passwords are hasahed with `argon2i`, in addition to a salt.
 pub struct Authenticator<T>
 where
     T: diesel::connection::Connection + 'static,
@@ -145,7 +161,7 @@ where
     Vec<u8>: diesel::types::FromSql<diesel::types::Binary, <T as diesel::Connection>::Backend>,
 {
     /// Creates an authenticator backed by a table in a database using a connection pool.
-    pub fn new(pool: ConnectionPool<T>) -> Self {
+    pub(crate) fn new(pool: ConnectionPool<T>) -> Self {
         Self { pool }
     }
 

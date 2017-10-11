@@ -14,6 +14,37 @@
 //!     }
 //! }
 //! ```
+//!
+//! In standard SQL parlance, this is equivalent to
+//!
+//! ```sql
+//! CREATE TABLE IF NOT EXISTS `users` (
+//!     `username` VARCHAR(255) UNIQUE NOT NULL,
+//!     `hash` BINARY(32) NOT NULL,
+//!     `salt` VARBINARY(255) NOT NULL,
+//!     PRIMARY KEY (`username`)
+//! );
+//! ```
+
+/// Diesel table definition inside a module to allow for some lints
+mod table_macro {
+    #![allow(unused_qualifications)]
+    table! {
+        /// Table used to hold users and their hashed passwords
+        ///
+        /// Hashing is done with the `argon2i` algorithm with a salt.
+        users (username) {
+            /// Username for the user. Also the primary key
+            username -> Varchar,
+            /// A argon2i hash of the user's password
+            hash -> Binary,
+            /// Salt used to generate the password hash
+            salt -> Varbinary,
+        }
+    }
+}
+// Then we re-export those to public for use.
+pub use self::table_macro::*;
 
 use std::ops::Deref;
 
@@ -30,20 +61,6 @@ macro_rules! sql_template {
     `salt` {varbinary}(255) NOT NULL,
     PRIMARY KEY (`username`)
 );"#)
-}
-
-table! {
-    /// Table used to hold users and their hashed passwords
-    ///
-    /// Hashing is done with the `argon2i` algorithm with a salt.
-    users (username) {
-        /// Username for the user. Also the primary key
-        username -> Varchar,
-        /// A argon2i hash of the user's password
-        hash -> Binary,
-        /// Salt used to generate the password hash
-        salt -> Varbinary,
-    }
 }
 
 /// Trait to provide idempotent minimal migration to create the table necessary for `rowdy-diesel`
