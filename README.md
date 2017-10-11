@@ -11,7 +11,6 @@ Documentation: [Stable](https://docs.rs/rowdy) | [Master](https://lawliet89.gith
 `rowdy` is a [Rocket](https://rocket.rs/)  based JSON Web token based authentication server
 based off Docker Registry's [authentication protocol](https://docs.docker.com/registry/spec/auth/).
 
-
 ## Requirements
 
 Rocket requires nightly Rust. You should probably install Rust with [rustup](https://www.rustup.rs/), then override the code directory to use nightly instead of stable. See
@@ -21,10 +20,18 @@ In particular, `rowdy` is currently targetted for `nightly-2017-09-26`.
 
 ## Testing
 
-To separate the dependencies of the `library` part of the crate from the `binary` part, the crate is set up
-to make use of [workspaces](http://doc.crates.io/manifest.html#the-workspace--field-optional).
+The crate is set up
+to make use of [workspaces](http://doc.crates.io/manifest.html#the-workspace--field-optional) for
+various parts of `rowdy`.
 
-To run tests on both the `libary` and `binary`, do `cargo test --all`.
+To run tests for `rowdy-diesel`, you will need to run the Docker containers for the various
+databases.
+
+```bash
+docker-compose -f diesel/docker-compose.db.yml up
+```
+
+To run tests on everything, do `cargo test --all --all-features --no-fail-fast`.
 
 ## Docker Image
 

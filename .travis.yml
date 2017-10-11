@@ -1,4 +1,4 @@
-sudo: false
+sudo: required
 language: rust
 rust:
   - nightly-2017-09-26
@@ -12,17 +12,20 @@ addons:
       - libelf-dev
       - libdw-dev
 services:
-  - mysql
+  - docker
 before_script:
+  - sudo /etc/init.d/mysql stop
+  - sudo docker-compose -f diesel/docker-compose.db.yml up -d
   - |
     pip install 'travis-cargo<0.2' --user &&
     export PATH=$HOME/.local/bin:$PATH
-  - mysql -uroot < diesel/test/fixtures/mysql.sql
 script:
   - |
     travis-cargo build -- --all-features --all --locked &&
     travis-cargo test -- --all-features --all &&
     travis-cargo --only nightly-2017-09-26 doc -- --no-deps --all-features --all
+after_script:
+  - sudo docker-compose -f diesel/docker-compose.db.yml down -v
 after_success:
   - travis-cargo --only nightly-2017-09-26 doc-upload
 env:

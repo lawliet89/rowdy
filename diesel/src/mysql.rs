@@ -7,7 +7,8 @@ use r2d2_diesel::ConnectionManager;
 use rowdy;
 use rowdy::auth::{AuthenticatorConfiguration, Basic};
 
-use {ConnectionPool, Error};
+use {ConnectionPool, Error, PooledConnection};
+use schema;
 
 /// A rowdy authenticator that uses a MySQL backed database to provide the users
 pub type Authenticator = ::Authenticator<MysqlConnection>;
@@ -44,6 +45,14 @@ impl Authenticator {
     fn connect(uri: &str) -> Result<MysqlConnection, Error> {
         debug_!("Attempting a connection to MySQL database");
         Ok(MysqlConnection::establish(uri)?)
+    }
+}
+
+impl schema::Migration<MysqlConnection> for Authenticator {
+    type Connection = PooledConnection<ConnectionManager<MysqlConnection>>;
+
+    fn connection(&self) -> Result<Self::Connection, ::Error> {
+        self.get_pooled_connection()
     }
 }
 
@@ -94,18 +103,41 @@ impl AuthenticatorConfiguration<Basic> for Configuration {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Once, ONCE_INIT};
+
+    use diesel::connection::SimpleConnection;
     use rowdy::auth::Authenticator;
     use rowdy::auth::util::hex_dump;
+
+    use schema::Migration;
     use super::*;
 
+    static SEED: Once = ONCE_INIT;
+
+    /// Reset and seed the databse. This should only be run once.
+    fn reset_and_seed(authenticator: &super::Authenticator) {
+        SEED.call_once(|| {
+            let query = format!(
+                include_str!("../test/fixtures/mysql.sql"),
+                migration = authenticator.migration_query()
+            );
+
+            let connection = authenticator.get_pooled_connection().expect("to succeed");
+            connection.batch_execute(&query).expect("to work");
+        });
+    }
+
+
     fn make_authenticator() -> super::Authenticator {
-        not_err!(super::Authenticator::with_configuration(
+        let authenticator = not_err!(super::Authenticator::with_configuration(
             "127.0.0.1",
             3306,
             "rowdy",
             "root",
             "",
-        ))
+        ));
+        reset_and_seed(&authenticator);
+        authenticator
     }
 
     #[test]
@@ -139,6 +171,15 @@ mod tests {
             "b400a5eea452afcc67a81602f28012e5634404ddf1e043d6ff1df67022c88cd2",
             hashed_password
         );
+    }
+
+    /// Migration should be idempotent
+    #[test]
+    fn migration_is_idempotent() {
+        let authenticator = make_authenticator();
+        authenticator
+            .migrate()
+            .expect("To succeed and be idempotent")
     }
 
     #[test]

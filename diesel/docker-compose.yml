@@ -1,8 +1,0 @@
-version: "2.0"
-services:
-  db:
-    image: mysql
-    environment:
-        MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
-    ports:
-      - 3306:3306

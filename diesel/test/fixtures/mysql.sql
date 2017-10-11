@@ -1,14 +1,7 @@
-# Create rowdy database
-CREATE DATABASE IF NOT EXISTS `rowdy`;
-USE `rowdy`;
+DROP TABLE IF EXISTS `users`;
 
 # Create users table
-CREATE TABLE IF NOT EXISTS `users` (
-    `username` VARCHAR(255) UNIQUE NOT NULL,
-    `hash` BINARY(32) NOT NULL,
-    `salt` VARBINARY(255) NOT NULL,
-    PRIMARY KEY (`username`)
-);
+{migration}
 
 # Populate with test data
 INSERT INTO `users` (username, hash, salt) VALUES

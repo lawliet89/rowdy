@@ -44,6 +44,10 @@ pub mod mysql;
 /// [`Connection`](http://docs.diesel.rs/diesel/connection/trait.Connection.html)
 pub type ConnectionPool<T> = r2d2::Pool<r2d2_diesel::ConnectionManager<T>>;
 
+/// Errors from using `rowdy-diesel`.
+///
+/// This enum `impl From<Error> for rowdy::Error`, and can be used with the `?` operator
+/// in places where `rowdy::Error` is expected.
 #[derive(Debug)]
 pub enum Error {
     /// A diesel connection error
@@ -113,6 +117,9 @@ pub struct User {
 }
 
 /// A generic authenticator backed by a connection to a database via [diesel](http://diesel.rs/).
+///
+/// Instead of using this, you should use the "specialised" authenticators defined in the
+/// `mysql`, `pg`, or `sqlite` modules for your database.
 pub struct Authenticator<T>
 where
     T: diesel::connection::Connection + 'static,
@@ -132,7 +139,9 @@ where
     }
 
     /// Retrieve a connection to the database from the pool
-    fn get_pooled_connection(&self) -> Result<PooledConnection<ConnectionManager<T>>, Error> {
+    pub(crate) fn get_pooled_connection(
+        &self,
+    ) -> Result<PooledConnection<ConnectionManager<T>>, Error> {
         debug_!("Retrieving a connection from the pool");
         Ok(self.pool.get()?)
     }

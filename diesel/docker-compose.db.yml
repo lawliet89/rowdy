@@ -1,0 +1,10 @@
+# Test DB services needed for `rowdy-diesel` tests
+version: "2.0"
+services:
+  mysql:
+    image: mysql:5
+    environment:
+        MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        MYSQL_DATABASE: "rowdy"
+    ports:
+      - 127.0.0.1:3306:3306
