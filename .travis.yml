@@ -1,7 +1,7 @@
 sudo: required
 language: rust
 rust:
-  - nightly-2017-09-26
+  - nightly-2017-10-11
 matrix:
   allow_failures:
     - rust: nightly
@@ -23,11 +23,11 @@ script:
   - |
     travis-cargo build -- --all-features --all --locked &&
     travis-cargo test -- --all-features --all &&
-    travis-cargo --only nightly-2017-09-26 doc -- --no-deps --all-features --all
+    travis-cargo --only nightly-2017-10-11 doc -- --no-deps --all-features --all
 after_script:
   - sudo docker-compose -f diesel/docker-compose.db.yml down -v
 after_success:
-  - travis-cargo --only nightly-2017-09-26 doc-upload
+  - travis-cargo --only nightly-2017-10-11 doc-upload
 env:
   global:
     - TRAVIS_CARGO_NIGHTLY_FEATURE=""

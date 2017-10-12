@@ -1,7 +1,7 @@
 FROM japaric/x86_64-unknown-linux-musl:v0.1.10 as builder
 ENV PATH "/root/.cargo/bin:${PATH}"
 
-ARG RUST_VERSION=nightly-2017-09-26
+ARG RUST_VERSION=nightly-2017-10-11
 ARG ARCHITECTURE=x86_64-unknown-linux-musl
 RUN set -x \
     && apt-get update \
