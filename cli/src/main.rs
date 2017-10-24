@@ -33,7 +33,7 @@ fn run_subcommand(args: &ArgMatches) -> Result<(), rowdy::Error> {
         ("noop", Some(args)) => launch::<auth::NoOpConfiguration>(args),
         ("csv", Some(args)) => launch::<auth::SimpleAuthenticatorConfiguration>(args),
         ("ldap", Some(args)) => launch::<auth::LdapAuthenticator>(args),
-        ("mysql", Some(args)) => launch::<rowdy_diesel::mysql::Configuration>(args),
+        ("mysql", Some(args)) => run_diesel::<rowdy_diesel::mysql::Configuration, _, _, _>(args),
         _ => unreachable!("Unknown subcommand encountered."),
     }
 }
@@ -91,6 +91,16 @@ where
     let mysql = SubCommand::with_name("mysql")
         .about("Launch rowdy with a `mysql` authenticator backed by a MySQL table.")
         .arg(
+            Arg::with_name("migrate")
+                .help(
+                    "Instead of launching the server, perform a migration to create the bare\
+                     minimum table for Rowdy to work. The migration is idempotent. See \
+                     https://lawliet89.github.io/rowdy/rowdy_diesel/schema/index.html \
+                     for schema information",
+                )
+                .long("migrate"),
+        )
+        .arg(
             Arg::with_name("config")
                 .index(1)
                 .help(
@@ -110,7 +120,6 @@ where
         .setting(AppSettings::SubcommandRequired)
         .setting(AppSettings::VersionlessSubcommands)
         .setting(AppSettings::PropagateGlobalValuesDown)
-        .setting(AppSettings::InferSubcommands)
         .global_setting(AppSettings::DontCollapseArgsInUsage)
         .global_setting(AppSettings::NextLineHelp)
         .about(
@@ -159,8 +168,37 @@ where
 
     // launch() will never return except in error
     let launch_error = rocket.mount("/", rowdy::routes()).launch();
-
     Err(launch_error)?
+}
+
+fn run_diesel<Config, Auth, Connection, ConnectionPool>(
+    args: &ArgMatches,
+) -> Result<(), rowdy::Error>
+where
+    Config: auth::AuthenticatorConfiguration<auth::Basic, Authenticator = Auth>,
+    Auth: auth::Authenticator<auth::Basic>
+        + rowdy_diesel::schema::Migration<Connection, Connection = ConnectionPool>,
+    Connection: rowdy_diesel::Connection + 'static,
+    ConnectionPool: std::ops::Deref<Target = Connection>,
+{
+    let config = args.value_of("config")
+        .expect("Required options to be present");
+    let reader = input_reader(&config)?;
+    let config = read_config::<Config, _>(reader)?;
+
+    if args.is_present("migrate") {
+        println!("Performing migration...");
+        let authenticator = config.basic_authenticator.make_authenticator()?;
+        authenticator.migrate()?;
+        println!("Migration complete.");
+        Ok(())
+    } else {
+        let rocket = config.ignite()?;
+
+        // launch() will never return except in error
+        let launch_error = rocket.mount("/", rowdy::routes()).launch();
+        Err(launch_error)?
+    }
 }
 
 fn read_config<B, R: Read>(reader: R) -> Result<rowdy::Configuration<B>, rowdy::Error>

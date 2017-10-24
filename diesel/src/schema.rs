@@ -48,8 +48,7 @@ pub use self::table_macro::*;
 
 use std::ops::Deref;
 
-use diesel::connection::Connection;
-
+use Connection;
 /// Templated SQL template to create the `users` table.
 ///
 /// The binary column types are different for each database type, and thus the query string needs
@@ -66,6 +65,8 @@ macro_rules! sql_template {
 /// Trait to provide idempotent minimal migration to create the table necessary for `rowdy-diesel`
 /// to work. If you have more sophisticated needs, you are able to add more columns to the basic
 /// columns needed for rowdy to work.
+// TODO: Look into folding this into the base `Authenticator` struct once const generics
+// is implemented. See https://github.com/rust-lang/rust/issues/44580
 pub trait Migration<T>
 where
     T: Connection + 'static,

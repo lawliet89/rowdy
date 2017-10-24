@@ -63,6 +63,8 @@ pub mod schema;
 #[cfg(feature = "mysql")]
 pub mod mysql;
 
+
+pub use diesel::connection::Connection;
 /// A connection pool for the Diesel backed authenticators
 ///
 /// Type `T` should implement
@@ -149,14 +151,14 @@ pub(crate) struct User {
 /// Passwords are hasahed with `argon2i`, in addition to a salt.
 pub struct Authenticator<T>
 where
-    T: diesel::connection::Connection + 'static,
+    T: Connection + 'static,
 {
     pool: ConnectionPool<T>,
 }
 
 impl<T> Authenticator<T>
 where
-    T: diesel::connection::Connection + 'static,
+    T: Connection + 'static,
     String: diesel::types::FromSql<diesel::types::Text, <T as diesel::Connection>::Backend>,
     Vec<u8>: diesel::types::FromSql<diesel::types::Binary, <T as diesel::Connection>::Backend>,
 {
@@ -268,7 +270,7 @@ where
 
 impl<T> auth::Authenticator<Basic> for Authenticator<T>
 where
-    T: diesel::connection::Connection + 'static,
+    T: Connection + 'static,
     String: diesel::types::FromSql<diesel::types::Text, <T as diesel::Connection>::Backend>,
     Vec<u8>: diesel::types::FromSql<diesel::types::Binary, <T as diesel::Connection>::Backend>,
 {

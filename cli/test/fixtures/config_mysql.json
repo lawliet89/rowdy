@@ -19,7 +19,7 @@
     "expiry_duration": 86400
   },
   "basic_authenticator": {
-    "host": "localhost",
+    "host": "127.0.0.1",
     "database": "rowdy",
     "user": "root",
     "password": ""

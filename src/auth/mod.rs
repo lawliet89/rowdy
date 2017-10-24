@@ -101,7 +101,7 @@ impl fmt::Display for Error {
 
 impl<'r> response::Responder<'r> for Error {
     fn respond_to(self, _: &Request) -> Result<response::Response<'r>, Status> {
-        error_!("Headers Error: {:?}", self);
+        error_!("Authentication Error: {:?}", self);
         match self {
             Error::MissingAuthorization { ref realm } => {
                 // TODO: Support other schemes!
