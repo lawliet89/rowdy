@@ -1,32 +1,120 @@
 #![feature(plugin)]
 #![plugin(rocket_codegen)]
 
-extern crate docopt;
 #[macro_use]
-extern crate log;
-#[macro_use]
+extern crate clap;
 extern crate rocket;
 extern crate rowdy;
 extern crate rowdy_diesel;
 extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 extern crate serde_json;
 
-use docopt::Docopt;
+use std::fs::File;
+use std::io::{self, Read};
+
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use rowdy::auth;
-use rocket::Rocket;
 
-const USAGE: &'static str = r#"
-rowdy JSON Web Token Authentication Server
+fn main() {
+    let args = make_parser().get_matches();
+    let result = run_subcommand(&args);
 
-Usage:
-  rowdy noop <configuration-json>
-  rowdy csv <configuration-json>
-  rowdy ldap <configuration-json>
-  rowdy mysql <configuration-json>
-  rowdy (-h | --help)
+    std::process::exit(match result {
+        Ok(()) => 0,
+        Err(e) => {
+            println!("Error: {}", e.to_string());
+            1
+        }
+    });
+}
 
+fn run_subcommand(args: &ArgMatches) -> Result<(), rowdy::Error> {
+    match args.subcommand() {
+        ("noop", Some(args)) => launch::<auth::NoOpConfiguration>(args),
+        ("csv", Some(args)) => launch::<auth::SimpleAuthenticatorConfiguration>(args),
+        ("ldap", Some(args)) => launch::<auth::LdapAuthenticator>(args),
+        ("mysql", Some(args)) => launch::<rowdy_diesel::mysql::Configuration>(args),
+        _ => unreachable!("Unknown subcommand encountered."),
+    }
+}
+
+/// Make a command line parser for options
+fn make_parser<'a, 'b>() -> App<'a, 'b>
+where
+    'a: 'b,
+{
+    let noop = SubCommand::with_name("noop")
+        .about("Launch rowdy with a `noop` authenticator.")
+        .arg(
+            Arg::with_name("config")
+                .index(1)
+                .help(
+                    "Specifies the path to read the configuration from. \
+                     Use - to refer to STDIN",
+                )
+                .takes_value(true)
+                .value_name("config_path")
+                .empty_values(false)
+                .required(true),
+        );
+
+    let csv = SubCommand::with_name("csv")
+        .about("Launch rowdy with a `csv` authenticator backed by a CSV user database.")
+        .arg(
+            Arg::with_name("config")
+                .index(1)
+                .help(
+                    "Specifies the path to read the configuration from. \
+                     Use - to refer to STDIN",
+                )
+                .takes_value(true)
+                .value_name("config_path")
+                .empty_values(false)
+                .required(true),
+        );
+
+    let ldap = SubCommand::with_name("ldap")
+        .about("Launch rowdy with a `ldap` authenticator backed by a LDAP directory.")
+        .arg(
+            Arg::with_name("config")
+                .index(1)
+                .help(
+                    "Specifies the path to read the configuration from. \
+                     Use - to refer to STDIN",
+                )
+                .takes_value(true)
+                .value_name("config_path")
+                .empty_values(false)
+                .required(true),
+        );
+
+    let mysql = SubCommand::with_name("mysql")
+        .about("Launch rowdy with a `mysql` authenticator backed by a MySQL table.")
+        .arg(
+            Arg::with_name("config")
+                .index(1)
+                .help(
+                    "Specifies the path to read the configuration from. \
+                     Use - to refer to STDIN",
+                )
+                .takes_value(true)
+                .value_name("config_path")
+                .empty_values(false)
+                .required(true),
+        );
+
+    App::new("rowdy")
+        .bin_name("rowdy")
+        .version(crate_version!())
+        .author(crate_authors!())
+        .setting(AppSettings::SubcommandRequired)
+        .setting(AppSettings::VersionlessSubcommands)
+        .setting(AppSettings::PropagateGlobalValuesDown)
+        .setting(AppSettings::InferSubcommands)
+        .global_setting(AppSettings::DontCollapseArgsInUsage)
+        .global_setting(AppSettings::NextLineHelp)
+        .about(
+            r#"
 Provide a configuration JSON file to run `rowdy` with. For available fields and examples for the
 JSON configuration, refer to the documentation at
 https://lawliet89.github.io/rowdy/rowdy/struct.Configuration.html
@@ -49,167 +137,102 @@ configuration JSON.
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.LdapAuthenticator.html
   - mysql: The key should behave according to the format documented at
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.MysqlAuthenticatorConfiguration.html
-
-Options:
-  -h --help                 Show this screen.
-"#;
-
-#[derive(Debug, Deserialize, PartialEq)]
-struct Args {
-    arg_configuration_json: String,
-    cmd_noop: bool,
-    cmd_csv: bool,
-    cmd_ldap: bool,
-    cmd_mysql: bool,
+        "#,
+        )
+        .subcommand(noop)
+        .subcommand(csv)
+        .subcommand(ldap)
+        .subcommand(mysql)
 }
 
-fn main() {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.deserialize())
-        .unwrap_or_else(|e| e.exit());
-
-    let rocket = if args.cmd_noop {
-        ignite::<auth::NoOpConfiguration>(&args.arg_configuration_json)
-    } else if args.cmd_csv {
-        ignite::<auth::SimpleAuthenticatorConfiguration>(&args.arg_configuration_json)
-    } else if args.cmd_ldap {
-        ignite::<auth::LdapAuthenticator>(&args.arg_configuration_json)
-    } else if args.cmd_mysql {
-        ignite::<rowdy_diesel::mysql::Configuration>(&args.arg_configuration_json)
-    } else {
-        unreachable!("Should never happen");
-    };
-
-    let rocket = rocket.unwrap_or_else(|e| panic!("{}", e));
-    rocket.mount("/", rowdy::routes()).launch();
-}
-
-/// Read configuration files, and ignite a `Rocket`
-fn ignite<B>(path: &str) -> Result<Rocket, rowdy::Error>
+/// Launch a rocket -- this function will block and never return unless on error
+fn launch<B>(args: &ArgMatches) -> Result<(), rowdy::Error>
 where
     B: auth::AuthenticatorConfiguration<auth::Basic>,
 {
-    let config = read_config::<B>(path)?;
-    config.ignite()
+    let config = args.value_of("config")
+        .expect("Required options to be present");
+
+    let reader = input_reader(&config)?;
+    let config = read_config::<B, _>(reader)?;
+    let rocket = config.ignite()?;
+
+    // launch() will never return except in error
+    let launch_error = rocket.mount("/", rowdy::routes()).launch();
+
+    Err(launch_error)?
 }
 
-fn read_config<B>(path: &str) -> Result<rowdy::Configuration<B>, String>
+fn read_config<B, R: Read>(reader: R) -> Result<rowdy::Configuration<B>, rowdy::Error>
 where
     B: auth::AuthenticatorConfiguration<auth::Basic>,
 {
-    use std::fs::File;
-    use std::io::Read;
-
-    info_!("Reading configuration from '{}'", path);
-    let mut file = File::open(&path).map_err(|e| format!("{:?}", e))?;
-    let mut config_json = String::new();
-    file.read_to_string(&mut config_json)
-        .map_err(|e| format!("{:?}", e))?;
-
-    deserialize_json(&config_json)
+    Ok(serde_json::from_reader(reader).map_err(|e| e.to_string())?)
 }
 
-pub fn deserialize_json<T>(json: &str) -> Result<T, String>
-where
-    T: serde::de::DeserializeOwned,
-{
-    serde_json::from_str(json).map_err(|e| format!("{:?}", e))
+/// Gets a `Read` depending on the path. If the path is `-`, read from STDIN
+fn input_reader(path: &str) -> Result<Box<Read>, rowdy::Error> {
+    match path {
+        "-" => Ok(Box::new(io::stdin())),
+        path => {
+            let file = File::open(path)?;
+            Ok(Box::new(file))
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn ignite_noop() {
-        ignite::<auth::NoOpConfiguration>("test/fixtures/config_noop.json").unwrap();
+    use std::io::Cursor;
+
+    fn noop_json() -> &'static str {
+        include_str!("../test/fixtures/config_noop.json")
+    }
+
+    fn csv_json() -> &'static str {
+        include_str!("../test/fixtures/config_csv.json")
+    }
+
+    fn ldap_json() -> &'static str {
+        include_str!("../test/fixtures/config_ldap.json")
+    }
+
+    fn mysql_json() -> &'static str {
+        include_str!("../test/fixtures/config_mysql.json")
+    }
+
+    fn to_cursor<F, T>(fixture: F) -> Cursor<T>
+    where
+        F: Fn() -> T,
+        T: AsRef<[u8]>,
+    {
+        Cursor::new(fixture())
     }
 
     #[test]
-    fn ignite_csv() {
-        ignite::<auth::NoOpConfiguration>("test/fixtures/config_csv.json").unwrap();
+    fn noop_configuration_reading() {
+        let config = to_cursor(noop_json);
+        let _ = read_config::<auth::NoOpConfiguration, _>(config).expect("to succeed");
     }
 
     #[test]
-    fn ignite_ldap() {
-        ignite::<auth::NoOpConfiguration>("test/fixtures/config_ldap.json").unwrap();
+    fn csv_configuration_reading() {
+        let config = to_cursor(csv_json);
+        let _ =
+            read_config::<auth::SimpleAuthenticatorConfiguration, _>(config).expect("to succeed");
     }
 
     #[test]
-    fn ignite_mysql() {
-        ignite::<auth::NoOpConfiguration>("test/fixtures/config_mysql.json").unwrap();
+    fn ldap_configuration_reading() {
+        let config = to_cursor(ldap_json);
+        let _ = read_config::<auth::LdapAuthenticator, _>(config).expect("to succeed");
     }
 
     #[test]
-    fn docopt_usage_string_parsing() {
-        Docopt::new(USAGE).unwrap();
-    }
-
-    #[test]
-    fn docopt_noop() {
-        let docopt = Docopt::new(USAGE).unwrap();
-        let docopt = docopt.argv(["rowdy", "noop", "test/fixtures/config/noop.json"].iter());
-        let args = docopt.deserialize().unwrap();
-
-        let expected_args = Args {
-            arg_configuration_json: "test/fixtures/config/noop.json".to_string(),
-            cmd_noop: true,
-            cmd_csv: false,
-            cmd_ldap: false,
-            cmd_mysql: false,
-        };
-
-        assert_eq!(expected_args, args);
-    }
-
-    #[test]
-    fn docopt_csv() {
-        let docopt = Docopt::new(USAGE).unwrap();
-        let docopt = docopt.argv(["rowdy", "csv", "test/fixtures/config/csv.json"].iter());
-        let args = docopt.deserialize().unwrap();
-
-        let expected_args = Args {
-            arg_configuration_json: "test/fixtures/config/csv.json".to_string(),
-            cmd_noop: false,
-            cmd_csv: true,
-            cmd_ldap: false,
-            cmd_mysql: false,
-        };
-
-        assert_eq!(expected_args, args);
-    }
-
-    #[test]
-    fn docopt_ldap() {
-        let docopt = Docopt::new(USAGE).unwrap();
-        let docopt = docopt.argv(["rowdy", "ldap", "test/fixtures/config/ldap.json"].iter());
-        let args = docopt.deserialize().unwrap();
-
-        let expected_args = Args {
-            arg_configuration_json: "test/fixtures/config/ldap.json".to_string(),
-            cmd_noop: false,
-            cmd_csv: false,
-            cmd_ldap: true,
-            cmd_mysql: false,
-        };
-
-        assert_eq!(expected_args, args);
-    }
-
-    #[test]
-    fn docopt_mysql() {
-        let docopt = Docopt::new(USAGE).unwrap();
-        let docopt = docopt.argv(["rowdy", "mysql", "test/fixtures/config/mysql.json"].iter());
-        let args = docopt.deserialize().unwrap();
-
-        let expected_args = Args {
-            arg_configuration_json: "test/fixtures/config/mysql.json".to_string(),
-            cmd_noop: false,
-            cmd_csv: false,
-            cmd_ldap: false,
-            cmd_mysql: true,
-        };
-
-        assert_eq!(expected_args, args);
+    fn mysql_configuration_reading() {
+        let config = to_cursor(mysql_json);
+        let _ = read_config::<rowdy_diesel::mysql::Configuration, _>(config).expect("to succeed");
     }
 }

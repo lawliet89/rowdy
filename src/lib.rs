@@ -261,6 +261,8 @@ pub enum Error {
     Token(token::Error),
     /// IO errors
     IOError(io::Error),
+    /// An error launcing Rocket
+    LaunchError(rocket::error::LaunchError),
 
     /// Unsupported operation
     UnsupportedOperation,
@@ -271,6 +273,7 @@ impl_from_error!(cors::Error, Error::CORS);
 impl_from_error!(token::Error, Error::Token);
 impl_from_error!(String, Error::GenericError);
 impl_from_error!(io::Error, Error::IOError);
+impl_from_error!(rocket::error::LaunchError, Error::LaunchError);
 
 impl error::Error for Error {
     fn description(&self) -> &str {
@@ -280,6 +283,7 @@ impl error::Error for Error {
             Error::CORS(ref e) => e.description(),
             Error::Token(ref e) => e.description(),
             Error::IOError(ref e) => e.description(),
+            Error::LaunchError(ref e) => e.description(),
             Error::GenericError(ref e) | Error::BadRequest(ref e) => e,
         }
     }
@@ -290,6 +294,7 @@ impl error::Error for Error {
             Error::CORS(ref e) => Some(e),
             Error::Token(ref e) => Some(e),
             Error::IOError(ref e) => Some(e),
+            Error::LaunchError(ref e) => Some(e),
             Error::UnsupportedOperation | Error::GenericError(_) | Error::BadRequest(_) => {
                 Some(self)
             }
@@ -306,6 +311,7 @@ impl fmt::Display for Error {
             Error::Token(ref e) => fmt::Display::fmt(e, f),
             Error::IOError(ref e) => fmt::Display::fmt(e, f),
             Error::GenericError(ref e) => fmt::Display::fmt(e, f),
+            Error::LaunchError(ref e) => fmt::Display::fmt(e, f),
             Error::BadRequest(ref e) => fmt::Display::fmt(e, f),
         }
     }

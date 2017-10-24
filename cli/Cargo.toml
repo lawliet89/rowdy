@@ -10,12 +10,10 @@ test = true
 doc = false
 
 [dependencies]
-docopt = "0.8"
-log = "0.3"
+clap = "2.26.2"
 rocket = "0.3.2"
 rocket_codegen = "0.3.2"
 rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
 rowdy-diesel = { path = "../diesel/", features = ["mysql"] }
 serde = "1.0"
-serde_derive = "1.0"
 serde_json = "1.0"
