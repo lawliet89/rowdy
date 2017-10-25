@@ -160,8 +160,7 @@ See https://rocket.rs/guide/overview#configuration
 The `noop` subcommand allows all username and passwords to authenticate.
 The `csv` subcommand uses a CSV file as its username database. See
 https://lawliet89.github.io/rowdy/rowdy/auth/simple/index.html for the database format.
-The `mysql` subcommand uses a MySQL database for usernames. See
-https://lawliet89.github.io/rowdy/rowdy/auth/mysql/index.html for the database format.
+The `mysql`, `postgres`, and `sqlite` subcommands uses a their respective databases for usernames.
 
 The subcommands will change the format expected by the `basic_authenticator` key of the
 configuration JSON.
@@ -172,6 +171,8 @@ configuration JSON.
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.LdapAuthenticator.html
   - mysql: The key should behave according to the format documented at
     https://lawliet89.github.io/rowdy/rowdy_diesel/mysql/struct.Configuration.html
+  - sqlite: The key should behave according to the format documented at
+    https://lawliet89.github.io/rowdy/rowdy_diesel/sqlite/struct.Configuration.html
         "#,
         )
         .subcommand(noop)
@@ -268,6 +269,10 @@ mod tests {
         include_str!("../test/fixtures/config_mysql.json")
     }
 
+    fn sqlite_json() -> &'static str {
+        include_str!("../test/fixtures/config_sqlite.json")
+    }
+
     fn to_cursor<F, T>(fixture: F) -> Cursor<T>
     where
         F: Fn() -> T,
@@ -299,5 +304,11 @@ mod tests {
     fn mysql_configuration_reading() {
         let config = to_cursor(mysql_json);
         let _ = read_config::<rowdy_diesel::mysql::Configuration, _>(config).expect("to succeed");
+    }
+
+    #[test]
+    fn sqlite_configuration_reading() {
+        let config = to_cursor(sqlite_json);
+        let _ = read_config::<rowdy_diesel::sqlite::Configuration, _>(config).expect("to succeed");
     }
 }
