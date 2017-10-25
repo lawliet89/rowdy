@@ -294,6 +294,7 @@ impl LdapAuthenticator {
             let mut user = self.search(&connection, username)
                 .map_err(|_e| super::Error::AuthenticationFailure)?;
             if user.len() != 1 {
+                error_!("{} users were returned for the username {}", user.len(), username);
                 Err(super::Error::AuthenticationFailure)?;
             }
 
