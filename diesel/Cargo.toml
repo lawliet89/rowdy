@@ -19,6 +19,9 @@ mysql = ["diesel/mysql", "diesel_codegen/mysql"]
 # Support Sqlite
 sqlite = ["diesel/sqlite", "diesel_codegen/sqlite"]
 
+# Support Postgres
+postgres = ["diesel/postgres", "diesel_codegen/postgres"]
+
 [dependencies]
 diesel = "0.16"
 diesel_codegen = "0.16"

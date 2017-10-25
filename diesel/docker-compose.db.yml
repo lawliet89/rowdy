@@ -8,3 +8,11 @@ services:
         MYSQL_DATABASE: "rowdy"
     ports:
       - 127.0.0.1:3306:3306
+  postgres:
+    image: postgres:10
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rowdy
+    ports:
+      - 127.0.0.1:5432:5432

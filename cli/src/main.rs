@@ -35,6 +35,7 @@ fn run_subcommand(args: &ArgMatches) -> Result<(), rowdy::Error> {
         ("ldap", Some(args)) => launch::<auth::LdapAuthenticator>(args),
         ("mysql", Some(args)) => run_diesel::<rowdy_diesel::mysql::Configuration, _, _, _>(args),
         ("sqlite", Some(args)) => run_diesel::<rowdy_diesel::sqlite::Configuration, _, _, _>(args),
+        ("postgres", Some(args)) => run_diesel::<rowdy_diesel::postgres::Configuration, _, _, _>(args),
         _ => unreachable!("Unknown subcommand encountered."),
     }
 }
@@ -139,6 +140,31 @@ where
                 .required(true),
         );
 
+    let postgres = SubCommand::with_name("postgres")
+        .about("Launch rowdy with a `postgres` authenticator backed by a PostgresSQL table.")
+        .arg(
+            Arg::with_name("migrate")
+                .help(
+                    "Instead of launching the server, perform a migration to create the bare\
+                     minimum table for Rowdy to work. The migration is idempotent. See \
+                     https://lawliet89.github.io/rowdy/rowdy_diesel/schema/index.html \
+                     for schema information",
+                )
+                .long("migrate"),
+        )
+        .arg(
+            Arg::with_name("config")
+                .index(1)
+                .help(
+                    "Specifies the path to read the configuration from. \
+                     Use - to refer to STDIN",
+                )
+                .takes_value(true)
+                .value_name("config_path")
+                .empty_values(false)
+                .required(true),
+        );
+
     App::new("rowdy")
         .bin_name("rowdy")
         .version(crate_version!())
@@ -180,6 +206,7 @@ configuration JSON.
         .subcommand(ldap)
         .subcommand(mysql)
         .subcommand(sqlite)
+        .subcommand(postgres)
 }
 
 /// Launch a rocket -- this function will block and never return unless on error
@@ -273,6 +300,10 @@ mod tests {
         include_str!("../test/fixtures/config_sqlite.json")
     }
 
+    fn postgres_json() -> &'static str {
+        include_str!("../test/fixtures/config_postgres.json")
+    }
+
     fn to_cursor<F, T>(fixture: F) -> Cursor<T>
     where
         F: Fn() -> T,
@@ -310,5 +341,11 @@ mod tests {
     fn sqlite_configuration_reading() {
         let config = to_cursor(sqlite_json);
         let _ = read_config::<rowdy_diesel::sqlite::Configuration, _>(config).expect("to succeed");
+    }
+
+    #[test]
+    fn postgres_configuration_reading() {
+        let config = to_cursor(postgres_json);
+        let _ = read_config::<rowdy_diesel::postgres::Configuration, _>(config).expect("to succeed");
     }
 }

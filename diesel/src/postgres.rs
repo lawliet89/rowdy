@@ -1,8 +1,8 @@
-//! MySQL authenticator module
+//! PostgresSQL authenticator module
 //!
-//! Requires `features = ["mysql"]` in your `Cargo.toml`
+//! Requires `features = ["postgres"]` in your `Cargo.toml`
 use diesel::prelude::*;
-use diesel::mysql::MysqlConnection;
+use diesel::pg::PgConnection;
 use r2d2::Config;
 use r2d2_diesel::ConnectionManager;
 
@@ -12,13 +12,13 @@ use rowdy::auth::{AuthenticatorConfiguration, Basic};
 use {ConnectionPool, Error, PooledConnection};
 use schema;
 
-/// A rowdy authenticator that uses a MySQL backed database to provide the users
-pub type Authenticator = ::Authenticator<MysqlConnection>;
+/// A rowdy authenticator that uses a PostgresSQL backed database to provide the users
+pub type Authenticator = ::Authenticator<PgConnection>;
 
 impl Authenticator {
     /// Using a database connection string of the form
-    /// `mysql://[user[:password]@]host/database_name`,
-    /// create an authenticator that is backed by a connection pool to a MySQL database
+    /// `postgresql://[user[:password]@][host][:port][/database_name]`,
+    /// create an authenticator that is backed by a connection pool to a PostgresSQL database
     pub fn with_uri(uri: &str) -> Result<Self, Error> {
         // Attempt a test connection with diesel
         let _ = Self::connect(uri)?;
@@ -39,35 +39,42 @@ impl Authenticator {
         user: &str,
         pass: &str,
     ) -> Result<Self, Error> {
-        let database_uri = format!("mysql://{}:{}@{}:{}/{}", user, pass, host, port, database);
+        let database_uri = format!(
+            "postgresql://{}:{}@{}:{}/{}",
+            user,
+            pass,
+            host,
+            port,
+            database
+        );
         Self::with_uri(&database_uri)
     }
 
     /// Test connection with the database uri
-    fn connect(uri: &str) -> Result<MysqlConnection, Error> {
+    fn connect(uri: &str) -> Result<PgConnection, Error> {
         debug_!("Attempting a connection to MySQL database");
-        Ok(MysqlConnection::establish(uri)?)
+        Ok(PgConnection::establish(uri)?)
     }
 }
 
-impl schema::Migration<MysqlConnection> for Authenticator {
-    type Connection = PooledConnection<ConnectionManager<MysqlConnection>>;
+impl schema::Migration<PgConnection> for Authenticator {
+    type Connection = PooledConnection<ConnectionManager<PgConnection>>;
 
     fn connection(&self) -> Result<Self::Connection, ::Error> {
         self.get_pooled_connection()
     }
 
     fn migration_query(&self) -> &str {
-        r#"CREATE TABLE IF NOT EXISTS `users` (
-    `username` VARCHAR(255) UNIQUE NOT NULL,
-    `hash` BINARY(32) NOT NULL,
-    `salt` VARBINARY(255) NOT NULL,
-    PRIMARY KEY (`username`)
+        r#"CREATE TABLE IF NOT EXISTS users (
+    username VARCHAR(255) UNIQUE NOT NULL,
+    hash BYTEA NOT NULL,
+    salt BYTEA NOT NULL,
+    PRIMARY KEY (username)
 );"#
     }
 }
 
-/// (De)Serializable configuration for MySQL Authenticator. This struct should be included
+/// (De)Serializable configuration for PostgresSQL Authenticator. This struct should be included
 /// in the base `Configuration`.
 /// # Examples
 /// ```json
@@ -81,21 +88,21 @@ impl schema::Migration<MysqlConnection> for Authenticator {
 /// ```
 #[derive(Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Configuration {
-    /// Host for the MySql database manager - domain name or IP
+    /// Host for the PostgresSQL database manager - domain name or IP
     pub host: String,
-    /// MySql database port - default 3306
+    /// PostgresSQL database port - default 5432
     #[serde(default = "default_port")]
     pub port: u16,
-    /// MySql database
+    /// PostgresSQL database
     pub database: String,
-    /// MySql user
+    /// PostgresSQL user
     pub user: String,
-    /// MySql password
+    /// PostgresSQL password
     pub password: String,
 }
 
 fn default_port() -> u16 {
-    3306
+    5432
 }
 
 impl AuthenticatorConfiguration<Basic> for Configuration {
@@ -128,7 +135,7 @@ mod tests {
     fn reset_and_seed(authenticator: &super::Authenticator) {
         SEED.call_once(|| {
             let query = format!(
-                include_str!("../test/fixtures/mysql.sql"),
+                include_str!("../test/fixtures/postgres.sql"),
                 migration = authenticator.migration_query()
             );
 
@@ -139,9 +146,13 @@ mod tests {
 
 
     fn make_authenticator() -> super::Authenticator {
-        let authenticator =
-            super::Authenticator::with_configuration("127.0.0.1", 3306, "rowdy", "root", "")
-                .expect("To be constructed successfully");
+        let authenticator = super::Authenticator::with_configuration(
+            "127.0.0.1",
+            5432,
+            "rowdy",
+            "postgres",
+            "postgres",
+        ).expect("To be constructed successfully");
         reset_and_seed(&authenticator);
         authenticator
     }
@@ -214,20 +225,20 @@ mod tests {
 
         let json = r#"{
             "host": "127.0.0.1",
-            "port": 3306,
+            "port": 5432,
             "database": "rowdy",
-            "user": "root",
-            "password": ""
+            "user": "postgres",
+            "password": "postgres"
         }"#;
 
         let deserialized: Configuration =
             serde_json::from_str(json).expect("to deserialize successfully");
         let expected_config = Configuration {
             host: "127.0.0.1".to_string(),
-            port: 3306,
+            port: 5432,
             database: "rowdy".to_string(),
-            user: "root".to_string(),
-            password: "".to_string(),
+            user: "postgres".to_string(),
+            password: "postgres".to_string(),
         };
         assert_eq!(deserialized, expected_config);
 

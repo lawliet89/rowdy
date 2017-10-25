@@ -52,12 +52,13 @@ impl schema::Migration<SqliteConnection> for Authenticator {
         self.get_pooled_connection()
     }
 
-    fn binary_type(&self) -> &'static str {
-        "BLOB"
-    }
-
-    fn varbinary_type(&self) -> &'static str {
-        "BLOB"
+    fn migration_query(&self) -> &str {
+        r#"CREATE TABLE IF NOT EXISTS 'users' (
+    'username' VARCHAR(255) UNIQUE NOT NULL,
+    'hash' BLOB(32) NOT NULL,
+    'salt' BLOB(255) NOT NULL,
+    PRIMARY KEY ('username')
+);"#
     }
 }
 

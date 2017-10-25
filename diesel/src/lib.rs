@@ -66,6 +66,9 @@ pub mod mysql;
 #[cfg(feature = "sqlite")]
 pub mod sqlite;
 
+#[cfg(feature = "postgres")]
+pub mod postgres;
+
 pub use diesel::connection::Connection;
 /// A connection pool for the Diesel backed authenticators
 ///
