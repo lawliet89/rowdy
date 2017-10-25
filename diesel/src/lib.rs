@@ -63,6 +63,8 @@ pub mod schema;
 #[cfg(feature = "mysql")]
 pub mod mysql;
 
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
 
 pub use diesel::connection::Connection;
 /// A connection pool for the Diesel backed authenticators
@@ -87,6 +89,8 @@ pub enum Error {
     ConnectionTimeout,
     /// Authentication error
     AuthenticationFailure,
+    /// Invalid Unicode characters in path
+    InvalidUnicodeInPath,
 }
 
 impl From<diesel::result::ConnectionError> for Error {
@@ -120,13 +124,16 @@ impl From<Error> for rowdy::Error {
                 rowdy::Error::Auth(rowdy::auth::Error::GenericError((e.to_string())))
             }
             Error::DieselError(e) => {
-                rowdy::Error::Auth(rowdy::auth::Error::GenericError((e.to_string())))
+                rowdy::Error::Auth(rowdy::auth::Error::GenericError(e.to_string()))
             }
             Error::ConnectionTimeout => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
                 "Timed out connecting to the database".to_string(),
             )),
             Error::InitializationError => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
                 "Error initializing a database connection pool".to_string(),
+            )),
+            Error::InvalidUnicodeInPath => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
+                "Path contains invalid unicode characters".to_string(),
             )),
             Error::AuthenticationFailure => {
                 rowdy::Error::Auth(rowdy::auth::Error::AuthenticationFailure)
@@ -249,18 +256,23 @@ where
     ) -> Result<AuthenticationResult, Error> {
         let user = {
             let connection = self.get_pooled_connection()?;
-            let mut user = self.search(&connection, username)
-                .map_err(|_e| Error::AuthenticationFailure)?;
+            let mut user = self.search(&connection, username).map_err(|e| {
+                error_!("Error searching database: {:?}", e);
+                Error::AuthenticationFailure
+            })?;
+
             if user.len() != 1 {
+                error_!("{} users with username {} found.", user.len(), username);
                 Err(Error::AuthenticationFailure)?;
             }
 
-            user.pop().unwrap() // safe to unwrap
+            user.pop().expect("at least one user to be found.") // safe to unwrap
         };
         assert_eq!(username, user.username);
 
         let actual_password_digest = hash_password_digest(password, &user.salt);
         if !verify_slices_are_equal(actual_password_digest.as_ref(), &user.hash).is_ok() {
+            error_!("Password hash verification failed");
             Err(Error::AuthenticationFailure)
         } else {
             Self::build_authentication_result(&user, include_refresh_payload)

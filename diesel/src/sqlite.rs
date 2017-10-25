@@ -1,8 +1,8 @@
-//! MySQL authenticator module
+//! SQLite authenticator module
 //!
-//! Requires `features = ["mysql"]` in your `Cargo.toml`
+//! Requires `features = ["sqlite"]` in your `Cargo.toml`
 use diesel::prelude::*;
-use diesel::mysql::MysqlConnection;
+use diesel::sqlite::SqliteConnection;
 use r2d2::Config;
 use r2d2_diesel::ConnectionManager;
 
@@ -12,96 +12,87 @@ use rowdy::auth::{AuthenticatorConfiguration, Basic};
 use {ConnectionPool, Error, PooledConnection};
 use schema;
 
-/// A rowdy authenticator that uses a MySQL backed database to provide the users
-pub type Authenticator = ::Authenticator<MysqlConnection>;
+/// A rowdy authenticator that uses a SQLite backed database to provide the users
+pub type Authenticator = ::Authenticator<SqliteConnection>;
 
 impl Authenticator {
-    /// Using a database connection string of the form
-    /// `mysql://[user[:password]@]host/database_name`,
-    /// create an authenticator that is backed by a connection pool to a MySQL database
-    pub fn with_uri(uri: &str) -> Result<Self, Error> {
+    /// Connect to a SQLite database at a certain path
+    ///
+    /// Note: Diesel does not support [URI filenames](https://www.sqlite.org/c3ref/open.html)
+    /// at this moment.
+    ///
+    /// # Warning about in memory databases
+    ///
+    /// Rowdy uses a connection pool to SQLite databases. So a distinct
+    /// [`:memory:` database ](https://www.sqlite.org/inmemorydb.html) is created for ever
+    /// connection in the pool. Since URI filenames are not supported,
+    /// `file:memdb1?mode=memory&cache=shared` cannot be used.
+    pub fn with_path<S: AsRef<str>>(path: S) -> Result<Self, Error> {
         // Attempt a test connection with diesel
-        let _ = Self::connect(uri)?;
+        let _ = Self::connect(path.as_ref())?;
 
         let config = Config::default();
-        let manager = ConnectionManager::new(uri);
+        let manager = ConnectionManager::new(path.as_ref());
         debug_!("Creating a connection pool");
         let pool = ConnectionPool::new(config, manager)?;
         Ok(Self::new(pool))
     }
 
-    /// Create a new `Authenticator` with a database config
-    ///
-    pub fn with_configuration(
-        host: &str,
-        port: u16,
-        database: &str,
-        user: &str,
-        pass: &str,
-    ) -> Result<Self, Error> {
-        let database_uri = format!("mysql://{}:{}@{}:{}/{}", user, pass, host, port, database);
-        Self::with_uri(&database_uri)
-    }
-
     /// Test connection with the database uri
-    fn connect(uri: &str) -> Result<MysqlConnection, Error> {
-        debug_!("Attempting a connection to MySQL database");
-        Ok(MysqlConnection::establish(uri)?)
+    fn connect(path: &str) -> Result<SqliteConnection, Error> {
+        debug_!("Attempting a connection to SQLite database");
+        Ok(SqliteConnection::establish(path)?)
     }
 }
 
-impl schema::Migration<MysqlConnection> for Authenticator {
-    type Connection = PooledConnection<ConnectionManager<MysqlConnection>>;
+impl schema::Migration<SqliteConnection> for Authenticator {
+    type Connection = PooledConnection<ConnectionManager<SqliteConnection>>;
 
     fn connection(&self) -> Result<Self::Connection, ::Error> {
         self.get_pooled_connection()
     }
+
+    fn binary_type(&self) -> &'static str {
+        "BLOB"
+    }
+
+    fn varbinary_type(&self) -> &'static str {
+        "BLOB"
+    }
 }
 
-/// (De)Serializable configuration for MySQL Authenticator. This struct should be included
+/// (De)Serializable configuration for SQLite Authenticator. This struct should be included
 /// in the base `Configuration`.
 /// # Examples
 /// ```json
 /// {
-///     "host": "localhost",
-///     "port": 3306,
-///     "database": "auth_users",
-///     "user": "auth_user",
-///     "password": "password"
+///     "database": "file:/home/fred/data.db"
 /// }
 /// ```
 #[derive(Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Configuration {
-    /// Host for the MySql database manager - domain name or IP
-    pub host: String,
-    /// MySql database port - default 3306
-    #[serde(default = "default_port")]
-    pub port: u16,
-    /// MySql database
-    pub database: String,
-    /// MySql user
-    pub user: String,
-    /// MySql password
-    pub password: String,
-}
-
-fn default_port() -> u16 {
-    3306
+    /// Connect to a SQLite database at a certain path
+    ///
+    /// Note: Diesel does not support [URI filenames](https://www.sqlite.org/c3ref/open.html)
+    /// at this moment.
+    ///
+    /// # Warning about in memory databases
+    ///
+    /// Rowdy uses a connection pool to SQLite databases. So a distinct
+    /// [`:memory:` database ](https://www.sqlite.org/inmemorydb.html) is created for ever
+    /// connection in the pool. Since URI filenames are not supported,
+    /// `file:memdb1?mode=memory&cache=shared` cannot be used.
+    pub path: String,
 }
 
 impl AuthenticatorConfiguration<Basic> for Configuration {
     type Authenticator = Authenticator;
 
     fn make_authenticator(&self) -> Result<Self::Authenticator, rowdy::Error> {
-        Ok(Authenticator::with_configuration(
-            &self.host,
-            self.port,
-            &self.database,
-            &self.user,
-            &self.password,
-        )?)
+        Ok(Authenticator::with_path(&self.path)?)
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -116,10 +107,10 @@ mod tests {
     static SEED: Once = ONCE_INIT;
 
     /// Reset and seed the databse. This should only be run once.
-    fn reset_and_seed(authenticator: &super::Authenticator) {
+    fn migrate_and_seed(authenticator: &super::Authenticator) {
         SEED.call_once(|| {
             let query = format!(
-                include_str!("../test/fixtures/mysql.sql"),
+                include_str!("../test/fixtures/sqlite.sql"),
                 migration = authenticator.migration_query()
             );
 
@@ -128,12 +119,10 @@ mod tests {
         });
     }
 
-
     fn make_authenticator() -> super::Authenticator {
-        let authenticator =
-            super::Authenticator::with_configuration("127.0.0.1", 3306, "rowdy", "root", "")
-                .expect("To be constructed successfully");
-        reset_and_seed(&authenticator);
+        let authenticator = super::Authenticator::with_path("../target/sqlite.db")
+            .expect("To be constructed successfully");
+        migrate_and_seed(&authenticator);
         authenticator
     }
 
@@ -199,26 +188,18 @@ mod tests {
     }
 
     #[test]
-    fn mysql_authenticator_configuration_deserialization() {
+    fn sqlite_authenticator_configuration_deserialization() {
         use serde_json;
         use rowdy::auth::AuthenticatorConfiguration;
 
         let json = r#"{
-            "host": "127.0.0.1",
-            "port": 3306,
-            "database": "rowdy",
-            "user": "root",
-            "password": ""
+            "path": "../target/test.db"
         }"#;
 
         let deserialized: Configuration =
             serde_json::from_str(json).expect("to deserialize successfully");
         let expected_config = Configuration {
-            host: "127.0.0.1".to_string(),
-            port: 3306,
-            database: "rowdy".to_string(),
-            user: "root".to_string(),
-            password: "".to_string(),
+            path: From::from("../target/test.db"),
         };
         assert_eq!(deserialized, expected_config);
 

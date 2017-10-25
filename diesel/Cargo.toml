@@ -16,6 +16,9 @@ default = []
 # Support MySQL
 mysql = ["diesel/mysql", "diesel_codegen/mysql"]
 
+# Support Sqlite
+sqlite = ["diesel/sqlite", "diesel_codegen/sqlite"]
+
 [dependencies]
 diesel = "0.16"
 diesel_codegen = "0.16"

@@ -34,6 +34,7 @@ fn run_subcommand(args: &ArgMatches) -> Result<(), rowdy::Error> {
         ("csv", Some(args)) => launch::<auth::SimpleAuthenticatorConfiguration>(args),
         ("ldap", Some(args)) => launch::<auth::LdapAuthenticator>(args),
         ("mysql", Some(args)) => run_diesel::<rowdy_diesel::mysql::Configuration, _, _, _>(args),
+        ("sqlite", Some(args)) => run_diesel::<rowdy_diesel::sqlite::Configuration, _, _, _>(args),
         _ => unreachable!("Unknown subcommand encountered."),
     }
 }
@@ -113,6 +114,31 @@ where
                 .required(true),
         );
 
+    let sqlite = SubCommand::with_name("sqlite")
+        .about("Launch rowdy with a `sqlite` authenticator backed by a SQLite table.")
+        .arg(
+            Arg::with_name("migrate")
+                .help(
+                    "Instead of launching the server, perform a migration to create the bare\
+                     minimum table for Rowdy to work. The migration is idempotent. See \
+                     https://lawliet89.github.io/rowdy/rowdy_diesel/schema/index.html \
+                     for schema information",
+                )
+                .long("migrate"),
+        )
+        .arg(
+            Arg::with_name("config")
+                .index(1)
+                .help(
+                    "Specifies the path to read the configuration from. \
+                     Use - to refer to STDIN",
+                )
+                .takes_value(true)
+                .value_name("config_path")
+                .empty_values(false)
+                .required(true),
+        );
+
     App::new("rowdy")
         .bin_name("rowdy")
         .version(crate_version!())
@@ -145,13 +171,14 @@ configuration JSON.
   - ldap: The key should behave according to the format documented at
     https://lawliet89.github.io/rowdy/rowdy/auth/struct.LdapAuthenticator.html
   - mysql: The key should behave according to the format documented at
-    https://lawliet89.github.io/rowdy/rowdy/auth/struct.MysqlAuthenticatorConfiguration.html
+    https://lawliet89.github.io/rowdy/rowdy_diesel/mysql/struct.Configuration.html
         "#,
         )
         .subcommand(noop)
         .subcommand(csv)
         .subcommand(ldap)
         .subcommand(mysql)
+        .subcommand(sqlite)
 }
 
 /// Launch a rocket -- this function will block and never return unless on error
