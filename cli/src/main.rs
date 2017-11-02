@@ -35,7 +35,9 @@ fn run_subcommand(args: &ArgMatches) -> Result<(), rowdy::Error> {
         ("ldap", Some(args)) => launch::<auth::LdapAuthenticator>(args),
         ("mysql", Some(args)) => run_diesel::<rowdy_diesel::mysql::Configuration, _, _, _>(args),
         ("sqlite", Some(args)) => run_diesel::<rowdy_diesel::sqlite::Configuration, _, _, _>(args),
-        ("postgres", Some(args)) => run_diesel::<rowdy_diesel::postgres::Configuration, _, _, _>(args),
+        ("postgres", Some(args)) => {
+            run_diesel::<rowdy_diesel::postgres::Configuration, _, _, _>(args)
+        }
         _ => unreachable!("Unknown subcommand encountered."),
     }
 }
@@ -346,6 +348,7 @@ mod tests {
     #[test]
     fn postgres_configuration_reading() {
         let config = to_cursor(postgres_json);
-        let _ = read_config::<rowdy_diesel::postgres::Configuration, _>(config).expect("to succeed");
+        let _ =
+            read_config::<rowdy_diesel::postgres::Configuration, _>(config).expect("to succeed");
     }
 }

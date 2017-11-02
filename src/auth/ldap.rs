@@ -291,10 +291,16 @@ impl LdapAuthenticator {
             // First, we search for the user
             let connection = self.connect()?;
             self.searcher_bind(&connection)?;
-            let mut user = self.search(&connection, username)
-                .map_err(|_e| super::Error::AuthenticationFailure)?;
+            let mut user = self.search(&connection, username).map_err(|e| {
+                error_!("Error searching for username `{}`: {}", username, e);
+                super::Error::AuthenticationFailure
+            })?;
             if user.len() != 1 {
-                error_!("{} users were returned for the username {}", user.len(), username);
+                error_!(
+                    "{} users were returned for the username {}",
+                    user.len(),
+                    username
+                );
                 Err(super::Error::AuthenticationFailure)?;
             }
 
@@ -306,8 +312,14 @@ impl LdapAuthenticator {
         {
             // Attempt a bind with the user's DN and password
             let connection = self.connect()?;
-            self.bind(&connection, &user_dn, password)
-                .map_err(|_e| super::Error::AuthenticationFailure)?;
+            self.bind(&connection, &user_dn, password).map_err(|e| {
+                error_!(
+                    "Error binding DN {} with user supplied password: {}",
+                    user_dn,
+                    e
+                );
+                super::Error::AuthenticationFailure
+            })?;
         }
 
         let user = From::from(user);
