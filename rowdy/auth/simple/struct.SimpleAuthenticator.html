@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `SimpleAuthenticator` struct in crate `rowdy`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, SimpleAuthenticator">
+
+    <title>rowdy::auth::simple::SimpleAuthenticator - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc struct">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'>Struct SimpleAuthenticator</p><div class="block items"><ul><li><a href="#methods">Methods</a></li><li><a href="#implementations">Trait Implementations</a></li></ul></div><p class='location'><a href='../../index.html'>rowdy</a>::<wbr><a href='../index.html'>auth</a>::<wbr><a href='index.html'>simple</a></p><script>window.sidebarCurrent = {name: 'SimpleAuthenticator', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../../index.html'>rowdy</a>::<wbr><a href='../index.html'>auth</a>::<wbr><a href='index.html'>simple</a>::<wbr><a class="struct" href=''>SimpleAuthenticator</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#34-36' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct SimpleAuthenticator { /* fields omitted */ }</pre><div class='docblock'><p>A simple authenticator that uses a CSV backed user database. <em>DO NOT USE THIS IN PRODUCTION</em></p>
+
+<p>Requires the <code>simple_authenticator</code> feature, which is enabled by default.</p>
+
+<p>The user database should be a CSV file, or a &quot;CSV-like&quot; file
+(meaning you can choose to use some other character as field delimiter instead of comma)
+where the first column is the username, the second column is a hashed password, and
+the third column is the salt.</p>
+
+<h1 id='password-hashing' class='section-header'><a href='#password-hashing'>Password Hashing</a></h1>
+<p>See <code>SimpleAuthenticator::hash_password</code> for the implementation of password hashing.
+The password is hashed using the <a href="https://github.com/p-h-c/phc-winner-argon2"><code>argon2i</code></a>
+algorithm with a randomly generated salt.</p>
+</div>
+                    <h2 id='methods' class='small-section-header'>
+                      Methods<a href='#methods' class='anchor'></a>
+                    </h2>
+                <h3 id='impl' class='impl'><span class='in-band'><code>impl <a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticator.html" title="struct rowdy::auth::simple::SimpleAuthenticator">SimpleAuthenticator</a></code><a href='#impl' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#38-140' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.new' class="method"><span id='new.v' class='invisible'><code>pub fn <a href='#method.new' class='fnname'>new</a>&lt;R:&nbsp;<a class="trait" href="https://doc.rust-lang.org/nightly/std/io/trait.Read.html" title="trait std::io::Read">Read</a>&gt;(csv: Reader&lt;R&gt;) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#41-46' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Create a new <code>SimpleAuthenticator</code> with the provided a CSV Reader.</p>
+</div><h4 id='method.with_csv_file' class="method"><span id='with_csv_file.v' class='invisible'><code>pub fn <a href='#method.with_csv_file' class='fnname'>with_csv_file</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;path: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;has_headers: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;delimiter: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#50-57' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Create a new <code>SimpleAuthenticator</code> with a path to a CSV file.</p>
+</div><h4 id='method.hash_password' class="method"><span id='hash_password.v' class='invisible'><code>pub fn <a href='#method.hash_password' class='fnname'>hash_password</a>(password: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, salt: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">&amp;[</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u8.html">u8</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.slice.html">]</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#101-103' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Hash a password with the salt. See struct level documentation for the algorithm used.</p>
+</div><h4 id='method.verify' class="method"><span id='verify.v' class='invisible'><code>pub fn <a href='#method.verify' class='fnname'>verify</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;username: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;password: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;include_refresh_payload: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../../../rowdy/auth/struct.AuthenticationResult.html" title="struct rowdy::auth::AuthenticationResult">AuthenticationResult</a>, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#109-139' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Verify that some user with the provided password exists in the CSV database,
+and the password is correct.</p>
+
+<p>Returns the payload to be included in a refresh token if successful</p>
+</div></div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Authenticator&lt;Basic&gt;' class='impl'><span class='in-band'><code>impl <a class="trait" href="../../../rowdy/auth/trait.Authenticator.html" title="trait rowdy::auth::Authenticator">Authenticator</a>&lt;<a class="type" href="../../../rowdy/auth/type.Basic.html" title="type rowdy::auth::Basic">Basic</a>&gt; for <a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticator.html" title="struct rowdy::auth::simple::SimpleAuthenticator">SimpleAuthenticator</a></code><a href='#impl-Authenticator&lt;Basic&gt;' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#142-174' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.authenticate' class="method"><span id='authenticate.v' class='invisible'><code>fn <a href='../../../rowdy/auth/trait.Authenticator.html#tymethod.authenticate' class='fnname'>authenticate</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;authorization: &amp;<a class="struct" href="../../../rowdy/auth/struct.Authorization.html" title="struct rowdy::auth::Authorization">Authorization</a>&lt;<a class="type" href="../../../rowdy/auth/type.Basic.html" title="type rowdy::auth::Basic">Basic</a>&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;include_refresh_payload: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../../../rowdy/auth/struct.AuthenticationResult.html" title="struct rowdy::auth::AuthenticationResult">AuthenticationResult</a>, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#143-152' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Verify the credentials provided in the headers with the authenticator for the initial issuing of Access Tokens. <a href="../../../rowdy/auth/trait.Authenticator.html#tymethod.authenticate">Read more</a></p>
+</div><h4 id='method.authenticate_refresh_token' class="method"><span id='authenticate_refresh_token.v' class='invisible'><code>fn <a href='../../../rowdy/auth/trait.Authenticator.html#method.authenticate_refresh_token' class='fnname'>authenticate_refresh_token</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;refresh_payload: &amp;<a class="enum" href="../../../rowdy/enum.JsonValue.html" title="enum rowdy::JsonValue">JsonValue</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../../../rowdy/auth/struct.AuthenticationResult.html" title="struct rowdy::auth::AuthenticationResult">AuthenticationResult</a>, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#154-173' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Verify the credentials provided with the refresh token payload, if supported by the authenticator. <a href="../../../rowdy/auth/trait.Authenticator.html#method.authenticate_refresh_token">Read more</a></p>
+</div><h4 id='method.prepare_authentication_response' class="method"><span id='prepare_authentication_response.v' class='invisible'><code>fn <a href='../../../rowdy/auth/trait.Authenticator.html#method.prepare_authentication_response' class='fnname'>prepare_authentication_response</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;authorization: &amp;<a class="struct" href="../../../rowdy/auth/struct.Authorization.html" title="struct rowdy::auth::Authorization">Authorization</a>&lt;S&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;request_refresh_token: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../../../rowdy/auth/struct.AuthenticationResult.html" title="struct rowdy::auth::AuthenticationResult">AuthenticationResult</a>, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/mod.rs.html#270-284' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Prepare a response to an authentication request by first verifying credentials. If validation fails, will return an <code>Err</code> with the response to be sent. Otherwise, the unwrapped authentication result will be returned in an <code>Ok</code>. This function will also check that the authenticator behaves correctly by checking that it does not return a refresh token payload when it is not requested for <a href="../../../rowdy/auth/trait.Authenticator.html#method.prepare_authentication_response">Read more</a></p>
+</div><h4 id='method.prepare_refresh_response' class="method"><span id='prepare_refresh_response.v' class='invisible'><code>fn <a href='../../../rowdy/auth/trait.Authenticator.html#method.prepare_refresh_response' class='fnname'>prepare_refresh_response</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;refresh_payload: &amp;<a class="enum" href="../../../rowdy/enum.JsonValue.html" title="enum rowdy::JsonValue">JsonValue</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../../../rowdy/auth/struct.AuthenticationResult.html" title="struct rowdy::auth::AuthenticationResult">AuthenticationResult</a>, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/mod.rs.html#292-305' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Prepare a response to a refresh request by first verifying the refresh payload. <a href="../../../rowdy/auth/trait.Authenticator.html#method.prepare_refresh_response">Read more</a></p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../../";
+        window.currentCrate = "rowdy";
+    </script>
+    <script src="../../../main.js"></script>
+    <script defer src="../../../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["hash","A argon2i hash of the user's password"],["salt","Salt used to generate the password hash"],["username","Username for the user. Also the primary key"],["users","The actual table struct"]]});

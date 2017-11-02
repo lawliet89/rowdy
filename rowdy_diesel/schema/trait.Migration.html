@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Migration` trait in crate `rowdy_diesel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Migration">
+
+    <title>rowdy_diesel::schema::Migration - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc trait">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'>Trait Migration</p><div class="block items"><ul><li><a href="#associated-types">Associated Types</a></li><li><a href="#required-methods">Required Methods</a></li><li><a href="#provided-methods">Provided Methods</a></li><li><a href="#implementors">Implementors</a></li></ul></div><p class='location'><a href='../index.html'>rowdy_diesel</a>::<wbr><a href='index.html'>schema</a></p><script>window.sidebarCurrent = {name: 'Migration', ty: 'trait', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Trait <a href='../index.html'>rowdy_diesel</a>::<wbr><a href='index.html'>schema</a>::<wbr><a class="trait" href=''>Migration</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../src/rowdy_diesel/schema.rs.html#59-83' title='goto source code'>[src]</a></span></h1>
+<pre class='rust trait'>pub trait Migration&lt;T&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="../../rowdy_diesel/trait.Connection.html" title="trait rowdy_diesel::Connection">Connection</a> + 'static,&nbsp;</span>{
+    type <a href='#associatedtype.Connection' class="type">Connection</a>: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/deref/trait.Deref.html" title="trait core::ops::deref::Deref">Deref</a>&lt;Target = T&gt;;
+    fn <a href='#tymethod.connection' class='fnname'>connection</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self::<a class="type" href="../../rowdy_diesel/schema/trait.Migration.html#associatedtype.Connection" title="type rowdy_diesel::schema::Migration::Connection">Connection</a>, <a class="enum" href="../../rowdy_diesel/enum.Error.html" title="enum rowdy_diesel::Error">Error</a>&gt;;
+<div class='item-spacer'></div>    fn <a href='#tymethod.migration_query' class='fnname'>migration_query</a>(&amp;self) -&gt; &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>;
+
+    fn <a href='#method.migrate' class='fnname'>migrate</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">()</a>, <a class="enum" href="../../rowdy_diesel/enum.Error.html" title="enum rowdy_diesel::Error">Error</a>&gt; { ... }
+}</pre><div class='docblock'><p>Trait to provide idempotent minimal migration to create the table necessary for <code>rowdy-diesel</code>
+to work. If you have more sophisticated needs, you are able to add more columns to the basic
+columns needed for rowdy to work.</p>
+</div>
+            <h2 id='associated-types' class='small-section-header'>
+              Associated Types<a href='#associated-types' class='anchor'></a>
+            </h2>
+            <div class='methods'>
+        <h3 id='associatedtype.Connection' class='method'><span id='Connection.t' class='invisible'><code>type <a href='#associatedtype.Connection' class="type">Connection</a>: <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/deref/trait.Deref.html" title="trait core::ops::deref::Deref">Deref</a>&lt;Target = T&gt;</code></span></h3><div class='docblock'><p>Connection type for the migration to work with</p>
+</div></div>
+            <h2 id='required-methods' class='small-section-header'>
+              Required Methods<a href='#required-methods' class='anchor'></a>
+            </h2>
+            <div class='methods'>
+        <h3 id='tymethod.connection' class='method'><span id='connection.v' class='invisible'><code>fn <a href='#tymethod.connection' class='fnname'>connection</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self::<a class="type" href="../../rowdy_diesel/schema/trait.Migration.html#associatedtype.Connection" title="type rowdy_diesel::schema::Migration::Connection">Connection</a>, <a class="enum" href="../../rowdy_diesel/enum.Error.html" title="enum rowdy_diesel::Error">Error</a>&gt;</code></span></h3><div class='docblock'><p>Provide a connection for the migration to work with</p>
+</div><h3 id='tymethod.migration_query' class='method'><span id='migration_query.v' class='invisible'><code>fn <a href='#tymethod.migration_query' class='fnname'>migration_query</a>(&amp;self) -&gt; &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a></code></span></h3><div class='docblock'><p>Format the migration query based on the connection type</p>
+</div></div>
+            <h2 id='provided-methods' class='small-section-header'>
+              Provided Methods<a href='#provided-methods' class='anchor'></a>
+            </h2>
+            <div class='methods'>
+        <h3 id='method.migrate' class='method'><span id='migrate.v' class='invisible'><code>fn <a href='#method.migrate' class='fnname'>migrate</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">()</a>, <a class="enum" href="../../rowdy_diesel/enum.Error.html" title="enum rowdy_diesel::Error">Error</a>&gt;</code></span></h3><div class='docblock'><p>Provide idempotent minimal migration to create the table necessary for <code>rowdy-diesel</code>
+to work</p>
+</div></div>
+        <h2 id='implementors' class='small-section-header'>
+          Implementors<a href='#implementors' class='anchor'></a>
+        </h2>
+        <ul class='item-list' id='implementors-list'>
+    <li><div class='out-of-band'><a class='srclink' href='../../src/rowdy_diesel/mysql.rs.html#53-68' title='goto source code'>[src]</a></div><code>impl Migration&lt;MysqlConnection&gt; for rowdy_diesel::mysql::<a class="type" href="../../rowdy_diesel/mysql/type.Authenticator.html" title="type rowdy_diesel::mysql::Authenticator">Authenticator</a><span class="where fmt-newline">  type <a href='#associatedtype.Connection' class="type">Connection</a> = <a class="struct" href="https://docs.rs/r2d2/0.7/r2d2/struct.PooledConnection.html" title="struct r2d2::PooledConnection">PooledConnection</a>&lt;ConnectionManager&lt;MysqlConnection&gt;&gt;;</span></code></li>
+<li><div class='out-of-band'><a class='srclink' href='../../src/rowdy_diesel/sqlite.rs.html#48-63' title='goto source code'>[src]</a></div><code>impl Migration&lt;SqliteConnection&gt; for rowdy_diesel::sqlite::<a class="type" href="../../rowdy_diesel/sqlite/type.Authenticator.html" title="type rowdy_diesel::sqlite::Authenticator">Authenticator</a><span class="where fmt-newline">  type <a href='#associatedtype.Connection' class="type">Connection</a> = <a class="struct" href="https://docs.rs/r2d2/0.7/r2d2/struct.PooledConnection.html" title="struct r2d2::PooledConnection">PooledConnection</a>&lt;ConnectionManager&lt;SqliteConnection&gt;&gt;;</span></code></li>
+<li><div class='out-of-band'><a class='srclink' href='../../src/rowdy_diesel/postgres.rs.html#60-75' title='goto source code'>[src]</a></div><code>impl Migration&lt;PgConnection&gt; for rowdy_diesel::postgres::<a class="type" href="../../rowdy_diesel/postgres/type.Authenticator.html" title="type rowdy_diesel::postgres::Authenticator">Authenticator</a><span class="where fmt-newline">  type <a href='#associatedtype.Connection' class="type">Connection</a> = <a class="struct" href="https://docs.rs/r2d2/0.7/r2d2/struct.PooledConnection.html" title="struct r2d2::PooledConnection">PooledConnection</a>&lt;ConnectionManager&lt;PgConnection&gt;&gt;;</span></code></li>
+</ul><script type="text/javascript" async
+                         src="../../implementors/rowdy_diesel/schema/trait.Migration.js">
+                 </script></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "rowdy_diesel";
+    </script>
+    <script src="../../main.js"></script>
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

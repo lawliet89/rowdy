@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Configuration","(De)Serializable configuration for SQLite Authenticator. This struct should be included in the base `Configuration`. # Examples `json { \"database\": \"file:/home/fred/data.db\" }`"]],"type":[["Authenticator","A rowdy authenticator that uses a SQLite backed database to provide the users"]]});

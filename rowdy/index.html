@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `rowdy` crate.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, rowdy">
+
+    <title>rowdy - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc mod">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'>Crate rowdy</p><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'rowdy', ty: 'mod', relpath: '../'};</script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Crate <a class="mod" href=''>rowdy</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../src/rowdy/lib.rs.html#1-575' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p><a href="https://travis-ci.org/lawliet89/rowdy"><img src="https://travis-ci.org/lawliet89/rowdy.svg" alt="Build Status"></a>
+<a href="https://dependencyci.com/github/lawliet89/rowdy"><img src="https://dependencyci.com/github/lawliet89/rowdy/badge" alt="Dependency Status"></a>
+<a href="https://crates.io/crates/rowdy"><img src="https://img.shields.io/crates/v/rowdy.svg" alt="Crates.io"></a>
+<a href="https://github.com/lawliet89/rowdy"><img src="https://img.shields.io/github/tag/lawliet89/rowdy.svg" alt="Repository"></a>
+<a href="https://docs.rs/rowdy"><img src="https://docs.rs/rowdy/badge.svg" alt="Documentation"></a></p>
+
+<p>Documentation: <a href="https://docs.rs/rowdy">Stable</a> | <a href="https://lawliet89.github.io/rowdy/">Master</a></p>
+
+<p><code>rowdy</code> is a <a href="https://rocket.rs/">Rocket</a>  based JSON Web token based authentication server
+based off Docker Registry&#39;s
+<a href="https://docs.docker.com/registry/spec/auth/">authentication protocol</a>.</p>
+
+<h1 id='features' class='section-header'><a href='#features'>Features</a></h1>
+<ul>
+<li><code>simple_authenticator</code>: A simple CSV based authenticator</li>
+<li><code>ldap_authenticator</code>: An LDAP based authenticator</li>
+</ul>
+
+<p>By default, the <code>simple_authenticator</code> feature is turned on.</p>
+
+<h1 id='rowdy-authentication-flow' class='section-header'><a href='#rowdy-authentication-flow'><code>rowdy</code> Authentication Flow</a></h1>
+<p>The authentication flow is inspired by
+<a href="https://docs.docker.com/registry/spec/auth/">Docker Registry</a> authentication specification.</p>
+
+<h2 id='json-web-tokens' class='section-header'><a href='#json-web-tokens'>JSON Web Tokens</a></h2>
+<p>Authentication makes use of two types of <a href="https://jwt.io/">JSON Web Tokens (JWT)</a>:
+Access and Refresh tokens.</p>
+
+<h3 id='access-token' class='section-header'><a href='#access-token'>Access Token</a></h3>
+<p>The access token is a short lived JWT that allows users to access resources within the scope
+that they are allowed to. The access token itself contains enough information for services
+to verify the user and their permissions in a stateless manner.</p>
+
+<h3 id='refresh-token' class='section-header'><a href='#refresh-token'>Refresh Token</a></h3>
+<p>The refresh token allows users to retrieve a new access token without needing to
+re-authenticate. As such, the refresh token is longer lived, but can be revoked.</p>
+
+<h2 id='authentication-flow' class='section-header'><a href='#authentication-flow'>Authentication Flow</a></h2>
+<ol>
+<li>Client attempts to access a resource on a protected service.</li>
+<li>Service responds with a <code>401 Unauthorized</code> authentication challenge with information on
+how to authenticate
+provided in the <code>WWW-Authenticate</code> response header.</li>
+<li>Using the information from the previous step, the client authenticates with the
+authentication server. The client
+will receive, among other information, opaque access and refresh tokens.</li>
+<li>The client retries the original request with the Bearer token embedded in the request’s
+Authorization header.</li>
+<li>The service authorizes the client by validating the Bearer token and the claim set
+embedded within it and
+proceeds as usual.</li>
+</ol>
+
+<h3 id='authentication-challenge' class='section-header'><a href='#authentication-challenge'>Authentication Challenge</a></h3>
+<p>Services will challenge users who do not provide a valid token via the HTTP response
+<code>401 Unauthorized</code>. Details for
+authentication is provided in the <code>WWW-Authenticate</code> header.</p>
+
+<pre><code class="language-text">Www-Authenticate: Bearer realm=&quot;https://www.auth.com&quot;,service=&quot;https://www.example.com&quot;,scope=&quot;all&quot;
+</code></pre>
+
+<p>The <code>realm</code> field indicates the authentcation server endpoint which clients should proceed to
+authenticate against.</p>
+
+<p>The <code>service</code> field indicates the <code>service</code> value that clients should use when attempting to
+authenticate at <code>realm</code>.</p>
+
+<p>The <code>scope</code> field indicates the <code>scope</code> value that clients should use when attempting to
+authenticate at <code>realm</code>.</p>
+
+<h3 id='retrieving-an-access-token-and-optionally-refresh-token-from-the-authentication-server' class='section-header'><a href='#retrieving-an-access-token-and-optionally-refresh-token-from-the-authentication-server'>Retrieving an Access Token (and optionally Refresh Token) from the Authentication Server</a></h3>
+<p>A HTTP <code>GET</code> request should be made to the <code>realm</code> endpoint provided above. The endpoint will
+support the following uery paremeters:</p>
+
+<ul>
+<li><code>service</code>: The service that the client is authenticating for. This should be the same as
+the <code>service</code> value in the previous step</li>
+<li><code>scope</code>: The scope that the client wishes to authenticate for.
+This should be the same as the <code>scope</code> value in the previous step.</li>
+<li><code>offline_token</code>: Set to <code>true</code> if a refresh token is also required. Defaults to <code>false</code>.
+Cannot be set to <code>true</code> when using a refresh token to retrieve a new access token.</li>
+</ul>
+
+<p>When authenticating for the first time, clients should send the user&#39;s username and passwords
+in the form of <code>Basic</code> authentication. If the client already has a prior refresh token and
+would like to obtain a new access token, the client should send the refresh token in the form
+of <code>Bearer</code> authentication.</p>
+
+<p>If successful, the authentcation server will return a <code>200 OK</code> response with a
+JSON body containing the following fields:</p>
+
+<ul>
+<li><code>token</code>: An opaque Access (<code>Bearer</code>) token that clients should supply to subsequent requests
+in the <code>Authorization</code> header.</li>
+<li><code>expires_in</code>: The duration in seconds since the token was issued that it will remain valid.</li>
+<li><code>issued_at</code>: RFC3339-serialized UTC standard time at which a given token was issued.</li>
+<li><code>refresh_token</code>: An opaque <code>Refresh</code> token which can be used to get additional access
+tokens for the same subject with different scopes. This token should be kept secure by
+the client and only sent to the authorization server which issues access tokens.
+This field will only be set when <code>offline_token=true</code> is provided in the request.</li>
+</ul>
+
+<p>If this fails, the server will return with the appropriate <code>4xx</code> response.</p>
+
+<h3 id='using-the-access-token' class='section-header'><a href='#using-the-access-token'>Using the Access Token</a></h3>
+<p>Once the client has a token, it will try the request again with the token placed in the
+HTTP Authorization header like so:</p>
+
+<pre><code class="language-text">Authorization: Bearer &lt;token&gt;
+</code></pre>
+
+<h3 id='using-the-refresh-token-to-retrieve-a-new-access-token' class='section-header'><a href='#using-the-refresh-token-to-retrieve-a-new-access-token'>Using the Refresh Token to Retrieve a New Access Token</a></h3>
+<p>When the client&#39;s Access token expires, and it has previously asked for a Refresh Token,
+the client can make a <code>GET</code> request to the same endpoint that the client used to retrieve the
+access token (the <code>realm</code> URL in an authentication challenge).</p>
+
+<p>The steps are described in the section &quot;Retrieving an Access Token&quot; above. The process is the
+same as the initial authentication except that instead of using <code>Basic</code> authentication,
+the client should instead send the refresh token retrieved prior as <code>Bearer</code> authentication.
+Also, <code>offline_token</code> cannot be requested for when requesting for a new access token using a
+refresh token. (HTTP 401 will be returned if this happens.)</p>
+
+<h3 id='example' class='section-header'><a href='#example'>Example</a></h3>
+<p>This example uses <code>curl</code> to make request to the some (hypothetical) protected endpoint.
+It requires <a href="https://stedolan.github.io/jq/"><code>jq</code></a> to parse JSON.</p>
+
+<pre><code class="language-bash">PROTECTED_RESOURCE=&quot;https://www.example.com/protected/resource/&quot;
+
+# Save the response headers of our first request to the endpoint to get the Www-Authenticate
+# header
+RESPONSE_HEADER=$(tempfile);
+curl --dump-header &quot;${RESPONSE_HEADER}&quot; &quot;${PROTECTED_RESOURCE}&quot;
+
+# Extract the realm, the service, and the scope from the Www-Authenticate header
+WWWAUTH=$(cat &quot;${RESPONSE_HEADER}&quot; | grep &quot;Www-Authenticate&quot;)
+REALM=$(echo &quot;${WWWAUTH}&quot; | grep -o &#39;\(realm\)=&quot;[^&quot;]*&quot;&#39; | cut -d &#39;&quot;&#39; -f 2)
+SERVICE=$(echo &quot;${WWWAUTH}&quot; | grep -o &#39;\(service\)=&quot;[^&quot;]*&quot;&#39; | cut -d &#39;&quot;&#39; -f 2)
+SCOPE=$(echo &quot;${WWWAUTH}&quot; | grep -o &#39;\(scope\)=&quot;[^&quot;]*&quot;&#39; | cut -d &#39;&quot;&#39; -f 2)
+
+# Build the URL to query the auth server
+AUTH_URL=&quot;${REALM}?service=${SERVICE}&amp;scope=${SCOPE}&amp;offline_token=true&quot;
+
+# Query the auth server to get a token -- replace the username and password
+# below with the value from 1password
+TOKEN=$(curl -s --user &quot;mozart:password&quot; &quot;${AUTH_URL}&quot;)
+
+# Get the access token from the JSON string: {&quot;token&quot;: &quot;....&quot;}
+ACCESS_TOKEN=$(echo ${TOKEN} | jq .token | tr -d &#39;&quot;&#39;)
+
+# Query the resource again, but this time with a bearer token
+curl -v -H &quot;Authorization: Bearer ${ACCESS_TOKEN}&quot; &quot;${PROTECTED_RESOURCE}&quot;
+
+# Get the refresh token
+REFRESH_TOKEN=$(echo &quot;${TOKEN}&quot; | jq .refresh_token | tr -d &#39;&quot;&#39;)
+
+# Get a new access token
+NEW_TOKEN=$(curl --header &quot;Authorization: Bearer ${REFRESH_TOKEN}&quot; &quot;${AUTH_URL}&quot;)
+
+# Parse the new access token
+NEW_ACCESS_TOKEN=$(echo &quot;${TOKEN}&quot; | jq .token | tr -d &#39;&quot;&#39;)
+
+# Query the resource again, but this time with a new access token
+curl -v -H &quot;Authorization: Bearer ${NEW_ACCESS_TOKEN}&quot; &quot;${PROTECTED_RESOURCE}&quot;
+</code></pre>
+
+<h2 id='scope' class='section-header'><a href='#scope'>Scope</a></h2>
+<p>Not in use at the moment. Just use <code>all</code>.</p>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="mod" href="auth/index.html"
+                                  title='mod rowdy::auth'>auth</a></td>
+                           <td class='docblock-short'>
+                                <p>Authentication module, including traits for identity provider and <code>Responder</code>s for
+authentication.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="mod" href="serde_custom/index.html"
+                                  title='mod rowdy::serde_custom'>serde_custom</a></td>
+                           <td class='docblock-short'>
+                                <p>Custom serde serialization and deserialization.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="mod" href="token/index.html"
+                                  title='mod rowdy::token'>token</a></td>
+                           <td class='docblock-short'>
+                                <p>Authentication token structs, and methods</p>
+                           </td>
+                       </tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Configuration.html"
+                                  title='struct rowdy::Configuration'>Configuration</a></td>
+                           <td class='docblock-short'>
+                                <p>Application configuration. Usually deserialized from JSON for use.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.JsonMap.html"
+                                  title='struct rowdy::JsonMap'>JsonMap</a></td>
+                           <td class='docblock-short'>
+                                <p>Represents a JSON key/value type.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="struct" href="struct.Url.html"
+                                  title='struct rowdy::Url'>Url</a></td>
+                           <td class='docblock-short'>
+                                <p>Wrapper around <code>hyper::Url</code> with <code>Serialize</code> and <code>Deserialize</code> implemented</p>
+                           </td>
+                       </tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="enum" href="enum.ByteSequence.html"
+                                  title='enum rowdy::ByteSequence'>ByteSequence</a></td>
+                           <td class='docblock-short'>
+                                <p>A sequence of bytes, either as an array of unsigned 8 bit integers, or a string which will be
+treated as UTF-8.
+This enum is (de)serialized <a href="https://serde.rs/enum-representations.html"><code>untagged</code></a>.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="enum" href="enum.Error.html"
+                                  title='enum rowdy::Error'>Error</a></td>
+                           <td class='docblock-short'>
+                                <p>Top level error enum</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="enum" href="enum.JsonValue.html"
+                                  title='enum rowdy::JsonValue'>JsonValue</a></td>
+                           <td class='docblock-short'>
+                                <p>Represents any valid JSON value.</p>
+                           </td>
+                       </tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.launch.html"
+                                  title='fn rowdy::launch'>launch</a></td>
+                           <td class='docblock-short'>
+                                <p>Convenience function to ignite and launch rowdy. This function will never return</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
+                           <td><a class="fn" href="fn.routes.html"
+                                  title='fn rowdy::routes'>routes</a></td>
+                           <td class='docblock-short'>
+                                <p>Return routes provided by rowdy</p>
+                           </td>
+                       </tr></table></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "rowdy";
+    </script>
+    <script src="../main.js"></script>
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

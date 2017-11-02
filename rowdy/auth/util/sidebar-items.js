@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["generate_salt","Generate a new random salt based on the configured salt length"],["hash_password_digest","Given a password and a salt, generate an argon2i hash 32 bytes in length"],["hex_dump","Dump a bunch of bytes as a hexadecimal string"]]});

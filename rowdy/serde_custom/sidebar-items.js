@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["duration","Custom serializer and deserializer for `std::time::Duration`. Serializes to seconds, and deserializes from seconds."]]});

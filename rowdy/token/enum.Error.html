@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Error` enum in crate `rowdy`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Error">
+
+    <title>rowdy::token::Error - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc enum">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'>Enum Error</p><div class="block items"><ul><li><a href="#variants">Variants</a></li><li><a href="#implementations">Trait Implementations</a></li></ul></div><p class='location'><a href='../index.html'>rowdy</a>::<wbr><a href='index.html'>token</a></p><script>window.sidebarCurrent = {name: 'Error', ty: 'enum', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Enum <a href='../index.html'>rowdy</a>::<wbr><a href='index.html'>token</a>::<wbr><a class="enum" href=''>Error</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../src/rowdy/token.rs.html#32-67' title='goto source code'>[src]</a></span></h1>
+<pre class='rust enum'>pub enum Error {
+    TokenAlreadyEncoded,
+    TokenAlreadyDecoded,
+    TokenNotEncoded,
+    TokenNotDecoded,
+    NoRefreshToken,
+    RefreshTokenAlreadyEncrypted,
+    RefreshTokenAlreadyDecrypted,
+    RefreshTokenNotDecrypted,
+    RefreshTokenNotEncrypted,
+    InvalidService,
+    InvalidIssuer,
+    InvalidAudience,
+    GenericError(<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>),
+    IOError(<a class="struct" href="https://doc.rust-lang.org/nightly/std/io/error/struct.Error.html" title="struct std::io::error::Error">Error</a>),
+    JWTError(Error),
+    TokenSerializationError(<a class="struct" href="https://docs.rs/serde_json/1.0.5/serde_json/error/struct.Error.html" title="struct serde_json::error::Error">Error</a>),
+}</pre><div class='docblock'><p>Token errors</p>
+</div><h2 id='variants' class='variants small-section-header'>
+                   Variants<a href='#variants' class='anchor'></a></h2>
+<span id="variant.TokenAlreadyEncoded" class="variant small-section-header"><a href="#variant.TokenAlreadyEncoded" class="anchor field"></a><span id='TokenAlreadyEncoded.v' class='invisible'><code>TokenAlreadyEncoded</code></span></span><div class='docblock'><p>Raised when attempting to encode an already encoded token</p>
+</div><span id="variant.TokenAlreadyDecoded" class="variant small-section-header"><a href="#variant.TokenAlreadyDecoded" class="anchor field"></a><span id='TokenAlreadyDecoded.v' class='invisible'><code>TokenAlreadyDecoded</code></span></span><div class='docblock'><p>Raised when attempting to decode an already decoded token</p>
+</div><span id="variant.TokenNotEncoded" class="variant small-section-header"><a href="#variant.TokenNotEncoded" class="anchor field"></a><span id='TokenNotEncoded.v' class='invisible'><code>TokenNotEncoded</code></span></span><div class='docblock'><p>Raised when attempting to use a decoded token when an encoded one is expected</p>
+</div><span id="variant.TokenNotDecoded" class="variant small-section-header"><a href="#variant.TokenNotDecoded" class="anchor field"></a><span id='TokenNotDecoded.v' class='invisible'><code>TokenNotDecoded</code></span></span><div class='docblock'><p>Raised when attempting to use an encoded token when an decoded one is expected</p>
+</div><span id="variant.NoRefreshToken" class="variant small-section-header"><a href="#variant.NoRefreshToken" class="anchor field"></a><span id='NoRefreshToken.v' class='invisible'><code>NoRefreshToken</code></span></span><div class='docblock'><p>Raised when attempting to perform an operation on the refresh token,
+but the refresh token is not present</p>
+</div><span id="variant.RefreshTokenAlreadyEncrypted" class="variant small-section-header"><a href="#variant.RefreshTokenAlreadyEncrypted" class="anchor field"></a><span id='RefreshTokenAlreadyEncrypted.v' class='invisible'><code>RefreshTokenAlreadyEncrypted</code></span></span><div class='docblock'><p>Raised when attempting to encrypt and sign an already encrypted and signed refresh token</p>
+</div><span id="variant.RefreshTokenAlreadyDecrypted" class="variant small-section-header"><a href="#variant.RefreshTokenAlreadyDecrypted" class="anchor field"></a><span id='RefreshTokenAlreadyDecrypted.v' class='invisible'><code>RefreshTokenAlreadyDecrypted</code></span></span><div class='docblock'><p>Raised when attempting to decrypt and verify an already decrypted and verified refresh token</p>
+</div><span id="variant.RefreshTokenNotDecrypted" class="variant small-section-header"><a href="#variant.RefreshTokenNotDecrypted" class="anchor field"></a><span id='RefreshTokenNotDecrypted.v' class='invisible'><code>RefreshTokenNotDecrypted</code></span></span><div class='docblock'><p>Raised when attempting to use an encrypted refresh token when a decrypted one is expected</p>
+</div><span id="variant.RefreshTokenNotEncrypted" class="variant small-section-header"><a href="#variant.RefreshTokenNotEncrypted" class="anchor field"></a><span id='RefreshTokenNotEncrypted.v' class='invisible'><code>RefreshTokenNotEncrypted</code></span></span><div class='docblock'><p>Raised when attempting to use an decrypted refresh token when a encrypted one is expected</p>
+</div><span id="variant.InvalidService" class="variant small-section-header"><a href="#variant.InvalidService" class="anchor field"></a><span id='InvalidService.v' class='invisible'><code>InvalidService</code></span></span><div class='docblock'><p>Raised when the service requested is not in the list of intended audiences</p>
+</div><span id="variant.InvalidIssuer" class="variant small-section-header"><a href="#variant.InvalidIssuer" class="anchor field"></a><span id='InvalidIssuer.v' class='invisible'><code>InvalidIssuer</code></span></span><div class='docblock'><p>Raised when the issuer is invalid</p>
+</div><span id="variant.InvalidAudience" class="variant small-section-header"><a href="#variant.InvalidAudience" class="anchor field"></a><span id='InvalidAudience.v' class='invisible'><code>InvalidAudience</code></span></span><div class='docblock'><p>Raised when the audience is invalid</p>
+</div><span id="variant.GenericError" class="variant small-section-header"><a href="#variant.GenericError" class="anchor field"></a><span id='GenericError.v' class='invisible'><code>GenericError(<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>)</code></span></span><div class='docblock'><p>Generic Error</p>
+</div><span id="variant.IOError" class="variant small-section-header"><a href="#variant.IOError" class="anchor field"></a><span id='IOError.v' class='invisible'><code>IOError(<a class="struct" href="https://doc.rust-lang.org/nightly/std/io/error/struct.Error.html" title="struct std::io::error::Error">Error</a>)</code></span></span><div class='docblock'><p>IO Error when reading keys from files</p>
+</div><span id="variant.JWTError" class="variant small-section-header"><a href="#variant.JWTError" class="anchor field"></a><span id='JWTError.v' class='invisible'><code>JWTError(Error)</code></span></span><div class='docblock'><p>Errors during token encoding/decoding</p>
+</div><span id="variant.TokenSerializationError" class="variant small-section-header"><a href="#variant.TokenSerializationError" class="anchor field"></a><span id='TokenSerializationError.v' class='invisible'><code>TokenSerializationError(<a class="struct" href="https://docs.rs/serde_json/1.0.5/serde_json/error/struct.Error.html" title="struct serde_json::error::Error">Error</a>)</code></span></span><div class='docblock'><p>Errors during token serialization</p>
+</div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Debug' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-Debug' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#31' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.fmt' class="method"><span id='fmt.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class="struct" href="https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#31' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Formats the value using the given formatter.</p>
+</div></div><h3 id='impl-From&lt;Error&gt;' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;Error&gt; for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-From&lt;Error&gt;' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#4-6' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.from' class="method"><span id='from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/convert/trait.From.html#tymethod.from' class='fnname'>from</a>(f: Error) -&gt; <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#5' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs the conversion.</p>
+</div></div><h3 id='impl-From&lt;Error&gt;-1' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/std/io/error/struct.Error.html" title="struct std::io::error::Error">Error</a>&gt; for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-From&lt;Error&gt;-1' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#4-6' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.from-1' class="method"><span id='from.v-1' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/convert/trait.From.html#tymethod.from' class='fnname'>from</a>(f: <a class="struct" href="https://doc.rust-lang.org/nightly/std/io/error/struct.Error.html" title="struct std::io::error::Error">Error</a>) -&gt; <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#5' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs the conversion.</p>
+</div></div><h3 id='impl-From&lt;Error&gt;-2' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;<a class="struct" href="https://docs.rs/serde_json/1.0.5/serde_json/error/struct.Error.html" title="struct serde_json::error::Error">Error</a>&gt; for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-From&lt;Error&gt;-2' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#4-6' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.from-2' class="method"><span id='from.v-2' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/convert/trait.From.html#tymethod.from' class='fnname'>from</a>(f: <a class="struct" href="https://docs.rs/serde_json/1.0.5/serde_json/error/struct.Error.html" title="struct serde_json::error::Error">Error</a>) -&gt; <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#5' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs the conversion.</p>
+</div></div><h3 id='impl-From&lt;String&gt;' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt; for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-From&lt;String&gt;' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#4-6' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.from-3' class="method"><span id='from.v-3' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/convert/trait.From.html#tymethod.from' class='fnname'>from</a>(f: <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>) -&gt; <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/macros.rs.html#5' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs the conversion.</p>
+</div></div><h3 id='impl-From&lt;&amp;&#39;a str&gt;' class='impl'><span class='in-band'><code>impl&lt;'a&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;&amp;'a <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>&gt; for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-From&lt;&amp;&#39;a str&gt;' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#74-78' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.from-4' class="method"><span id='from.v-4' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/convert/trait.From.html#tymethod.from' class='fnname'>from</a>(s: &amp;'a <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>) -&gt; <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#75-77' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs the conversion.</p>
+</div></div><h3 id='impl-Error' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/std/error/trait.Error.html" title="trait std::error::Error">Error</a> for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-Error' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#80-116' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.description' class="method"><span id='description.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/std/error/trait.Error.html#tymethod.description' class='fnname'>description</a>(&amp;self) -&gt; &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#81-106' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>A short description of the error. <a href="https://doc.rust-lang.org/nightly/std/error/trait.Error.html#tymethod.description">Read more</a></p>
+</div><h4 id='method.cause' class="method"><span id='cause.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/std/error/trait.Error.html#method.cause' class='fnname'>cause</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;<a class="trait" href="https://doc.rust-lang.org/nightly/std/error/trait.Error.html" title="trait std::error::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#108-115' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>The lower-level cause of this error, if any. <a href="https://doc.rust-lang.org/nightly/std/error/trait.Error.html#method.cause">Read more</a></p>
+</div></div><h3 id='impl-Display' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html" title="trait core::fmt::Display">Display</a> for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-Display' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#118-128' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.fmt-1' class="method"><span id='fmt.v-1' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, f: &amp;mut <a class="struct" href="https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#119-127' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Formats the value using the given formatter. <a href="https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html#tymethod.fmt">Read more</a></p>
+</div></div><h3 id='impl-Responder&lt;&#39;r&gt;' class='impl'><span class='in-band'><code>impl&lt;'r&gt; <a class="trait" href="https://api.rocket.rs/rocket/rocket/response/responder/trait.Responder.html" title="trait rocket::response::responder::Responder">Responder</a>&lt;'r&gt; for <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a></code><a href='#impl-Responder&lt;&#39;r&gt;' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#130-153' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.respond_to' class="method"><span id='respond_to.v' class='invisible'><code>fn <a href='https://api.rocket.rs/rocket/rocket/response/responder/trait.Responder.html#tymethod.respond_to' class='fnname'>respond_to</a>(self, _: &amp;<a class="struct" href="https://api.rocket.rs/rocket/rocket/request/request/struct.Request.html" title="struct rocket::request::request::Request">Request</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://api.rocket.rs/rocket/rocket/response/response/struct.Response.html" title="struct rocket::response::response::Response">Response</a>&lt;'r&gt;, <a class="struct" href="https://api.rocket.rs/rocket/rocket/http/status/struct.Status.html" title="struct rocket::http::status::Status">Status</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#131-152' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns <code>Ok</code> if a <code>Response</code> could be generated successfully. Otherwise, returns an <code>Err</code> with a failing <code>Status</code>. <a href="https://api.rocket.rs/rocket/rocket/response/responder/trait.Responder.html#tymethod.respond_to">Read more</a></p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "rowdy";
+    </script>
+    <script src="../../main.js"></script>
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

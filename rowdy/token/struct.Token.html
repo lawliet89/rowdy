@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Token` struct in crate `rowdy`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Token">
+
+    <title>rowdy::token::Token - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc struct">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'>Struct Token</p><div class="block items"><ul><li><a href="#fields">Fields</a></li><li><a href="#methods">Methods</a></li><li><a href="#implementations">Trait Implementations</a></li></ul></div><p class='location'><a href='../index.html'>rowdy</a>::<wbr><a href='index.html'>token</a></p><script>window.sidebarCurrent = {name: 'Token', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../index.html'>rowdy</a>::<wbr><a href='index.html'>token</a>::<wbr><a class="struct" href=''>Token</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../src/rowdy/token.rs.html#657-668' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Token&lt;T&gt; {
+    pub token: JWT&lt;T, Empty&gt;,
+    pub expires_in: <a class="struct" href="https://doc.rust-lang.org/nightly/std/time/duration/struct.Duration.html" title="struct std::time::duration::Duration">Duration</a>,
+    pub issued_at: <a class="struct" href="https://docs.rs/chrono/0.4.0/chrono/datetime/struct.DateTime.html" title="struct chrono::datetime::DateTime">DateTime</a>&lt;<a class="struct" href="https://docs.rs/chrono/0.4.0/chrono/offset/utc/struct.Utc.html" title="struct chrono::offset::utc::Utc">Utc</a>&gt;,
+    pub refresh_token: <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../rowdy/token/struct.RefreshToken.html" title="struct rowdy::token::RefreshToken">RefreshToken</a>&gt;,
+}</pre><div class='docblock'><p>A token that will be serialized into JSON and passed to clients.
+This encapsulates a JSON Web Token or <code>JWT</code>. Clients will pass the encapsulated JWT to services
+that require it. The JWT should be considered opaque to clients. The <code>Token</code> struct contains
+enough information for the client to act on, including expiry times.</p>
+</div><h2 id='fields' class='fields small-section-header'>
+                       Fields<a href='#fields' class='anchor'></a></h2><span id="structfield.token" class="structfield small-section-header">
+                           <a href="#structfield.token" class="anchor field"></a>
+                           <span id="token.v" class='invisible'>
+                           <code>token: JWT&lt;T, Empty&gt;</code>
+                           </span></span><div class='docblock'><p>Tne encapsulated JWT.</p>
+</div><span id="structfield.expires_in" class="structfield small-section-header">
+                           <a href="#structfield.expires_in" class="anchor field"></a>
+                           <span id="expires_in.v" class='invisible'>
+                           <code>expires_in: <a class="struct" href="https://doc.rust-lang.org/nightly/std/time/duration/struct.Duration.html" title="struct std::time::duration::Duration">Duration</a></code>
+                           </span></span><div class='docblock'><p>The duration from <code>issued_at</code> where the token will expire</p>
+</div><span id="structfield.issued_at" class="structfield small-section-header">
+                           <a href="#structfield.issued_at" class="anchor field"></a>
+                           <span id="issued_at.v" class='invisible'>
+                           <code>issued_at: <a class="struct" href="https://docs.rs/chrono/0.4.0/chrono/datetime/struct.DateTime.html" title="struct chrono::datetime::DateTime">DateTime</a>&lt;<a class="struct" href="https://docs.rs/chrono/0.4.0/chrono/offset/utc/struct.Utc.html" title="struct chrono::offset::utc::Utc">Utc</a>&gt;</code>
+                           </span></span><div class='docblock'><p>Time the token was issued at</p>
+</div><span id="structfield.refresh_token" class="structfield small-section-header">
+                           <a href="#structfield.refresh_token" class="anchor field"></a>
+                           <span id="refresh_token.v" class='invisible'>
+                           <code>refresh_token: <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="../../rowdy/token/struct.RefreshToken.html" title="struct rowdy::token::RefreshToken">RefreshToken</a>&gt;</code>
+                           </span></span><div class='docblock'><p>Refresh token, if enabled and requested for</p>
+</div>
+                    <h2 id='methods' class='small-section-header'>
+                      Methods<a href='#methods' class='anchor'></a>
+                    </h2>
+                <h3 id='impl' class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class="trait" href="https://docs.rs/serde/1.0.16/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.16/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> + 'static&gt; <a class="struct" href="../../rowdy/token/struct.Token.html" title="struct rowdy::token::Token">Token</a>&lt;T&gt;</code><a href='#impl' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#684-896' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.with_configuration' class="method"><span id='with_configuration.v' class='invisible'><code>pub fn <a href='#method.with_configuration' class='fnname'>with_configuration</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;config: &amp;<a class="struct" href="../../rowdy/token/struct.Configuration.html" title="struct rowdy::token::Configuration">Configuration</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;subject: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;service: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>, <br>&nbsp;&nbsp;&nbsp;&nbsp;private_claims: T, <br>&nbsp;&nbsp;&nbsp;&nbsp;refresh_token_payload: <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;<a class="enum" href="../../rowdy/enum.JsonValue.html" title="enum rowdy::JsonValue">JsonValue</a>&gt;<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#741-756' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Based on the configuration, make a token for the subject, along with some private claims.</p>
+</div><h4 id='method.encode' class="method"><span id='encode.v' class='invisible'><code>pub fn <a href='#method.encode' class='fnname'>encode</a>(self, secret: &amp;Secret) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#760-768' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Consumes self and encode the embedded JWT with signature.
+If the JWT is already encoded, this returns an error</p>
+</div><h4 id='method.decode' class="method"><span id='decode.v' class='invisible'><code>pub fn <a href='#method.decode' class='fnname'>decode</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;secret: &amp;Secret, <br>&nbsp;&nbsp;&nbsp;&nbsp;algorithm: SignatureAlgorithm<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#772-784' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Consumes self and decode the embedded JWT with signature verification
+If the JWT is already decoded, this returns an error</p>
+</div><h4 id='method.is_decoded' class="method"><span id='is_decoded.v' class='invisible'><code>pub fn <a href='#method.is_decoded' class='fnname'>is_decoded</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#803-808' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns whether the wrapped token is decoded and verified</p>
+</div><h4 id='method.is_encoded' class="method"><span id='is_encoded.v' class='invisible'><code>pub fn <a href='#method.is_encoded' class='fnname'>is_encoded</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#811-813' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns whether the wrapped token is encoded and signed</p>
+</div><h4 id='method.registered_claims' class="method"><span id='registered_claims.v' class='invisible'><code>pub fn <a href='#method.registered_claims' class='fnname'>registered_claims</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;&amp;RegisteredClaims, <a class="enum" href="../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#816-826' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Convenience function to extract the registered claims from a decoded token</p>
+</div><h4 id='method.private_claims' class="method"><span id='private_claims.v' class='invisible'><code>pub fn <a href='#method.private_claims' class='fnname'>private_claims</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;</a>T, <a class="enum" href="../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#829-839' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Conveneince function to extract the private claims from a decoded token</p>
+</div><h4 id='method.header' class="method"><span id='header.v' class='invisible'><code>pub fn <a href='#method.header' class='fnname'>header</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;&amp;Header&lt;Empty&gt;, <a class="enum" href="../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#842-852' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Convenience function to extract the headers from a decoded token</p>
+</div><h4 id='method.encoded_token' class="method"><span id='encoded_token.v' class='invisible'><code>pub fn <a href='#method.encoded_token' class='fnname'>encoded_token</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="enum" href="../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#855-857' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Convenience method to extract the encoded token</p>
+</div><h4 id='method.refresh_token' class="method"><span id='refresh_token.v-1' class='invisible'><code>pub fn <a href='#method.refresh_token' class='fnname'>refresh_token</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;<a class="struct" href="../../rowdy/token/struct.RefreshToken.html" title="struct rowdy::token::RefreshToken">RefreshToken</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#860-862' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Convenience method to obtain a reference to the refresh token</p>
+</div><h4 id='method.encrypt_refresh_token' class="method"><span id='encrypt_refresh_token.v' class='invisible'><code>pub fn <a href='#method.encrypt_refresh_token' class='fnname'>encrypt_refresh_token</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;secret: &amp;Secret, <br>&nbsp;&nbsp;&nbsp;&nbsp;key: &amp;JWK&lt;Empty&gt;<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#865-874' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Consumes self, and encrypt and sign the embedded refresh token</p>
+</div><h4 id='method.decrypt_refresh_token' class="method"><span id='decrypt_refresh_token.v' class='invisible'><code>pub fn <a href='#method.decrypt_refresh_token' class='fnname'>decrypt_refresh_token</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;self, <br>&nbsp;&nbsp;&nbsp;&nbsp;secret: &amp;Secret, <br>&nbsp;&nbsp;&nbsp;&nbsp;key: &amp;JWK&lt;Empty&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;signing_algorithm: SignatureAlgorithm, <br>&nbsp;&nbsp;&nbsp;&nbsp;cek_algorithm: KeyManagementAlgorithm, <br>&nbsp;&nbsp;&nbsp;&nbsp;enc_algorithm: ContentEncryptionAlgorithm<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self, <a class="enum" href="../../rowdy/token/enum.Error.html" title="enum rowdy::token::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#877-890' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Consumes self, and decrypt and verify the signature of the embedded refresh token</p>
+</div><h4 id='method.has_refresh_token' class="method"><span id='has_refresh_token.v' class='invisible'><code>pub fn <a href='#method.has_refresh_token' class='fnname'>has_refresh_token</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#893-895' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns whether there is a refresh token</p>
+</div></div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Debug' class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a>&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> for <a class="struct" href="../../rowdy/token/struct.Token.html" title="struct rowdy::token::Token">Token</a>&lt;T&gt;</code><a href='#impl-Debug' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#656' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.fmt' class="method"><span id='fmt.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class="struct" href="https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#656' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Formats the value using the given formatter.</p>
+</div></div><h3 id='impl-PartialEq' class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;<a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html" title="trait core::cmp::PartialEq">PartialEq</a>&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html" title="trait core::cmp::PartialEq">PartialEq</a> for <a class="struct" href="../../rowdy/token/struct.Token.html" title="struct rowdy::token::Token">Token</a>&lt;T&gt;</code><a href='#impl-PartialEq' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#656' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.eq' class="method"><span id='eq.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#tymethod.eq' class='fnname'>eq</a>(&amp;self, __arg_0: &amp;<a class="struct" href="../../rowdy/token/struct.Token.html" title="struct rowdy::token::Token">Token</a>&lt;T&gt;) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#656' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>This method tests for <code>self</code> and <code>other</code> values to be equal, and is used by <code>==</code>. <a href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#tymethod.eq">Read more</a></p>
+</div><h4 id='method.ne' class="method"><span id='ne.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.ne' class='fnname'>ne</a>(&amp;self, __arg_0: &amp;<a class="struct" href="../../rowdy/token/struct.Token.html" title="struct rowdy::token::Token">Token</a>&lt;T&gt;) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#656' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>This method tests for <code>!=</code>.</p>
+</div></div><h3 id='impl-Clone' class='impl'><span class='in-band'><code>impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> for <a class="struct" href="../../rowdy/token/struct.Token.html" title="struct rowdy::token::Token">Token</a>&lt;T&gt; <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: <a class="trait" href="https://docs.rs/serde/1.0.16/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.16/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> + <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a>,&nbsp;</span></code><a href='#impl-Clone' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#670-682' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.clone' class="method"><span id='clone.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone' class='fnname'>clone</a>(&amp;self) -&gt; Self</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#674-681' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns a copy of the value. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone">Read more</a></p>
+</div><h4 id='method.clone_from' class="method"><span id='clone_from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;</a>Self)</code></span><span class='out-of-band'><div class='ghost'></div><div class='since' title='Stable since Rust version 1.0.0'>1.0.0</div><a class='srclink' href='https://doc.rust-lang.org/nightly/src/core/clone.rs.html#112-114' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs copy-assignment from <code>source</code>. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from">Read more</a></p>
+</div></div><h3 id='impl-Responder&lt;&#39;r&gt;' class='impl'><span class='in-band'><code>impl&lt;'r, T:&nbsp;<a class="trait" href="https://docs.rs/serde/1.0.16/serde/ser/trait.Serialize.html" title="trait serde::ser::Serialize">Serialize</a> + <a class="trait" href="https://docs.rs/serde/1.0.16/serde/de/trait.DeserializeOwned.html" title="trait serde::de::DeserializeOwned">DeserializeOwned</a> + 'static&gt; <a class="trait" href="https://api.rocket.rs/rocket/rocket/response/responder/trait.Responder.html" title="trait rocket::response::responder::Responder">Responder</a>&lt;'r&gt; for <a class="struct" href="../../rowdy/token/struct.Token.html" title="struct rowdy::token::Token">Token</a>&lt;T&gt;</code><a href='#impl-Responder&lt;&#39;r&gt;' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#898-905' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.respond_to' class="method"><span id='respond_to.v' class='invisible'><code>fn <a href='https://api.rocket.rs/rocket/rocket/response/responder/trait.Responder.html#tymethod.respond_to' class='fnname'>respond_to</a>(self, request: &amp;<a class="struct" href="https://api.rocket.rs/rocket/rocket/request/request/struct.Request.html" title="struct rocket::request::request::Request">Request</a>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://api.rocket.rs/rocket/rocket/response/response/struct.Response.html" title="struct rocket::response::response::Response">Response</a>&lt;'r&gt;, <a class="struct" href="https://api.rocket.rs/rocket/rocket/http/status/struct.Status.html" title="struct rocket::http::status::Status">Status</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../src/rowdy/token.rs.html#899-904' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Returns <code>Ok</code> if a <code>Response</code> could be generated successfully. Otherwise, returns an <code>Err</code> with a failing <code>Status</code>. <a href="https://api.rocket.rs/rocket/rocket/response/responder/trait.Responder.html#tymethod.respond_to">Read more</a></p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "rowdy";
+    </script>
+    <script src="../../main.js"></script>
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

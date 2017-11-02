@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `table` struct in crate `rowdy_diesel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, table">
+
+    <title>rowdy_diesel::schema::users::table - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc struct">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'>Struct table</p><div class="block items"><ul><li><a href="#methods">Methods</a></li><li><a href="#implementations">Trait Implementations</a></li></ul></div><p class='location'><a href='../../index.html'>rowdy_diesel</a>::<wbr><a href='../index.html'>schema</a>::<wbr><a href='index.html'>users</a></p><script>window.sidebarCurrent = {name: 'table', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../../index.html'>rowdy_diesel</a>::<wbr><a href='../index.html'>schema</a>::<wbr><a href='index.html'>users</a>::<wbr><a class="struct" href=''>table</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span></span></h1>
+<pre class='rust struct'>pub struct table;</pre><div class='docblock'><p>The actual table struct</p>
+
+<p>This is the type which provides the base methods of the query
+builder, such as <code>.select</code> and <code>.filter</code>.</p>
+</div>
+                    <h2 id='methods' class='small-section-header'>
+                      Methods<a href='#methods' class='anchor'></a>
+                    </h2>
+                <h3 id='impl' class='impl'><span class='in-band'><code>impl <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='method.star' class="method"><span id='star.v' class='invisible'><code>pub fn <a href='#method.star' class='fnname'>star</a>(&amp;self) -&gt; <a class="struct" href="../../../rowdy_diesel/schema/users/struct.star.html" title="struct rowdy_diesel::schema::users::star">star</a></code></span></h4>
+<div class='docblock'><p>Represents <code>table_name.*</code>, which is sometimes necessary
+for efficient count queries. It cannot be used in place of
+<code>all_columns</code></p>
+</div></div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Debug' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-Debug' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='method.fmt' class="method"><span id='fmt.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class="struct" href="https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></code></span></h4>
+<div class='docblock'><p>Formats the value using the given formatter.</p>
+</div></div><h3 id='impl-Clone' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-Clone' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='method.clone' class="method"><span id='clone.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code></span></h4>
+<div class='docblock'><p>Returns a copy of the value. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#tymethod.clone">Read more</a></p>
+</div><h4 id='method.clone_from' class="method"><span id='clone_from.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;</a>Self)</code></span><span class='out-of-band'><div class='ghost'></div><div class='since' title='Stable since Rust version 1.0.0'>1.0.0</div><a class='srclink' href='https://doc.rust-lang.org/nightly/src/core/clone.rs.html#112-114' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Performs copy-assignment from <code>source</code>. <a href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from">Read more</a></p>
+</div></div><h3 id='impl-Copy' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html" title="trait core::marker::Copy">Copy</a> for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-Copy' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'></div><h3 id='impl-QuerySource' class='impl'><span class='in-band'><code>impl QuerySource for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-QuerySource' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.FromClause' class="type"><span id='FromClause.t' class='invisible'><code>type <a href='#associatedtype.FromClause' class="type">FromClause</a> = Identifier&lt;'static&gt;</code></span></h4>
+<h4 id='associatedtype.DefaultSelection' class="type"><span id='DefaultSelection.t' class='invisible'><code>type <a href='#associatedtype.DefaultSelection' class="type">DefaultSelection</a> = Self::AllColumns</code></span></h4>
+<h4 id='method.from_clause' class="method"><span id='from_clause.v' class='invisible'><code>fn <a href='#method.from_clause' class='fnname'>from_clause</a>(&amp;self) -&gt; Self::FromClause</code></span></h4>
+<h4 id='method.default_selection' class="method"><span id='default_selection.v' class='invisible'><code>fn <a href='#method.default_selection' class='fnname'>default_selection</a>(&amp;self) -&gt; Self::DefaultSelection</code></span></h4>
+</div><h3 id='impl-AsQuery' class='impl'><span class='in-band'><code>impl AsQuery for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-AsQuery' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.SqlType' class="type"><span id='SqlType.t' class='invisible'><code>type <a href='#associatedtype.SqlType' class="type">SqlType</a> = <a class="type" href="../../../rowdy_diesel/schema/users/type.SqlType.html" title="type rowdy_diesel::schema::users::SqlType">SqlType</a></code></span></h4>
+<h4 id='associatedtype.Query' class="type"><span id='Query.t' class='invisible'><code>type <a href='#associatedtype.Query' class="type">Query</a> = SelectStatement&lt;Self&gt;</code></span></h4>
+<h4 id='method.as_query' class="method"><span id='as_query.v' class='invisible'><code>fn <a href='#method.as_query' class='fnname'>as_query</a>(self) -&gt; Self::Query</code></span></h4>
+</div><h3 id='impl-Table' class='impl'><span class='in-band'><code>impl Table for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-Table' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.PrimaryKey' class="type"><span id='PrimaryKey.t' class='invisible'><code>type <a href='#associatedtype.PrimaryKey' class="type">PrimaryKey</a> = <a class="struct" href="../../../rowdy_diesel/schema/users/struct.username.html" title="struct rowdy_diesel::schema::users::username">username</a></code></span></h4>
+<h4 id='associatedtype.AllColumns' class="type"><span id='AllColumns.t' class='invisible'><code>type <a href='#associatedtype.AllColumns' class="type">AllColumns</a> = <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(</a><a class="struct" href="../../../rowdy_diesel/schema/users/struct.username.html" title="struct rowdy_diesel::schema::users::username">username</a>, <a class="struct" href="../../../rowdy_diesel/schema/users/struct.hash.html" title="struct rowdy_diesel::schema::users::hash">hash</a>, <a class="struct" href="../../../rowdy_diesel/schema/users/struct.salt.html" title="struct rowdy_diesel::schema::users::salt">salt</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">)</a></code></span></h4>
+<h4 id='method.primary_key' class="method"><span id='primary_key.v' class='invisible'><code>fn <a href='#method.primary_key' class='fnname'>primary_key</a>(&amp;self) -&gt; Self::PrimaryKey</code></span></h4>
+<h4 id='method.all_columns' class="method"><span id='all_columns.v' class='invisible'><code>fn <a href='#method.all_columns' class='fnname'>all_columns</a>() -&gt; Self::AllColumns</code></span></h4>
+</div><h3 id='impl-HasTable' class='impl'><span class='in-band'><code>impl HasTable for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-HasTable' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.Table' class="type"><span id='Table.t' class='invisible'><code>type <a href='#associatedtype.Table' class="type">Table</a> = Self</code></span></h4>
+<h4 id='method.table' class="method"><span id='table.v' class='invisible'><code>fn <a href='#method.table' class='fnname'>table</a>() -&gt; Self::Table</code></span></h4>
+</div><h3 id='impl-IntoUpdateTarget' class='impl'><span class='in-band'><code>impl IntoUpdateTarget for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-IntoUpdateTarget' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.WhereClause' class="type"><span id='WhereClause.t' class='invisible'><code>type <a href='#associatedtype.WhereClause' class="type">WhereClause</a> = &lt;Self::Query as IntoUpdateTarget&gt;::WhereClause</code></span></h4>
+<h4 id='method.into_update_target' class="method"><span id='into_update_target.v' class='invisible'><code>fn <a href='#method.into_update_target' class='fnname'>into_update_target</a>(self) -&gt; UpdateTarget&lt;Self::Table, Self::WhereClause&gt;</code></span></h4>
+</div><h3 id='impl-AppearsInFromClause&lt;table&gt;' class='impl'><span class='in-band'><code>impl AppearsInFromClause&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt; for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-AppearsInFromClause&lt;table&gt;' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.Count' class="type"><span id='Count.t' class='invisible'><code>type <a href='#associatedtype.Count' class="type">Count</a> = Once</code></span></h4>
+</div><h3 id='impl-AppearsInFromClause&lt;T&gt;' class='impl'><span class='in-band'><code>impl&lt;T&gt; AppearsInFromClause&lt;T&gt; for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a> <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: Table + JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;,&nbsp;</span></code><a href='#impl-AppearsInFromClause&lt;T&gt;' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.Count-1' class="type"><span id='Count.t-1' class='invisible'><code>type <a href='#associatedtype.Count' class="type">Count</a> = Never</code></span></h4>
+</div><h3 id='impl-JoinTo&lt;Join&lt;Left, Right, Kind&gt;&gt;' class='impl'><span class='in-band'><code>impl&lt;Left, Right, Kind&gt; JoinTo&lt;Join&lt;Left, Right, Kind&gt;&gt; for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a> <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Join&lt;Left, Right, Kind&gt;: JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;,&nbsp;</span></code><a href='#impl-JoinTo&lt;Join&lt;Left, Right, Kind&gt;&gt;' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.FromClause-1' class="type"><span id='FromClause.t-1' class='invisible'><code>type <a href='#associatedtype.FromClause' class="type">FromClause</a> = Join&lt;Left, Right, Kind&gt;</code></span></h4>
+<h4 id='associatedtype.OnClause' class="type"><span id='OnClause.t' class='invisible'><code>type <a href='#associatedtype.OnClause' class="type">OnClause</a> = &lt;Join&lt;Left, Right, Kind&gt; as JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;&gt;::OnClause</code></span></h4>
+<h4 id='method.join_target' class="method"><span id='join_target.v' class='invisible'><code>fn <a href='#method.join_target' class='fnname'>join_target</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;rhs: Join&lt;Left, Right, Kind&gt;<br>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(</a>Self::FromClause, Self::OnClause<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">)</a></code></span></h4>
+</div><h3 id='impl-JoinTo&lt;JoinOn&lt;Join, On&gt;&gt;' class='impl'><span class='in-band'><code>impl&lt;Join, On&gt; JoinTo&lt;JoinOn&lt;Join, On&gt;&gt; for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a> <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;JoinOn&lt;Join, On&gt;: JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;,&nbsp;</span></code><a href='#impl-JoinTo&lt;JoinOn&lt;Join, On&gt;&gt;' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.FromClause-2' class="type"><span id='FromClause.t-2' class='invisible'><code>type <a href='#associatedtype.FromClause' class="type">FromClause</a> = JoinOn&lt;Join, On&gt;</code></span></h4>
+<h4 id='associatedtype.OnClause-1' class="type"><span id='OnClause.t-1' class='invisible'><code>type <a href='#associatedtype.OnClause' class="type">OnClause</a> = &lt;JoinOn&lt;Join, On&gt; as JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;&gt;::OnClause</code></span></h4>
+<h4 id='method.join_target-1' class="method"><span id='join_target.v-1' class='invisible'><code>fn <a href='#method.join_target' class='fnname'>join_target</a>(rhs: JoinOn&lt;Join, On&gt;) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(</a>Self::FromClause, Self::OnClause<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">)</a></code></span></h4>
+</div><h3 id='impl-JoinTo&lt;SelectStatement&lt;F, S, D, W, O, L, Of, G&gt;&gt;' class='impl'><span class='in-band'><code>impl&lt;F, S, D, W, O, L, Of, G&gt; JoinTo&lt;SelectStatement&lt;F, S, D, W, O, L, Of, G&gt;&gt; for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a> <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;SelectStatement&lt;F, S, D, W, O, L, Of, G&gt;: JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;,&nbsp;</span></code><a href='#impl-JoinTo&lt;SelectStatement&lt;F, S, D, W, O, L, Of, G&gt;&gt;' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.FromClause-3' class="type"><span id='FromClause.t-3' class='invisible'><code>type <a href='#associatedtype.FromClause' class="type">FromClause</a> = SelectStatement&lt;F, S, D, W, O, L, Of, G&gt;</code></span></h4>
+<h4 id='associatedtype.OnClause-2' class="type"><span id='OnClause.t-2' class='invisible'><code>type <a href='#associatedtype.OnClause' class="type">OnClause</a> = &lt;SelectStatement&lt;F, S, D, W, O, L, Of, G&gt; as JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;&gt;::OnClause</code></span></h4>
+<h4 id='method.join_target-2' class="method"><span id='join_target.v-2' class='invisible'><code>fn <a href='#method.join_target' class='fnname'>join_target</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;rhs: SelectStatement&lt;F, S, D, W, O, L, Of, G&gt;<br>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(</a>Self::FromClause, Self::OnClause<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">)</a></code></span></h4>
+</div><h3 id='impl-JoinTo&lt;BoxedSelectStatement&lt;&#39;a, QS, ST, DB&gt;&gt;' class='impl'><span class='in-band'><code>impl&lt;'a, QS, ST, DB&gt; JoinTo&lt;BoxedSelectStatement&lt;'a, QS, ST, DB&gt;&gt; for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a> <span class="where fmt-newline">where<br>&nbsp;&nbsp;&nbsp;&nbsp;BoxedSelectStatement&lt;'a, QS, ST, DB&gt;: JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;,&nbsp;</span></code><a href='#impl-JoinTo&lt;BoxedSelectStatement&lt;&#39;a, QS, ST, DB&gt;&gt;' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.FromClause-4' class="type"><span id='FromClause.t-4' class='invisible'><code>type <a href='#associatedtype.FromClause' class="type">FromClause</a> = BoxedSelectStatement&lt;'a, QS, ST, DB&gt;</code></span></h4>
+<h4 id='associatedtype.OnClause-3' class="type"><span id='OnClause.t-3' class='invisible'><code>type <a href='#associatedtype.OnClause' class="type">OnClause</a> = &lt;BoxedSelectStatement&lt;'a, QS, ST, DB&gt; as JoinTo&lt;<a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a>&gt;&gt;::OnClause</code></span></h4>
+<h4 id='method.join_target-3' class="method"><span id='join_target.v-3' class='invisible'><code>fn <a href='#method.join_target' class='fnname'>join_target</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;rhs: BoxedSelectStatement&lt;'a, QS, ST, DB&gt;<br>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(</a>Self::FromClause, Self::OnClause<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">)</a></code></span></h4>
+</div><h3 id='impl-QueryId' class='impl'><span class='in-band'><code>impl QueryId for <a class="struct" href="../../../rowdy_diesel/schema/users/struct.table.html" title="struct rowdy_diesel::schema::users::table">table</a></code><a href='#impl-QueryId' class='anchor'></a></span><span class='out-of-band'></span></h3>
+<div class='impl-items'><h4 id='associatedtype.QueryId' class="type"><span id='QueryId.t' class='invisible'><code>type <a href='#associatedtype.QueryId' class="type">QueryId</a> = Self</code></span></h4>
+<h4 id='method.has_static_query_id' class="method"><span id='has_static_query_id.v' class='invisible'><code>fn <a href='#method.has_static_query_id' class='fnname'>has_static_query_id</a>() -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span></h4>
+<h4 id='method.query_id' class="method"><span id='query_id.v' class='invisible'><code>fn <a href='#method.query_id' class='fnname'>query_id</a>() -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/core/any/struct.TypeId.html" title="struct core::any::TypeId">TypeId</a>&gt;</code></span></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../../";
+        window.currentCrate = "rowdy_diesel";
+    </script>
+    <script src="../../../main.js"></script>
+    <script defer src="../../../search-index.js"></script>
+</body>
+</html>

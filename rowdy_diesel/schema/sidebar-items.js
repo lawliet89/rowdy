@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["users","Table used to hold users and their hashed passwords"]],"trait":[["Migration","Trait to provide idempotent minimal migration to create the table necessary for `rowdy-diesel` to work. If you have more sophisticated needs, you are able to add more columns to the basic columns needed for rowdy to work."]]});

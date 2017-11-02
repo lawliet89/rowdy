@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["deserialize","From a `u64`, deserialize into a `Duration` with the `u64` in seconds"],["serialize","Serialize a `Duration` into a `u64` representing the seconds"]]});

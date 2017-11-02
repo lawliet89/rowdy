@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `SimpleAuthenticatorConfiguration` struct in crate `rowdy`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, SimpleAuthenticatorConfiguration">
+
+    <title>rowdy::auth::simple::SimpleAuthenticatorConfiguration - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc struct">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'>Struct SimpleAuthenticatorConfiguration</p><div class="block items"><ul><li><a href="#fields">Fields</a></li><li><a href="#implementations">Trait Implementations</a></li></ul></div><p class='location'><a href='../../index.html'>rowdy</a>::<wbr><a href='../index.html'>auth</a>::<wbr><a href='index.html'>simple</a></p><script>window.sidebarCurrent = {name: 'SimpleAuthenticatorConfiguration', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../../index.html'>rowdy</a>::<wbr><a href='../index.html'>auth</a>::<wbr><a href='index.html'>simple</a>::<wbr><a class="struct" href=''>SimpleAuthenticatorConfiguration</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#187-200' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct SimpleAuthenticatorConfiguration {
+    pub csv_path: <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>,
+    pub has_headers: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,
+    pub delimiter: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.char.html">char</a>,
+}</pre><div class='docblock'><p>(De)Serializable configuration for <code>SimpleAuthenticator</code>. This struct should be included
+in the base <code>Configuration</code>.</p>
+
+<h1 id='examples' class='section-header'><a href='#examples'>Examples</a></h1>
+<pre><code class="language-json">{
+    &quot;csv_path&quot;: &quot;test/fixtures/users.csv&quot;,
+    &quot;has_headers&quot;: false,
+    &quot;delimiter&quot;: &quot; &quot;
+}
+</code></pre>
+</div><h2 id='fields' class='fields small-section-header'>
+                       Fields<a href='#fields' class='anchor'></a></h2><span id="structfield.csv_path" class="structfield small-section-header">
+                           <a href="#structfield.csv_path" class="anchor field"></a>
+                           <span id="csv_path.v" class='invisible'>
+                           <code>csv_path: <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a></code>
+                           </span></span><div class='docblock'><p>Path to the CSV database, in the format described by <code>SimpleAuthenticator</code>. This should be
+relative to the working directory, or an absolute path</p>
+</div><span id="structfield.has_headers" class="structfield small-section-header">
+                           <a href="#structfield.has_headers" class="anchor field"></a>
+                           <span id="has_headers.v" class='invisible'>
+                           <code>has_headers: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code>
+                           </span></span><div class='docblock'><p>Whether the CSV file has a header row or not. Defaults to <code>false</code>.</p>
+</div><span id="structfield.delimiter" class="structfield small-section-header">
+                           <a href="#structfield.delimiter" class="anchor field"></a>
+                           <span id="delimiter.v" class='invisible'>
+                           <code>delimiter: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.char.html">char</a></code>
+                           </span></span><div class='docblock'><p>The delimiter char. By default, this is &#39;,&#39;.
+Because of the limitation of the <code>CSV</code> crate which elects to only allow delimiters with
+one byte, the <code>char</code> will be truncated to only one byte.
+This means you should only use delimiters that are ASCII.</p>
+</div>
+            <h2 id='implementations' class='small-section-header'>
+              Trait Implementations<a href='#implementations' class='anchor'></a>
+            </h2>
+        <h3 id='impl-Eq' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html" title="trait core::cmp::Eq">Eq</a> for <a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticatorConfiguration.html" title="struct rowdy::auth::simple::SimpleAuthenticatorConfiguration">SimpleAuthenticatorConfiguration</a></code><a href='#impl-Eq' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#186' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'></div><h3 id='impl-PartialEq' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html" title="trait core::cmp::PartialEq">PartialEq</a> for <a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticatorConfiguration.html" title="struct rowdy::auth::simple::SimpleAuthenticatorConfiguration">SimpleAuthenticatorConfiguration</a></code><a href='#impl-PartialEq' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#186' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.eq' class="method"><span id='eq.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#tymethod.eq' class='fnname'>eq</a>(&amp;self, __arg_0: &amp;<a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticatorConfiguration.html" title="struct rowdy::auth::simple::SimpleAuthenticatorConfiguration">SimpleAuthenticatorConfiguration</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#186' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>This method tests for <code>self</code> and <code>other</code> values to be equal, and is used by <code>==</code>. <a href="https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#tymethod.eq">Read more</a></p>
+</div><h4 id='method.ne' class="method"><span id='ne.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.ne' class='fnname'>ne</a>(&amp;self, __arg_0: &amp;<a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticatorConfiguration.html" title="struct rowdy::auth::simple::SimpleAuthenticatorConfiguration">SimpleAuthenticatorConfiguration</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#186' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>This method tests for <code>!=</code>.</p>
+</div></div><h3 id='impl-Debug' class='impl'><span class='in-band'><code>impl <a class="trait" href="https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html" title="trait core::fmt::Debug">Debug</a> for <a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticatorConfiguration.html" title="struct rowdy::auth::simple::SimpleAuthenticatorConfiguration">SimpleAuthenticatorConfiguration</a></code><a href='#impl-Debug' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#186' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.fmt' class="method"><span id='fmt.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#tymethod.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class="struct" href="https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html" title="struct core::fmt::Formatter">Formatter</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/nightly/core/fmt/type.Result.html" title="type core::fmt::Result">Result</a></code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#186' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Formats the value using the given formatter.</p>
+</div></div><h3 id='impl-AuthenticatorConfiguration&lt;Basic&gt;' class='impl'><span class='in-band'><code>impl <a class="trait" href="../../../rowdy/auth/trait.AuthenticatorConfiguration.html" title="trait rowdy::auth::AuthenticatorConfiguration">AuthenticatorConfiguration</a>&lt;<a class="type" href="../../../rowdy/auth/type.Basic.html" title="type rowdy::auth::Basic">Basic</a>&gt; for <a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticatorConfiguration.html" title="struct rowdy::auth::simple::SimpleAuthenticatorConfiguration">SimpleAuthenticatorConfiguration</a></code><a href='#impl-AuthenticatorConfiguration&lt;Basic&gt;' class='anchor'></a></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#206-216' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='associatedtype.Authenticator' class="type"><span id='Authenticator.t' class='invisible'><code>type <a href='../../../rowdy/auth/trait.AuthenticatorConfiguration.html#associatedtype.Authenticator' class="type">Authenticator</a> = <a class="struct" href="../../../rowdy/auth/simple/struct.SimpleAuthenticator.html" title="struct rowdy::auth::simple::SimpleAuthenticator">SimpleAuthenticator</a></code></span></h4>
+<div class='docblock'><p>The <code>Authenticator</code> type this configuration is associated with</p>
+</div><h4 id='method.make_authenticator' class="method"><span id='make_authenticator.v' class='invisible'><code>fn <a href='../../../rowdy/auth/trait.AuthenticatorConfiguration.html#tymethod.make_authenticator' class='fnname'>make_authenticator</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;Self::<a class="type" href="../../../rowdy/auth/trait.AuthenticatorConfiguration.html#associatedtype.Authenticator" title="type rowdy::auth::AuthenticatorConfiguration::Authenticator">Authenticator</a>, <a class="enum" href="../../../rowdy/enum.Error.html" title="enum rowdy::Error">Error</a>&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../../../src/rowdy/auth/simple.rs.html#209-215' title='goto source code'>[src]</a></span></h4>
+<div class='docblock'><p>Using the configuration struct, create a new <code>Authenticator</code>.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../../";
+        window.currentCrate = "rowdy";
+    </script>
+    <script src="../../../main.js"></script>
+    <script defer src="../../../search-index.js"></script>
+</body>
+</html>
