@@ -1,15 +1,15 @@
 //! Simple authenticator module
-use std::io::{Read, Write};
 use std::collections::HashMap;
+use std::io::{Read, Write};
 
 use csv;
 // FIXME: Remove dependency on `ring`.
-use ring::test;
 use ring::constant_time::verify_slices_are_equal;
+use ring::test;
 
-use {Error, JsonMap, JsonValue};
-use super::{AuthenticationResult, Basic};
 use super::util::{generate_salt, hash_password_digest, hex_dump};
+use super::{AuthenticationResult, Basic};
+use crate::{Error, JsonMap, JsonValue};
 
 // Code for conversion to hex stolen from rustc-serialize:
 // https://doc.rust-lang.org/rustc-serialize/src/rustc_serialize/hex.rs.html
@@ -154,15 +154,17 @@ impl super::Authenticator<Basic> for SimpleAuthenticator {
     fn authenticate_refresh_token(
         &self,
         refresh_payload: &JsonValue,
-    ) -> Result<AuthenticationResult, ::Error> {
+    ) -> Result<AuthenticationResult, Error> {
         warn_!("Do not use the Simple authenticator in production");
         match *refresh_payload {
             JsonValue::Object(ref map) => {
-                let user = map.get("user")
+                let user = map
+                    .get("user")
                     .ok_or_else(|| super::Error::AuthenticationFailure)?
                     .as_str()
                     .ok_or_else(|| super::Error::AuthenticationFailure)?;
-                let password = map.get("password")
+                let password = map
+                    .get("password")
                     .ok_or_else(|| super::Error::AuthenticationFailure)?
                     .as_str()
                     .ok_or_else(|| super::Error::AuthenticationFailure)?;
@@ -206,7 +208,7 @@ fn default_delimiter() -> char {
 impl super::AuthenticatorConfiguration<Basic> for SimpleAuthenticatorConfiguration {
     type Authenticator = SimpleAuthenticator;
 
-    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
+    fn make_authenticator(&self) -> Result<Self::Authenticator, Error> {
         Ok(SimpleAuthenticator::with_csv_file(
             &self.csv_path,
             self.has_headers,
@@ -239,8 +241,8 @@ pub fn write_csv<W: Write>(users: &Users, mut writer: W) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use auth::Authenticator;
     use super::*;
+    use crate::auth::Authenticator;
 
     fn make_authenticator() -> SimpleAuthenticator {
         not_err!(SimpleAuthenticator::with_csv_file(
@@ -347,8 +349,8 @@ mod tests {
 
     #[test]
     fn simple_authenticator_configuration_deserialization() {
+        use crate::auth::AuthenticatorConfiguration;
         use serde_json;
-        use auth::AuthenticatorConfiguration;
 
         let json = r#"{
             "csv_path": "test/fixtures/users.csv",

@@ -18,28 +18,59 @@
 //! rowdy_diesel = { version = "0.0.1", features = ["mysql"] }
 //! ```
 
-#![allow(legacy_directory_ownership, missing_copy_implementations, missing_debug_implementations,
-        unknown_lints, unsafe_code)]
-#![deny(const_err, dead_code, deprecated, exceeding_bitshifts, fat_ptr_transmutes, improper_ctypes,
-       missing_docs, mutable_transmutes, no_mangle_const_items, non_camel_case_types,
-       non_shorthand_field_patterns, non_upper_case_globals, overflowing_literals,
-       path_statements, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-       stable_features, trivial_casts, trivial_numeric_casts, unconditional_recursion,
-       unknown_crate_types, unreachable_code, unused_allocation, unused_assignments,
-       unused_attributes, unused_comparisons, unused_extern_crates, unused_features,
-       unused_imports, unused_import_braces, unused_qualifications, unused_must_use, unused_mut,
-       unused_parens, unused_results, unused_unsafe, unused_variables, variant_size_differences,
-       warnings, while_true)]
+#![allow(
+    legacy_directory_ownership,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    unknown_lints,
+    intra_doc_link_resolution_failure
+)]
+#![deny(
+    const_err,
+    dead_code,
+    deprecated,
+    exceeding_bitshifts,
+    improper_ctypes,
+    missing_docs,
+    mutable_transmutes,
+    no_mangle_const_items,
+    non_camel_case_types,
+    non_shorthand_field_patterns,
+    non_upper_case_globals,
+    overflowing_literals,
+    path_statements,
+    plugin_as_library,
+    stable_features,
+    trivial_casts,
+    trivial_numeric_casts,
+    unconditional_recursion,
+    unknown_crate_types,
+    unreachable_code,
+    unused_allocation,
+    unused_assignments,
+    unused_attributes,
+    unused_comparisons,
+    unused_extern_crates,
+    unused_features,
+    unused_imports,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    unused_mut,
+    unused_parens,
+    unused_results,
+    unused_unsafe,
+    unused_variables,
+    variant_size_differences,
+    warnings,
+    while_true
+)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
 #[macro_use]
 extern crate diesel;
 #[macro_use]
-extern crate diesel_codegen;
-#[macro_use]
 extern crate log;
-extern crate r2d2;
-extern crate r2d2_diesel;
 extern crate ring;
 #[macro_use]
 extern crate rocket;
@@ -49,14 +80,13 @@ extern crate rowdy;
 extern crate serde_derive;
 extern crate serde_json;
 
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use serde_json::value;
-use r2d2::PooledConnection;
-use r2d2_diesel::ConnectionManager;
 // FIXME: Remove dependency on `ring`.
 use ring::constant_time::verify_slices_are_equal;
-use rowdy::{JsonMap, JsonValue};
-use rowdy::auth::{self, AuthenticationResult, Authorization, Basic};
 use rowdy::auth::util::{hash_password_digest, hex_dump};
+use rowdy::auth::{self, AuthenticationResult, Authorization, Basic};
+use rowdy::{JsonMap, JsonValue};
 
 pub mod schema;
 
@@ -74,7 +104,7 @@ pub use diesel::connection::Connection;
 ///
 /// Type `T` should implement
 /// [`Connection`](http://docs.diesel.rs/diesel/connection/trait.Connection.html)
-pub(crate) type ConnectionPool<T> = r2d2::Pool<ConnectionManager<T>>;
+pub(crate) type ConnectionPool<T> = Pool<ConnectionManager<T>>;
 
 /// Errors from using `rowdy-diesel`.
 ///
@@ -86,14 +116,12 @@ pub enum Error {
     ConnectionError(diesel::result::ConnectionError),
     /// A generic error occuring from Diesel
     DieselError(diesel::result::Error),
-    /// Error while attempting to initialize a connection pool
-    InitializationError,
-    /// Timeout while attempting to retrieve a connection from the connection pool
-    ConnectionTimeout,
     /// Authentication error
     AuthenticationFailure,
     /// Invalid Unicode characters in path
     InvalidUnicodeInPath,
+    /// Connection Pool Error
+    PoolError(r2d2::Error),
 }
 
 impl From<diesel::result::ConnectionError> for Error {
@@ -108,15 +136,9 @@ impl From<diesel::result::Error> for Error {
     }
 }
 
-impl From<r2d2::InitializationError> for Error {
-    fn from(_: r2d2::InitializationError) -> Error {
-        Error::InitializationError
-    }
-}
-
-impl From<r2d2::GetTimeout> for Error {
-    fn from(_: r2d2::GetTimeout) -> Error {
-        Error::ConnectionTimeout
+impl From<r2d2::Error> for Error {
+    fn from(error: r2d2::Error) -> Error {
+        Error::PoolError(error)
     }
 }
 
@@ -124,22 +146,19 @@ impl From<Error> for rowdy::Error {
     fn from(error: Error) -> rowdy::Error {
         match error {
             Error::ConnectionError(e) => {
-                rowdy::Error::Auth(rowdy::auth::Error::GenericError((e.to_string())))
+                rowdy::Error::Auth(rowdy::auth::Error::GenericError(e.to_string()))
             }
             Error::DieselError(e) => {
                 rowdy::Error::Auth(rowdy::auth::Error::GenericError(e.to_string()))
             }
-            Error::ConnectionTimeout => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
-                "Timed out connecting to the database".to_string(),
-            )),
-            Error::InitializationError => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
-                "Error initializing a database connection pool".to_string(),
-            )),
             Error::InvalidUnicodeInPath => rowdy::Error::Auth(rowdy::auth::Error::GenericError(
                 "Path contains invalid unicode characters".to_string(),
             )),
             Error::AuthenticationFailure => {
                 rowdy::Error::Auth(rowdy::auth::Error::AuthenticationFailure)
+            }
+            Error::PoolError(e) => {
+                rowdy::Error::Auth(rowdy::auth::Error::GenericError(e.to_string()))
             }
         }
     }
@@ -169,10 +188,11 @@ where
 impl<T> Authenticator<T>
 where
     T: Connection + 'static,
-    String: diesel::types::FromSql<diesel::types::Text, <T as diesel::Connection>::Backend>,
-    Vec<u8>: diesel::types::FromSql<diesel::types::Binary, <T as diesel::Connection>::Backend>,
+    String: diesel::types::FromSql<diesel::sql_types::Text, <T as diesel::Connection>::Backend>,
+    Vec<u8>: diesel::types::FromSql<diesel::sql_types::Binary, <T as diesel::Connection>::Backend>,
 {
     /// Creates an authenticator backed by a table in a database using a connection pool.
+    #[allow(dead_code)]
     pub(crate) fn new(pool: ConnectionPool<T>) -> Self {
         Self { pool }
     }
@@ -187,9 +207,8 @@ where
 
     /// Search for the specified user entry
     fn search(&self, connection: &T, search_user: &str) -> Result<Vec<User>, Error> {
-        use diesel::FilterDsl;
+        use diesel::prelude::*;
         use diesel::ExpressionMethods;
-        use diesel::LoadDsl;
         use schema::users::dsl::*;
 
         debug_!("Querying user {} from database", search_user);
@@ -217,10 +236,11 @@ where
     fn deserialize_refresh_token_payload(refresh_payload: JsonValue) -> Result<User, Error> {
         match refresh_payload {
             JsonValue::Object(ref map) => {
-                let user = map.get("user").ok_or_else(|| Error::AuthenticationFailure)?;
+                let user = map
+                    .get("user")
+                    .ok_or_else(|| Error::AuthenticationFailure)?;
                 // TODO verify the user object matches the database
-                Ok(value::from_value(user.clone())
-                    .map_err(|_| Error::AuthenticationFailure)?)
+                Ok(value::from_value(user.clone()).map_err(|_| Error::AuthenticationFailure)?)
             }
             _ => Err(Error::AuthenticationFailure),
         }
@@ -286,8 +306,8 @@ where
 impl<T> auth::Authenticator<Basic> for Authenticator<T>
 where
     T: Connection + 'static,
-    String: diesel::types::FromSql<diesel::types::Text, <T as diesel::Connection>::Backend>,
-    Vec<u8>: diesel::types::FromSql<diesel::types::Binary, <T as diesel::Connection>::Backend>,
+    String: diesel::types::FromSql<diesel::sql_types::Text, <T as diesel::Connection>::Backend>,
+    Vec<u8>: diesel::types::FromSql<diesel::sql_types::Binary, <T as diesel::Connection>::Backend>,
 {
     fn authenticate(
         &self,

@@ -1,7 +1,8 @@
 sudo: required
 language: rust
 rust:
-  - nightly-2017-10-11
+  - nightly-2018-11-24
+  - nightly
 matrix:
   allow_failures:
     - rust: nightly
@@ -24,12 +25,18 @@ script:
   - |
     travis-cargo build -- --all-features --all --locked &&
     travis-cargo test -- --all-features --all &&
-    travis-cargo --only nightly-2017-10-11 doc -- --no-deps --all-features --all
+    travis-cargo --only nightly-2018-11-24 doc -- --no-deps --all-features --all
 after_script:
   - sudo docker-compose -f diesel/docker-compose.db.yml down -v
 after_success:
-  - travis-cargo --only nightly-2017-10-11 doc-upload
+  - travis-cargo --only nightly-2018-11-24 doc-upload
 env:
   global:
     - TRAVIS_CARGO_NIGHTLY_FEATURE=""
     - secure: hwv0LMn8lmU6kJy3kwumu/V+k0Nh0yJ8/3UFnaYT7WefcXWWl5B8oXem7+SEtSpe6/dfJ+rX1MpwAJhfRlNXSrGc3BZwIvWy6G19AyeXqGLhHpJVXjA3XWXyer72BHuB59FNw0glGVg+p2bl/pOkzUDkQotBoTnMBusSgaTXgPwFOG35KcDf/zfpOd7Cu2mSOLRbQ9KwxhS0v5NyDdpxWrSd1YQYbUUveaBlLKBl87A3ik8StErWopiMUGM4CO4OAR2giUhKkC4fqeodY9+kGwgydkMluKrRTC40xDm25GexDSPlcbs3SiqTd7ezmlk7+N+qU1dclmutkpldr59WZjKiG//CaaPiE7pa+7ferF08p+TyN+W+ce5kqNUNI2bqJy8Pk0Al6YAnwn2SAVZ7WCL8PO/B4NMO7LO5WO6+w9DPSE0cFvyuRCyMHU/q2zTZjB+4A5oTgeZvP3U1TSSPKAslb9LCY7SxwJTin6VS3dfLnVS+dMJe1dpn/Xa7eqp2INcEPKTFMOf63iwP1Go5mvcIvUF4v1JDbAfb1gU5UFwN6an5NAgJUlsfB0Un2K48APyIXrIWcGuHHT9yJV9jpA6TfVkJN7CfTJfPoR0vZbmE9fChZ69JY0HfK+EvVcF3utkIhWXiZ5hjUtcVa2dMVehyRoGCYzimVCWPpllsKSs=
+branches:
+  only:
+  - master
+
+notifications:
+  email: false

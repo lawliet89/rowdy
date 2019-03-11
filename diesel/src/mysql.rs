@@ -1,16 +1,15 @@
 //! MySQL authenticator module
 //!
 //! Requires `features = ["mysql"]` in your `Cargo.toml`
-use diesel::prelude::*;
 use diesel::mysql::MysqlConnection;
-use r2d2::Config;
-use r2d2_diesel::ConnectionManager;
+use diesel::prelude::*;
+use diesel::r2d2::{Builder, ConnectionManager};
 
 use rowdy;
 use rowdy::auth::{AuthenticatorConfiguration, Basic};
 
-use {ConnectionPool, Error, PooledConnection};
 use schema;
+use {Error, PooledConnection};
 
 /// A rowdy authenticator that uses a MySQL backed database to provide the users
 pub type Authenticator = ::Authenticator<MysqlConnection>;
@@ -23,10 +22,9 @@ impl Authenticator {
         // Attempt a test connection with diesel
         let _ = Self::connect(uri)?;
 
-        let config = Config::default();
-        let manager = ConnectionManager::new(uri);
         debug_!("Creating a connection pool");
-        let pool = ConnectionPool::new(config, manager)?;
+        let manager = ConnectionManager::new(uri.as_ref());
+        let pool = Builder::new().build(manager)?;
         Ok(Self::new(pool))
     }
 
@@ -119,8 +117,8 @@ mod tests {
     use diesel::connection::SimpleConnection;
     use rowdy::auth::Authenticator;
 
-    use schema::Migration;
     use super::*;
+    use schema::Migration;
 
     static SEED: Once = ONCE_INIT;
 
@@ -136,7 +134,6 @@ mod tests {
             connection.batch_execute(&query).expect("to work");
         });
     }
-
 
     fn make_authenticator() -> super::Authenticator {
         let authenticator =
@@ -209,8 +206,8 @@ mod tests {
 
     #[test]
     fn mysql_authenticator_configuration_deserialization() {
-        use serde_json;
         use rowdy::auth::AuthenticatorConfiguration;
+        use serde_json;
 
         let json = r#"{
             "host": "127.0.0.1",

@@ -173,48 +173,73 @@
 //!
 //! Not in use at the moment. Just use `all`.
 //!
-#![feature(plugin, custom_derive)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 // See https://github.com/rust-unofficial/patterns/blob/master/anti_patterns/deny-warnings.md
-#![allow(legacy_directory_ownership, missing_copy_implementations, missing_debug_implementations,
-        unknown_lints, unsafe_code)]
-#![deny(const_err, dead_code, deprecated, exceeding_bitshifts, fat_ptr_transmutes, improper_ctypes,
-       missing_docs, mutable_transmutes, no_mangle_const_items, non_camel_case_types,
-       non_shorthand_field_patterns, non_upper_case_globals, overflowing_literals,
-       path_statements, plugin_as_library, private_no_mangle_fns, private_no_mangle_statics,
-       stable_features, trivial_casts, trivial_numeric_casts, unconditional_recursion,
-       unknown_crate_types, unreachable_code, unused_allocation, unused_assignments,
-       unused_attributes, unused_comparisons, unused_extern_crates, unused_features,
-       unused_imports, unused_import_braces, unused_qualifications, unused_must_use, unused_mut,
-       unused_parens, unused_results, unused_unsafe, unused_variables, variant_size_differences,
-       warnings, while_true)]
+#![allow(
+    legacy_directory_ownership,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    unknown_lints,
+    unsafe_code,
+    intra_doc_link_resolution_failure
+)]
+#![deny(
+    const_err,
+    dead_code,
+    deprecated,
+    exceeding_bitshifts,
+    improper_ctypes,
+    missing_docs,
+    mutable_transmutes,
+    no_mangle_const_items,
+    non_camel_case_types,
+    non_shorthand_field_patterns,
+    non_upper_case_globals,
+    overflowing_literals,
+    path_statements,
+    plugin_as_library,
+    stable_features,
+    trivial_casts,
+    trivial_numeric_casts,
+    unconditional_recursion,
+    unknown_crate_types,
+    unreachable_code,
+    unused_allocation,
+    unused_assignments,
+    unused_attributes,
+    unused_comparisons,
+    unused_extern_crates,
+    unused_features,
+    unused_imports,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    unused_mut,
+    unused_parens,
+    unused_results,
+    unused_unsafe,
+    unused_variables,
+    variant_size_differences,
+    warnings,
+    while_true
+)]
 #![doc(test(attr(allow(unused_variables), deny(warnings))))]
 
-extern crate biscuit as jwt;
-extern crate chrono;
-extern crate hyper;
+use biscuit as jwt;
+
+use hyper;
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate rocket;
 // we are using the "log_!" macros which are redefined from `log`'s
-extern crate rocket_cors as cors;
-extern crate serde;
+use rocket_cors as cors;
+
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate uuid;
-
-#[cfg(feature = "simple_authenticator")]
-extern crate argon2rs;
-#[cfg(feature = "simple_authenticator")]
-extern crate csv;
-#[cfg(feature = "ldap_authenticator")]
-extern crate ldap3;
-#[cfg(feature = "simple_authenticator")]
-extern crate ring;
-#[cfg(feature = "ldap_authenticator")]
-extern crate strfmt;
+use serde_json;
 
 #[cfg(test)]
 extern crate serde_test;
@@ -237,14 +262,15 @@ use std::io;
 use std::ops::Deref;
 use std::str::FromStr;
 
-use rocket::Request;
+use ring::rand::SystemRandom;
 use rocket::http::Status;
 use rocket::response::{Responder, Response};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use rocket::Request;
 use serde::de;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub use serde_json::Value as JsonValue;
 pub use serde_json::Map as JsonMap;
+pub use serde_json::Value as JsonValue;
 
 /// Top level error enum
 #[derive(Debug)]
@@ -288,7 +314,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             Error::Auth(ref e) => Some(e),
             Error::CORS(ref e) => Some(e),
@@ -303,7 +329,7 @@ impl error::Error for Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Error::UnsupportedOperation => write!(f, "{}", error::Error::description(self)),
             Error::Auth(ref e) => fmt::Display::fmt(e, f),
@@ -318,7 +344,7 @@ impl fmt::Display for Error {
 }
 
 impl<'r> Responder<'r> for Error {
-    fn respond_to(self, request: &Request) -> Result<Response<'r>, Status> {
+    fn respond_to(self, request: &Request<'_>) -> Result<Response<'r>, Status> {
         match self {
             Error::Auth(e) => e.respond_to(request),
             Error::CORS(e) => e.respond_to(request),
@@ -349,7 +375,7 @@ impl FromStr for Url {
 }
 
 impl fmt::Display for Url {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.as_str())
     }
 }
@@ -372,7 +398,7 @@ impl<'de> Deserialize<'de> for Url {
         impl<'de> de::Visitor<'de> for UrlVisitor {
             type Value = Url;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("a valid URL string")
             }
 
@@ -380,16 +406,18 @@ impl<'de> Deserialize<'de> for Url {
             where
                 E: de::Error,
             {
-                Ok(Url(hyper::Url::from_str(&value)
-                    .map_err(|e| E::custom(e.to_string()))?))
+                Ok(Url(
+                    hyper::Url::from_str(&value).map_err(|e| E::custom(e.to_string()))?
+                ))
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
-                Ok(Url(hyper::Url::from_str(value)
-                    .map_err(|e| E::custom(e.to_string()))?))
+                Ok(Url(
+                    hyper::Url::from_str(value).map_err(|e| E::custom(e.to_string()))?
+                ))
             }
         }
 
@@ -474,13 +502,11 @@ impl<B: auth::AuthenticatorConfiguration<auth::Basic>> Configuration<B> {
         // Prepare the keys
         let keys = self.token.keys()?;
 
-        Ok(
-            rocket::ignite()
-                .manage(self.token.clone())
-                .manage(basic_authenticator)
-                .manage(keys)
-                .attach(token_getter_cors_options),
-        )
+        Ok(rocket::ignite()
+            .manage(self.token.clone())
+            .manage(basic_authenticator)
+            .manage(keys)
+            .attach(token_getter_cors_options))
     }
 }
 
@@ -523,6 +549,17 @@ pub fn launch<B: auth::AuthenticatorConfiguration<auth::Basic>>(
 ) -> rocket::error::LaunchError {
     let rocket = config.ignite().unwrap_or_else(|e| panic!("{}", e));
     rocket.mount("/", routes()).launch()
+}
+
+/// Return a psuedo random number generator
+pub(crate) fn rng() -> &'static SystemRandom {
+    use std::ops::Deref;
+
+    lazy_static! {
+        static ref RANDOM: SystemRandom = SystemRandom::new();
+    }
+
+    RANDOM.deref()
 }
 
 #[cfg(test)]

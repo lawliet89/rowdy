@@ -1,13 +1,13 @@
 //! LDAP Authentication module
 use std::collections::HashMap;
 
-use ldap3::{LdapConn, Scope, SearchEntry};
 use ldap3::ldap_escape;
-use strfmt::{strfmt, FmtError};
+use ldap3::{LdapConn, Scope, SearchEntry};
 use serde_json::value;
+use strfmt::{strfmt, FmtError};
 
-use {Error, JsonMap, JsonValue};
 use super::{AuthenticationResult, Basic};
+use crate::{Error, JsonMap, JsonValue};
 
 /// Error mapping for `FmtError`
 impl From<FmtError> for Error {
@@ -191,7 +191,8 @@ impl LdapAuthenticator {
     fn deserialize_refresh_token_payload(refresh_payload: JsonValue) -> Result<User, Error> {
         match refresh_payload {
             JsonValue::Object(ref map) => {
-                let user = map.get("user")
+                let user = map
+                    .get("user")
                     .ok_or_else(|| Error::Auth(super::Error::AuthenticationFailure))?;
                 Ok(value::from_value(user.clone())
                     .map_err(|_| super::Error::AuthenticationFailure)?)
@@ -227,7 +228,8 @@ impl LdapAuthenticator {
             Err(errors.join("; "))?;
         }
 
-        let map: JsonMap<_, _> = map.into_iter()
+        let map: JsonMap<_, _> = map
+            .into_iter()
             .map(|tuple| {
                 // Safe to unwrap
                 tuple.unwrap()
@@ -237,10 +239,10 @@ impl LdapAuthenticator {
         let private_claims = match attributes_namespace {
             None => JsonValue::Object(map),
             Some(namespace) => {
-                let outer_map: JsonMap<_, _> = vec![
-                    (namespace.to_string(), JsonValue::Object(map)),
-                ].into_iter()
-                    .collect();
+                let outer_map: JsonMap<_, _> =
+                    vec![(namespace.to_string(), JsonValue::Object(map))]
+                        .into_iter()
+                        .collect();
                 JsonValue::Object(outer_map)
             }
         };
@@ -348,7 +350,7 @@ impl super::Authenticator<Basic> for LdapAuthenticator {
     fn authenticate_refresh_token(
         &self,
         refresh_payload: &JsonValue,
-    ) -> Result<AuthenticationResult, ::Error> {
+    ) -> Result<AuthenticationResult, Error> {
         let user = Self::deserialize_refresh_token_payload(refresh_payload.clone())?;
         Self::build_authentication_result(
             &user,
@@ -363,7 +365,7 @@ impl super::Authenticator<Basic> for LdapAuthenticator {
 impl super::AuthenticatorConfiguration<Basic> for LdapAuthenticator {
     type Authenticator = LdapAuthenticator;
 
-    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
+    fn make_authenticator(&self) -> Result<Self::Authenticator, Error> {
         {
             // Test connection to LDAP server
             let connection = self.connect()?;
@@ -378,8 +380,8 @@ impl super::AuthenticatorConfiguration<Basic> for LdapAuthenticator {
 #[cfg(test)]
 mod tests {
     //! These tests might intermittently fail due to Test server being inaccessible
-    use auth::Authenticator;
     use super::*;
+    use crate::auth::Authenticator;
 
     /// Test LDAP server:
     /// http://www.forumsys.com/tutorials/integration-how-to/ldap/online-ldap-test-server/
@@ -406,8 +408,9 @@ mod tests {
                     "memberOf".to_string(),
                     vec!["admins".to_string(), "user".to_string()],
                 ),
-            ].into_iter()
-                .collect(),
+            ]
+            .into_iter()
+            .collect(),
         }
     }
 
@@ -495,9 +498,10 @@ mod tests {
                 "memberOf".to_string(),
                 vec!["admins".to_string(), "user".to_string()],
             ),
-        ].into_iter()
-            .map(|(key, value)| (key, value::to_value(value).unwrap()))
-            .collect();
+        ]
+        .into_iter()
+        .map(|(key, value)| (key, value::to_value(value).unwrap()))
+        .collect();
 
         assert_eq!(
             JsonValue::Object(expected_attributes),
@@ -520,17 +524,17 @@ mod tests {
                 "memberOf".to_string(),
                 vec!["admins".to_string(), "user".to_string()],
             ),
-        ].into_iter()
-            .map(|(key, value)| (key, value::to_value(value).unwrap()))
-            .collect();
+        ]
+        .into_iter()
+        .map(|(key, value)| (key, value::to_value(value).unwrap()))
+        .collect();
 
-        let namespaced_attributes: JsonMap<_, _> = vec![
-            (
-                "namespace".to_string(),
-                JsonValue::Object(expected_attributes),
-            ),
-        ].into_iter()
-            .collect();
+        let namespaced_attributes: JsonMap<_, _> = vec![(
+            "namespace".to_string(),
+            JsonValue::Object(expected_attributes),
+        )]
+        .into_iter()
+        .collect();
 
         assert_eq!(
             JsonValue::Object(namespaced_attributes),
@@ -547,11 +551,11 @@ mod tests {
             None,
             false,
         ));
-        let expected_attributes: JsonMap<_, _> = vec![
-            ("cn".to_string(), vec!["John Doe".to_string()]),
-        ].into_iter()
-            .map(|(key, value)| (key, value::to_value(value).unwrap()))
-            .collect();
+        let expected_attributes: JsonMap<_, _> =
+            vec![("cn".to_string(), vec!["John Doe".to_string()])]
+                .into_iter()
+                .map(|(key, value)| (key, value::to_value(value).unwrap()))
+                .collect();
 
         assert_eq!(
             JsonValue::Object(expected_attributes),

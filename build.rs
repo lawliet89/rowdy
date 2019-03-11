@@ -2,17 +2,14 @@
 //! incompatible version of rust.
 //! This scipt was stolen from `rocket_codegen`.
 
-extern crate ansi_term;
-extern crate version_check;
-
 use ansi_term::Color::{Blue, Red, White, Yellow};
 use version_check::{is_min_date, is_min_version, is_nightly};
 
 // Specifies the minimum nightly version that is targetted
 // Note that sometimes the `rustc` date might be older than the nightly version,
 // usually one day older
-const MIN_DATE: &'static str = "2017-10-10";
-const MIN_VERSION: &'static str = "1.22.0-nightly";
+const MIN_DATE: &'static str = "2018-11-23";
+const MIN_VERSION: &'static str = "1.32.0-nightly";
 
 // Convenience macro for writing to stderr.
 macro_rules! printerr {

@@ -28,7 +28,7 @@
 
 /// Diesel table definition inside a module to allow for some lints
 mod table_macro {
-    #![allow(unused_qualifications)]
+    #![allow(unused_qualifications, unused_import_braces)]
     table! {
         /// Table used to hold users and their hashed passwords
         ///
@@ -50,7 +50,6 @@ use std::ops::Deref;
 
 use Connection;
 
-
 /// Trait to provide idempotent minimal migration to create the table necessary for `rowdy-diesel`
 /// to work. If you have more sophisticated needs, you are able to add more columns to the basic
 /// columns needed for rowdy to work.
@@ -66,7 +65,6 @@ where
     /// Provide a connection for the migration to work with
     // TODO: Object safety?
     fn connection(&self) -> Result<Self::Connection, ::Error>;
-
 
     /// Format the migration query based on the connection type
     fn migration_query(&self) -> &str;

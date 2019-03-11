@@ -1,5 +1,4 @@
-#![feature(plugin)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 
 #[macro_use]
 extern crate clap;
@@ -173,7 +172,6 @@ where
         .author(crate_authors!())
         .setting(AppSettings::SubcommandRequired)
         .setting(AppSettings::VersionlessSubcommands)
-        .setting(AppSettings::PropagateGlobalValuesDown)
         .global_setting(AppSettings::DontCollapseArgsInUsage)
         .global_setting(AppSettings::NextLineHelp)
         .about(
@@ -216,7 +214,8 @@ fn launch<B>(args: &ArgMatches) -> Result<(), rowdy::Error>
 where
     B: auth::AuthenticatorConfiguration<auth::Basic>,
 {
-    let config = args.value_of("config")
+    let config = args
+        .value_of("config")
         .expect("Required options to be present");
 
     let reader = input_reader(&config)?;
@@ -238,7 +237,8 @@ where
     Connection: rowdy_diesel::Connection + 'static,
     ConnectionPool: std::ops::Deref<Target = Connection>,
 {
-    let config = args.value_of("config")
+    let config = args
+        .value_of("config")
         .expect("Required options to be present");
     let reader = input_reader(&config)?;
     let config = read_config::<Config, _>(reader)?;

@@ -2,15 +2,14 @@
 //!
 //! Requires `features = ["sqlite"]` in your `Cargo.toml`
 use diesel::prelude::*;
+use diesel::r2d2::{Builder, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use r2d2::Config;
-use r2d2_diesel::ConnectionManager;
 
 use rowdy;
 use rowdy::auth::{AuthenticatorConfiguration, Basic};
 
-use {ConnectionPool, Error, PooledConnection};
 use schema;
+use {Error, PooledConnection};
 
 /// A rowdy authenticator that uses a SQLite backed database to provide the users
 pub type Authenticator = ::Authenticator<SqliteConnection>;
@@ -31,10 +30,8 @@ impl Authenticator {
         // Attempt a test connection with diesel
         let _ = Self::connect(path.as_ref())?;
 
-        let config = Config::default();
         let manager = ConnectionManager::new(path.as_ref());
-        debug_!("Creating a connection pool");
-        let pool = ConnectionPool::new(config, manager)?;
+        let pool = Builder::new().build(manager)?;
         Ok(Self::new(pool))
     }
 
@@ -94,7 +91,6 @@ impl AuthenticatorConfiguration<Basic> for Configuration {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::sync::{Once, ONCE_INIT};
@@ -102,8 +98,8 @@ mod tests {
     use diesel::connection::SimpleConnection;
     use rowdy::auth::Authenticator;
 
-    use schema::Migration;
     use super::*;
+    use schema::Migration;
 
     static SEED: Once = ONCE_INIT;
 
@@ -190,8 +186,8 @@ mod tests {
 
     #[test]
     fn sqlite_authenticator_configuration_deserialization() {
-        use serde_json;
         use rowdy::auth::AuthenticatorConfiguration;
+        use serde_json;
 
         let json = r#"{
             "path": "../target/test.db"

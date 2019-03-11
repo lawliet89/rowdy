@@ -11,8 +11,8 @@ use rocket::http::Status;
 use rocket::request::{self, FromRequest, Request};
 use rocket::response;
 use rocket::Outcome;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 pub mod util;
 
@@ -32,21 +32,21 @@ mod ldap;
 #[cfg(feature = "ldap_authenticator")]
 pub use self::ldap::LdapAuthenticator;
 
-use JsonValue;
+use crate::JsonValue;
 
 /// Re-exported [`hyper::header::Scheme`]
-pub type Scheme = hyper::header::Scheme<Err = hyper::error::Error>;
+pub type Scheme = dyn hyper::header::Scheme<Err = hyper::error::Error>;
 /// Re-exported [`hyper::header::Basic`].
 pub type Basic = hyper::header::Basic;
 /// Re-exported [`hyper::header::Bearer`].
 pub type Bearer = hyper::header::Bearer;
 
 /// A typedef for an `Authenticator` trait object that requires HTTP Basic authentication
-pub type BasicAuthenticator = Authenticator<Basic>;
+pub type BasicAuthenticator = dyn Authenticator<Basic>;
 /// A typedef for an `Authenticator` trait object that requires Bearer authentication.
-pub type BearerAuthenticator = Authenticator<Bearer>;
+pub type BearerAuthenticator = dyn Authenticator<Bearer>;
 /// A typedef for an `Authenticator` trait object that uses an arbitrary string
-pub type StringAuthenticator = Authenticator<String>;
+pub type StringAuthenticator = dyn Authenticator<String>;
 
 /// Authentication errors
 #[derive(Debug)]
@@ -82,7 +82,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             Error::HyperError(ref e) => Some(e),
             _ => Some(self),
@@ -91,7 +91,7 @@ impl error::Error for Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Error::HyperError(ref e) => fmt::Display::fmt(e, f),
             _ => write!(f, "{}", error::Error::description(self)),
@@ -100,7 +100,7 @@ impl fmt::Display for Error {
 }
 
 impl<'r> response::Responder<'r> for Error {
-    fn respond_to(self, _: &Request) -> Result<response::Response<'r>, Status> {
+    fn respond_to(self, _: &Request<'_>) -> Result<response::Response<'r>, Status> {
         error_!("Authentication Error: {:?}", self);
         match self {
             Error::MissingAuthorization { ref realm } => {
@@ -108,12 +108,10 @@ impl<'r> response::Responder<'r> for Error {
                 let www_header =
                     rocket::http::Header::new("WWW-Authenticate", format!("Basic realm={}", realm));
 
-                Ok(
-                    response::Response::build()
-                        .status(Status::Unauthorized)
-                        .header(www_header)
-                        .finalize(),
-                )
+                Ok(response::Response::build()
+                    .status(Status::Unauthorized)
+                    .header(www_header)
+                    .finalize())
             }
             Error::AuthenticationFailure => Err(Status::Unauthorized),
             Error::HyperError(_) => Err(Status::BadRequest),
@@ -247,7 +245,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
         &self,
         authorization: &Authorization<S>,
         include_refresh_payload: bool,
-    ) -> Result<AuthenticationResult, ::Error>;
+    ) -> Result<AuthenticationResult, crate::Error>;
 
     /// Verify the credentials provided with the refresh token payload, if supported by the
     /// authenticator.
@@ -258,8 +256,8 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
     fn authenticate_refresh_token(
         &self,
         _payload: &JsonValue,
-    ) -> Result<AuthenticationResult, ::Error> {
-        Err(::Error::UnsupportedOperation)
+    ) -> Result<AuthenticationResult, crate::Error> {
+        Err(crate::Error::UnsupportedOperation)
     }
 
     /// Prepare a response to an authentication request
@@ -271,7 +269,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
         &self,
         authorization: &Authorization<S>,
         request_refresh_token: bool,
-    ) -> Result<AuthenticationResult, ::Error> {
+    ) -> Result<AuthenticationResult, crate::Error> {
         let result = self.authenticate(authorization, request_refresh_token)?;
         if !request_refresh_token && result.refresh_payload.is_some() {
             Err(Error::GenericError(
@@ -292,7 +290,7 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
     fn prepare_refresh_response(
         &self,
         refresh_payload: &JsonValue,
-    ) -> Result<AuthenticationResult, ::Error> {
+    ) -> Result<AuthenticationResult, crate::Error> {
         let result = self.authenticate_refresh_token(refresh_payload)?;
         if result.refresh_payload.is_some() {
             Err(Error::GenericError(
@@ -306,24 +304,25 @@ pub trait Authenticator<S: header::Scheme + 'static>: Send + Sync {
 }
 
 /// Convenience function to respond with a missing authorization error
-pub fn missing_authorization<T>(realm: &str) -> Result<T, ::Error> {
+pub fn missing_authorization<T>(realm: &str) -> Result<T, crate::Error> {
     Err(Error::MissingAuthorization {
         realm: realm.to_string(),
     })?
 }
 
-/// Configuration for the associated type `Authenticator`. [`rowdy::Configuration`] expects its
+/// Configuration for the associated type `Authenticator`. [`crate::Configuration`] expects its
 /// `authenticator` field to implement this trait.
 ///
 /// Before launching, `rowdy` will attempt to make an `Authenticator` based off the
 /// configuration by calling the `make_authenticator` method.
-pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>
-    : Send + Sync + Serialize + DeserializeOwned + 'static {
+pub trait AuthenticatorConfiguration<S: header::Scheme + 'static>:
+    Send + Sync + Serialize + DeserializeOwned + 'static
+{
     /// The `Authenticator` type this configuration is associated with
     type Authenticator: Authenticator<S>;
 
     /// Using the configuration struct, create a new `Authenticator`.
-    fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error>;
+    fn make_authenticator(&self) -> Result<Self::Authenticator, crate::Error>;
 }
 
 /// Result from a successful authentication operation
@@ -341,12 +340,12 @@ pub struct AuthenticationResult {
 pub mod tests {
     #[allow(deprecated)]
     use hyper::header::{self, Header, HeaderFormatter};
-    use rocket::{self, Rocket, State};
     use rocket::http;
     use rocket::local::Client;
+    use rocket::{self, Rocket, State};
 
-    use {Error, JsonMap};
     use super::*;
+    use crate::{Error, JsonMap};
 
     /// Mock authenticator that authenticates only the following:
     ///
@@ -426,7 +425,7 @@ pub mod tests {
         fn authenticate_refresh_token(
             &self,
             refresh_payload: &JsonValue,
-        ) -> Result<AuthenticationResult, ::Error> {
+        ) -> Result<AuthenticationResult, Error> {
             let header: header::Authorization<Basic> =
                 Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
@@ -460,7 +459,7 @@ pub mod tests {
         fn authenticate_refresh_token(
             &self,
             refresh_payload: &JsonValue,
-        ) -> Result<AuthenticationResult, ::Error> {
+        ) -> Result<AuthenticationResult, Error> {
             let header: header::Authorization<Bearer> =
                 Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
@@ -494,7 +493,7 @@ pub mod tests {
         fn authenticate_refresh_token(
             &self,
             refresh_payload: &JsonValue,
-        ) -> Result<AuthenticationResult, ::Error> {
+        ) -> Result<AuthenticationResult, Error> {
             let header: header::Authorization<String> =
                 Self::deserialize_refresh_token_payload(refresh_payload);
             self.authenticate(&Authorization(header), false)
@@ -512,13 +511,13 @@ pub mod tests {
     {
         type Authenticator = MockAuthenticator;
 
-        fn make_authenticator(&self) -> Result<Self::Authenticator, ::Error> {
+        fn make_authenticator(&self) -> Result<Self::Authenticator, Error> {
             Ok(Self::Authenticator {})
         }
     }
 
     /// Ignite a Rocket with a Basic authenticator
-    pub fn ignite_basic(authenticator: Box<Authenticator<Basic>>) -> Rocket {
+    pub fn ignite_basic(authenticator: Box<dyn Authenticator<Basic>>) -> Rocket {
         // Ignite rocket
         rocket::ignite()
             .mount("/", routes![auth_basic])
@@ -530,18 +529,17 @@ pub mod tests {
     #[allow(needless_pass_by_value)]
     fn auth_basic(
         authorization: Option<Authorization<Basic>>,
-        authenticator: State<Box<Authenticator<Basic>>>,
-    ) -> Result<(), ::Error> {
-        let authorization = authorization.ok_or_else(|| {
-            missing_authorization::<()>("https://www.acme.com").unwrap_err()
-        })?;
+        authenticator: State<'_, Box<dyn Authenticator<Basic>>>,
+    ) -> Result<(), Error> {
+        let authorization = authorization
+            .ok_or_else(|| missing_authorization::<()>("https://www.acme.com").unwrap_err())?;
         authenticator
             .prepare_authentication_response(&authorization, true)
             .and_then(|_| Ok(()))
     }
 
     /// Ignite a Rocket with a Bearer authenticator
-    pub fn ignite_bearer(authenticator: Box<Authenticator<Bearer>>) -> Rocket {
+    pub fn ignite_bearer(authenticator: Box<dyn Authenticator<Bearer>>) -> Rocket {
         // Ignite rocket
         rocket::ignite()
             .mount("/", routes![auth_bearer])
@@ -553,18 +551,17 @@ pub mod tests {
     #[allow(needless_pass_by_value)]
     fn auth_bearer(
         authorization: Option<Authorization<Bearer>>,
-        authenticator: State<Box<Authenticator<Bearer>>>,
-    ) -> Result<(), ::Error> {
-        let authorization = authorization.ok_or_else(|| {
-            missing_authorization::<()>("https://www.acme.com").unwrap_err()
-        })?;
+        authenticator: State<'_, Box<dyn Authenticator<Bearer>>>,
+    ) -> Result<(), Error> {
+        let authorization = authorization
+            .ok_or_else(|| missing_authorization::<()>("https://www.acme.com").unwrap_err())?;
         authenticator
             .prepare_authentication_response(&authorization, true)
             .and_then(|_| Ok(()))
     }
 
     /// Ignite a Rocket with a String authenticator
-    pub fn ignite_string(authenticator: Box<Authenticator<String>>) -> Rocket {
+    pub fn ignite_string(authenticator: Box<dyn Authenticator<String>>) -> Rocket {
         // Ignite rocket
         rocket::ignite()
             .mount("/", routes![auth_string])
@@ -576,11 +573,10 @@ pub mod tests {
     #[allow(needless_pass_by_value)]
     fn auth_string(
         authorization: Option<Authorization<String>>,
-        authenticator: State<Box<Authenticator<String>>>,
-    ) -> Result<(), ::Error> {
-        let authorization = authorization.ok_or_else(|| {
-            missing_authorization::<()>("https://www.acme.com").unwrap_err()
-        })?;
+        authenticator: State<'_, Box<dyn Authenticator<String>>>,
+    ) -> Result<(), Error> {
+        let authorization = authorization
+            .ok_or_else(|| missing_authorization::<()>("https://www.acme.com").unwrap_err())?;
         authenticator
             .prepare_authentication_response(&authorization, true)
             .and_then(|_| Ok(()))
@@ -595,9 +591,8 @@ pub mod tests {
         });
 
         let header = HeaderFormatter(&auth).to_string();
-        let parsed_header = not_err!(::auth::Authorization::new(&header));
-        let ::auth::Authorization(header::Authorization(Basic { username, password })) =
-            parsed_header;
+        let parsed_header = not_err!(Authorization::new(&header));
+        let Authorization(header::Authorization(Basic { username, password })) = parsed_header;
         assert_eq!(username, "Aladdin");
         assert_eq!(password, Some("open sesame".to_string()));
     }
@@ -609,8 +604,8 @@ pub mod tests {
             token: "token".to_string(),
         });
         let header = HeaderFormatter(&auth).to_string();
-        let parsed_header = not_err!(::auth::Authorization::new(&header));
-        let ::auth::Authorization(header::Authorization(Bearer { token })) = parsed_header;
+        let parsed_header = not_err!(Authorization::new(&header));
+        let Authorization(header::Authorization(Bearer { token })) = parsed_header;
         assert_eq!(token, "token");
     }
 
@@ -619,9 +614,8 @@ pub mod tests {
     fn parses_string_auth_correctly() {
         let auth = header::Authorization("hello".to_string());
         let header = HeaderFormatter(&auth).to_string();
-        let parsed_header: ::auth::Authorization<String> =
-            not_err!(::auth::Authorization::new(&header));
-        let ::auth::Authorization(header::Authorization(ref s)) = parsed_header;
+        let parsed_header: Authorization<String> = not_err!(Authorization::new(&header));
+        let Authorization(header::Authorization(ref s)) = parsed_header;
         assert_eq!(s, "hello");
     }
 

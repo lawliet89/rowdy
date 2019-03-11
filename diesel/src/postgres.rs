@@ -1,16 +1,15 @@
 //! PostgresSQL authenticator module
 //!
 //! Requires `features = ["postgres"]` in your `Cargo.toml`
-use diesel::prelude::*;
 use diesel::pg::PgConnection;
-use r2d2::Config;
-use r2d2_diesel::ConnectionManager;
+use diesel::prelude::*;
+use diesel::r2d2::{Builder, ConnectionManager};
 
 use rowdy;
 use rowdy::auth::{AuthenticatorConfiguration, Basic};
 
-use {ConnectionPool, Error, PooledConnection};
 use schema;
+use {Error, PooledConnection};
 
 /// A rowdy authenticator that uses a PostgresSQL backed database to provide the users
 pub type Authenticator = ::Authenticator<PgConnection>;
@@ -23,10 +22,9 @@ impl Authenticator {
         // Attempt a test connection with diesel
         let _ = Self::connect(uri)?;
 
-        let config = Config::default();
-        let manager = ConnectionManager::new(uri);
         debug_!("Creating a connection pool");
-        let pool = ConnectionPool::new(config, manager)?;
+        let manager = ConnectionManager::new(uri.as_ref());
+        let pool = Builder::new().build(manager)?;
         Ok(Self::new(pool))
     }
 
@@ -41,11 +39,7 @@ impl Authenticator {
     ) -> Result<Self, Error> {
         let database_uri = format!(
             "postgresql://{}:{}@{}:{}/{}",
-            user,
-            pass,
-            host,
-            port,
-            database
+            user, pass, host, port, database
         );
         Self::with_uri(&database_uri)
     }
@@ -126,8 +120,8 @@ mod tests {
     use diesel::connection::SimpleConnection;
     use rowdy::auth::Authenticator;
 
-    use schema::Migration;
     use super::*;
+    use schema::Migration;
 
     static SEED: Once = ONCE_INIT;
 
@@ -144,7 +138,6 @@ mod tests {
         });
     }
 
-
     fn make_authenticator() -> super::Authenticator {
         let authenticator = super::Authenticator::with_configuration(
             "127.0.0.1",
@@ -152,7 +145,8 @@ mod tests {
             "rowdy",
             "postgres",
             "postgres",
-        ).expect("To be constructed successfully");
+        )
+        .expect("To be constructed successfully");
         reset_and_seed(&authenticator);
         authenticator
     }
@@ -220,8 +214,8 @@ mod tests {
 
     #[test]
     fn mysql_authenticator_configuration_deserialization() {
-        use serde_json;
         use rowdy::auth::AuthenticatorConfiguration;
+        use serde_json;
 
         let json = r#"{
             "host": "127.0.0.1",

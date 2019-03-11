@@ -4,8 +4,8 @@
 //! salt to produce a hash with [Argon2i](https://en.wikipedia.org/wiki/Argon2).
 //!
 //! The hash produced will be 32 bytes long.
+use crate::jwt::jwa::SecureRandom;
 use argon2rs;
-use jwt::jwa::{self, SecureRandom};
 
 static CHARS: &'static [u8] = b"0123456789abcdef";
 
@@ -28,7 +28,7 @@ pub fn hash_password_digest(password: &str, salt: &[u8]) -> Vec<u8> {
 /// See [`Unspecified`](https://briansmith.org/rustdoc/ring/error/struct.Unspecified.html)
 pub fn generate_salt(salt_length: usize) -> Result<Vec<u8>, ()> {
     let mut salt: Vec<u8> = vec![0; salt_length];
-    jwa::rng().fill(&mut salt).map_err(|_| ())?;
+    crate::rng().fill(&mut salt).map_err(|_| ())?;
     Ok(salt)
 }
 

@@ -4,8 +4,8 @@
 //! Clients will pass the encapsulated JWT to services that require it.
 //! The JWT should be considered opaque to clients.
 //! The `Token` struct contains enough information for the client to act on, including expiry times.
-use std::collections::HashSet;
 use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::error;
 use std::fmt;
 use std::fs::File;
@@ -14,18 +14,18 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::time::Duration;
 
-use cors;
+use crate::cors;
+use crate::jwt::{self, jwa, jwk, jws};
 use chrono::{self, DateTime, Utc};
-use jwt::{self, jwa, jwk, jws};
-use rocket::Request;
 use rocket::http::{ContentType, Method, Status};
 use rocket::response::{Responder, Response};
-use serde::Serialize;
+use rocket::Request;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json;
 use uuid::Uuid;
 
-use {ByteSequence, JsonValue};
+use crate::{ByteSequence, JsonValue};
 
 /// Token errors
 #[derive(Debug)]
@@ -61,15 +61,20 @@ pub enum Error {
     /// IO Error when reading keys from files
     IOError(io::Error),
     /// Errors during token encoding/decoding
-    JWTError(jwt::errors::Error),
+    JWTError(Box<jwt::errors::Error>),
     /// Errors during token serialization
     TokenSerializationError(serde_json::Error),
 }
 
-impl_from_error!(jwt::errors::Error, Error::JWTError);
 impl_from_error!(io::Error, Error::IOError);
 impl_from_error!(serde_json::Error, Error::TokenSerializationError);
 impl_from_error!(String, Error::GenericError);
+
+impl From<jwt::errors::Error> for Error {
+    fn from(jwt: jwt::errors::Error) -> Self {
+        Error::JWTError(Box::new(jwt))
+    }
+}
 
 impl<'a> From<&'a str> for Error {
     fn from(s: &'a str) -> Error {
@@ -105,7 +110,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             Error::JWTError(ref e) => Some(e),
             Error::IOError(ref e) => Some(e),
@@ -116,7 +121,7 @@ impl error::Error for Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Error::JWTError(ref e) => fmt::Display::fmt(e, f),
             Error::IOError(ref e) => fmt::Display::fmt(e, f),
@@ -128,21 +133,21 @@ impl fmt::Display for Error {
 }
 
 impl<'r> Responder<'r> for Error {
-    fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
+    fn respond_to(self, _: &Request<'_>) -> Result<Response<'r>, Status> {
         error_!("Token Error: {:?}", self);
         match self {
             Error::InvalidService | Error::InvalidIssuer | Error::InvalidAudience => {
                 Err(Status::Forbidden)
             }
             Error::JWTError(ref e) => {
-                use jwt::errors::Error::*;
+                use crate::jwt::errors::Error::*;
 
-                let status = match *e {
-                    ValidationError(_) |
-                    JsonError(_) |
-                    DecodeBase64(_) |
-                    Utf8(_) |
-                    UnspecifiedCryptographicError => Status::Unauthorized,
+                let status = match **e {
+                    ValidationError(_)
+                    | JsonError(_)
+                    | DecodeBase64(_)
+                    | Utf8(_)
+                    | UnspecifiedCryptographicError => Status::Unauthorized,
                     _ => Status::InternalServerError,
                 };
                 Err(status)
@@ -153,15 +158,14 @@ impl<'r> Responder<'r> for Error {
 }
 
 fn make_uuid() -> Result<Uuid, Error> {
+    use crate::jwt::jwa::SecureRandom;
     use std::error::Error;
-    use jwt::jwa::SecureRandom;
 
     let mut bytes = vec![0; 16];
-    jwa::rng()
+    crate::rng()
         .fill(&mut bytes)
         .map_err(|_| "Unable to generate UUID")?;
-    Ok(Uuid::from_bytes(&bytes)
-        .map_err(|e| e.description().to_string())?)
+    Ok(Uuid::from_bytes(&bytes).map_err(|e| e.description().to_string())?)
 }
 
 fn make_header(signature_algorithm: Option<jwa::SignatureAlgorithm>) -> jws::Header<jwt::Empty> {
@@ -178,12 +182,12 @@ fn make_registered_claims(
     expiry_duration: Duration,
     issuer: &jwt::StringOrUri,
     audience: &jwt::SingleOrMultiple<jwt::StringOrUri>,
-) -> Result<jwt::RegisteredClaims, ::Error> {
+) -> Result<jwt::RegisteredClaims, crate::Error> {
     let expiry_duration = chrono::Duration::from_std(expiry_duration).map_err(|e| e.to_string())?;
 
     Ok(jwt::RegisteredClaims {
         issuer: Some(issuer.clone()),
-        subject: Some(FromStr::from_str(subject).map_err(Error::JWTError)?),
+        subject: Some(FromStr::from_str(subject).map_err(|e| Error::JWTError(Box::new(e)))?),
         audience: Some(audience.clone()),
         issued_at: Some(now.into()),
         not_before: Some(now.into()),
@@ -202,7 +206,7 @@ fn make_token<P: Serialize + DeserializeOwned + 'static>(
     private_claims: P,
     signature_algorithm: Option<jwa::SignatureAlgorithm>,
     now: DateTime<Utc>,
-) -> Result<jwt::JWT<P, jwt::Empty>, ::Error> {
+) -> Result<jwt::JWT<P, jwt::Empty>, crate::Error> {
     let header = make_header(signature_algorithm);
     let registered_claims =
         make_registered_claims(subject, now, expiry_duration, issuer, audience)?;
@@ -262,7 +266,7 @@ const TOKEN_GETTER_HEADERS: &[&str] = &[
     "Origin",
 ];
 
-/// Token configuration. Usually deserialized as part of [`rowdy::Configuration`] from JSON for use.
+/// Token configuration. Usually deserialized as part of [`crate::Configuration`] from JSON for use.
 ///
 ///
 /// # Examples
@@ -328,13 +332,16 @@ pub struct Configuration {
     ///
     /// Defaults to `None`.
     ///
-    /// See [`token::Secret`] for serialization examples
+    /// See [`Secret`] for serialization examples
     #[serde(default)]
     pub secret: Secret,
     /// Expiry duration of tokens, in seconds.
     ///
     /// Defaults to 24 hours when deserialized and left unfilled
-    #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
+    #[serde(
+        with = "crate::serde_custom::duration",
+        default = "Configuration::default_expiry_duration"
+    )]
     pub expiry_duration: Duration,
     /// Customise refresh token options. Set to `None` to disable refresh tokens
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -427,7 +434,10 @@ pub struct RefreshTokenConfiguration {
     /// Expiry duration of refresh tokens, in seconds.
     ///
     /// Defaults to 24 hours when deserialized and left unfilled
-    #[serde(with = "::serde_custom::duration", default = "Configuration::default_expiry_duration")]
+    #[serde(
+        with = "crate::serde_custom::duration",
+        default = "Configuration::default_expiry_duration"
+    )]
     pub expiry_duration: Duration,
 }
 
@@ -476,7 +486,7 @@ impl RefreshToken {
         cek_algorithm: jwa::KeyManagementAlgorithm,
         enc_algorithm: jwa::ContentEncryptionAlgorithm,
         now: DateTime<Utc>,
-    ) -> Result<Self, ::Error> {
+    ) -> Result<Self, crate::Error> {
         // First, make a token
         let token = make_token(
             subject,
@@ -525,18 +535,44 @@ impl RefreshToken {
         !self.encrypted()
     }
 
+    // TODO: Random Nonce! Should we keep a counter?
+    fn encryption_option(&self) -> Result<jwa::EncryptionOptions, Error> {
+        let headers = &self.0.header()?.registered;
+
+        let need_nonce = if let jwa::KeyManagementAlgorithm::A128GCMKW
+        | jwa::KeyManagementAlgorithm::A192GCMKW
+        | jwa::KeyManagementAlgorithm::A256GCMKW = headers.cek_algorithm
+        {
+            true
+        } else if let jwa::ContentEncryptionAlgorithm::A128GCM
+        | jwa::ContentEncryptionAlgorithm::A192GCM
+        | jwa::ContentEncryptionAlgorithm::A256GCM = headers.enc_algorithm
+        {
+            true
+        } else {
+            false
+        };
+        if need_nonce {
+            let nonce = crate::auth::util::generate_salt(96 / 8)
+                .map_err(|_| Error::GenericError("An unknown error".to_string()))?;
+            Ok(jwa::EncryptionOptions::AES_GCM { nonce: nonce })
+        } else {
+            Ok(jwa::EncryptionOptions::None)
+        }
+    }
+
     /// Consumes self, and sign and encrypt the refresh token.
     /// If the Refresh Token is already encrypted, this will return an error
     pub fn encrypt(self, secret: &jws::Secret, key: &jwk::JWK<jwt::Empty>) -> Result<Self, Error> {
         if self.encrypted() {
             Err(Error::RefreshTokenAlreadyEncrypted)?
         }
-
+        let options = self.encryption_option()?;
         let (header, jws) = self.unwrap().unwrap_decrypted();
         let jws = jws.into_encoded(secret)?;
 
         let jwe = jwt::JWE::new_decrypted(header, jws);
-        let jwe = jwe.into_encrypted(key)?;
+        let jwe = jwe.into_encrypted(key, &options)?;
 
         Ok(From::from(jwe))
     }
@@ -585,17 +621,18 @@ impl RefreshToken {
         &self,
         service: &str,
         config: &Configuration,
-        options: Option<jwt::TemporalValidationOptions>,
+        options: Option<jwt::ValidationOptions>,
     ) -> Result<(), Error> {
         use std::str::FromStr;
 
-        let options = options.or_else(|| {
-            Some(jwt::TemporalValidationOptions {
-                issued_at_required: true,
-                not_before_required: true,
-                expiry_required: true,
+        let options = options.unwrap_or_else(|| jwt::ValidationOptions {
+            claim_presence_options: jwt::ClaimPresenceOptions {
+                issued_at: jwt::Presence::Required,
+                not_before: jwt::Presence::Required,
+                expiry: jwt::Presence::Required,
                 ..Default::default()
-            })
+            },
+            ..Default::default()
         });
 
         let claims_set = self.claims_set()?;
@@ -611,29 +648,30 @@ impl RefreshToken {
             .ok_or_else(|| Error::InvalidAudience)?;
 
         verify_service(config, service)
-            .and_then(|_| if audience.contains(&FromStr::from_str(service)?) {
-                Ok(())
-            } else {
-                Err(Error::InvalidAudience)
+            .and_then(|_| {
+                if audience.contains(&FromStr::from_str(service)?) {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidAudience)
+                }
             })
             .and_then(|_| verify_audience(config, audience))
             .and_then(|_| verify_issuer(config, issuer))
             .and_then(|_| {
                 claims_set
                     .registered
-                    .validate_times(options)
-                    .map_err(|e| Error::JWTError(jwt::errors::Error::ValidationError(e)))
+                    .validate(options)
+                    .map_err(|e| Error::JWTError(Box::new(jwt::errors::Error::ValidationError(e))))
             })
     }
 
     /// Convenience function to convert a decrypted payload to string
     pub fn to_string(&self) -> Result<String, Error> {
-        Ok(
-            self.0
-                .encrypted()
-                .map_err(|_| Error::RefreshTokenNotEncrypted)?
-                .to_string(),
-        )
+        Ok(self
+            .0
+            .encrypted()
+            .map_err(|_| Error::RefreshTokenNotEncrypted)?
+            .to_string())
     }
 }
 
@@ -658,7 +696,7 @@ pub struct Token<T> {
     /// Tne encapsulated JWT.
     pub token: jwt::JWT<T, jwt::Empty>,
     /// The duration from `issued_at` where the token will expire
-    #[serde(with = "::serde_custom::duration")]
+    #[serde(with = "crate::serde_custom::duration")]
     pub expires_in: Duration,
     /// Time the token was issued at
     pub issued_at: DateTime<Utc>,
@@ -690,7 +728,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         private_claims: T,
         refresh_token_payload: Option<&JsonValue>,
         now: DateTime<Utc>,
-    ) -> Result<Self, ::Error> {
+    ) -> Result<Self, crate::Error> {
         verify_service(config, service)?;
 
         let access_token = make_token(
@@ -744,7 +782,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
         service: &str,
         private_claims: T,
         refresh_token_payload: Option<&JsonValue>,
-    ) -> Result<Self, ::Error> {
+    ) -> Result<Self, crate::Error> {
         Self::with_configuration_and_time(
             config,
             subject,
@@ -813,7 +851,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     }
 
     /// Convenience function to extract the registered claims from a decoded token
-    pub fn registered_claims(&self) -> Result<&jwt::RegisteredClaims, ::Error> {
+    pub fn registered_claims(&self) -> Result<&jwt::RegisteredClaims, crate::Error> {
         match self.token {
             jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
             ref jwt @ jwt::jws::Compact::Decoded { .. } => Ok(match_extract!(*jwt,
@@ -826,7 +864,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     }
 
     /// Conveneince function to extract the private claims from a decoded token
-    pub fn private_claims(&self) -> Result<&T, ::Error> {
+    pub fn private_claims(&self) -> Result<&T, crate::Error> {
         match self.token {
             jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
             ref jwt @ jwt::jws::Compact::Decoded { .. } => Ok(match_extract!(*jwt,
@@ -839,7 +877,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     }
 
     /// Convenience function to extract the headers from a decoded token
-    pub fn header(&self) -> Result<&jwt::jws::Header<jwt::Empty>, ::Error> {
+    pub fn header(&self) -> Result<&jwt::jws::Header<jwt::Empty>, crate::Error> {
         match self.token {
             jwt::jws::Compact::Encoded(_) => Err(Error::TokenNotDecoded)?,
             ref jwt @ jwt::jws::Compact::Decoded { .. } => Ok(match_extract!(*jwt,
@@ -852,8 +890,12 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
     }
 
     /// Convenience method to extract the encoded token
-    pub fn encoded_token(&self) -> Result<String, ::Error> {
-        Ok(self.token.encoded().map_err(Error::JWTError)?.to_string())
+    pub fn encoded_token(&self) -> Result<String, crate::Error> {
+        Ok(self
+            .token
+            .encoded()
+            .map_err(|e| Error::JWTError(Box::new(e)))?
+            .to_string())
     }
 
     /// Convenience method to obtain a reference to the refresh token
@@ -896,7 +938,7 @@ impl<T: Serialize + DeserializeOwned + 'static> Token<T> {
 }
 
 impl<'r, T: Serialize + DeserializeOwned + 'static> Responder<'r> for Token<T> {
-    fn respond_to(self, request: &Request) -> Result<Response<'r>, Status> {
+    fn respond_to(self, request: &Request<'_>) -> Result<Response<'r>, Status> {
         match self.respond() {
             Ok(r) => Ok(r),
             Err(e) => Err::<String, Error>(e).respond_to(request),
@@ -1093,9 +1135,9 @@ mod tests {
     use chrono::{DateTime, NaiveDateTime, Utc};
     use serde_json;
 
-    use {JsonMap, JsonValue};
-    use jwt;
     use super::*;
+    use crate::jwt;
+    use crate::{JsonMap, JsonValue};
 
     #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
     struct TestClaims {
@@ -1125,7 +1167,7 @@ mod tests {
         };
 
         let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::some(&allowed_origins);
+        let (allowed_origins, _) = crate::cors::AllowedOrigins::some(&allowed_origins);
 
         Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
@@ -1157,7 +1199,8 @@ mod tests {
             jwt::jwa::KeyManagementAlgorithm::A256GCMKW,
             jwt::jwa::ContentEncryptionAlgorithm::A256GCM,
             Utc::now(),
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn make_token(refresh_token: bool) -> Token<TestClaims> {
@@ -1294,11 +1337,9 @@ mod tests {
     #[test]
     fn token_serialization_smoke_test() {
         let expected_token = make_token(false);
-        let token = not_err!(
-            expected_token
-                .clone()
-                .encode(&jwt::jws::Secret::bytes_from_str("secret"))
-        );
+        let token = not_err!(expected_token
+            .clone()
+            .encode(&jwt::jws::Secret::bytes_from_str("secret")));
         let serialized = not_err!(token.serialize());
 
         let deserialized: Token<TestClaims> = not_err!(serde_json::from_str(&serialized));
@@ -1312,11 +1353,9 @@ mod tests {
     #[test]
     fn token_response_smoke_test() {
         let expected_token = make_token(false);
-        let token = not_err!(
-            expected_token
-                .clone()
-                .encode(&jwt::jws::Secret::bytes_from_str("secret"))
-        );
+        let token = not_err!(expected_token
+            .clone()
+            .encode(&jwt::jws::Secret::bytes_from_str("secret")));
         let mut response = not_err!(token.respond());
 
         assert_eq!(response.status(), Status::Ok);
@@ -1541,18 +1580,15 @@ mod tests {
             Default::default(),
             None,
             now,
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     #[test]
     fn refresh_token_validates_correctly() {
         let configuration = make_config(true);
         let refresh_token = make_refresh_token();
-        not_err!(refresh_token.validate(
-            "https://www.example.com/",
-            &configuration,
-            None
-        ));
+        not_err!(refresh_token.validate("https://www.example.com/", &configuration, None));
     }
 
     /// Token does not have an issuer field
@@ -1666,7 +1702,7 @@ mod tests {
 
     /// Issued at time is required
     #[test]
-    #[should_panic(expected = "MissingRequired(\"iat\")")]
+    #[should_panic(expected = "MissingRequiredClaims([\"iat\"])")]
     fn refresh_token_validates_missing_issued_at() {
         let configuration = make_config(true);
 
@@ -1686,7 +1722,7 @@ mod tests {
 
     /// Not before time is required
     #[test]
-    #[should_panic(expected = "MissingRequired(\"nbf\")")]
+    #[should_panic(expected = "MissingRequiredClaims([\"nbf\"])")]
     fn refresh_token_validates_missing_not_before() {
         let configuration = make_config(true);
 
@@ -1706,7 +1742,7 @@ mod tests {
 
     /// Expiry time is required
     #[test]
-    #[should_panic(expected = "MissingRequired(\"exp\")")]
+    #[should_panic(expected = "MissingRequiredClaims([\"exp\"])")]
     fn refresh_token_validates_missing_expiry() {
         let configuration = make_config(true);
 

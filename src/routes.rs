@@ -4,10 +4,11 @@
 #![allow(unmounted_route)]
 
 use hyper;
+use rocket::request::Form;
 use rocket::{Route, State};
 
-use auth;
-use token::{Configuration, Keys, PrivateClaim, RefreshToken, Token};
+use crate::auth;
+use crate::token::{Configuration, Keys, PrivateClaim, RefreshToken, Token};
 
 #[derive(FromForm, Default, Clone, Debug)]
 struct AuthParam {
@@ -22,9 +23,9 @@ impl AuthParam {
     fn verify<S: hyper::header::Scheme + 'static>(
         &self,
         authorization: &auth::Authorization<S>,
-    ) -> Result<(), ::Error> {
+    ) -> Result<(), crate::Error> {
         if authorization.is_bearer() && self.offline_token.is_some() {
-            Err(::Error::BadRequest(
+            Err(crate::Error::BadRequest(
                 "Offline token cannot be requested for when authenticating with a refresh token"
                     .to_string(),
             ))?
@@ -34,14 +35,14 @@ impl AuthParam {
 }
 
 /// Access token retrieval via initial authentication route
-#[get("/?<auth_param>", rank = 1)]
+#[get("/?<auth_param..>", rank = 1)]
 fn token_getter(
     authorization: auth::Authorization<auth::Basic>,
-    auth_param: AuthParam,
-    configuration: State<Configuration>,
-    keys: State<Keys>,
-    authenticator: State<Box<auth::BasicAuthenticator>>,
-) -> Result<Token<PrivateClaim>, ::Error> {
+    auth_param: Form<AuthParam>,
+    configuration: State<'_, Configuration>,
+    keys: State<'_, Keys>,
+    authenticator: State<'_, Box<auth::BasicAuthenticator>>,
+) -> Result<Token<PrivateClaim>, crate::Error> {
     auth_param.verify(&authorization)?;
     authenticator
         .prepare_authentication_response(&authorization, auth_param.offline_token.unwrap_or(false))
@@ -57,7 +58,8 @@ fn token_getter(
             let token = token.encode(signing_key)?;
 
             let token = if configuration.refresh_token_enabled() && token.has_refresh_token() {
-                let refresh_token_key = keys.encryption
+                let refresh_token_key = keys
+                    .encryption
                     .as_ref()
                     .expect("Refresh token was enabled but encryption key is missing");
                 token.encrypt_refresh_token(signing_key, refresh_token_key)?
@@ -70,16 +72,16 @@ fn token_getter(
 }
 
 /// Access token retrieval via refresh token route
-#[get("/?<auth_param>", rank = 2)]
+#[get("/?<auth_param..>", rank = 2)]
 fn refresh_token(
     authorization: auth::Authorization<auth::Bearer>,
-    auth_param: AuthParam,
-    configuration: State<Configuration>,
-    keys: State<Keys>,
-    authenticator: State<Box<auth::BasicAuthenticator>>,
-) -> Result<Token<PrivateClaim>, ::Error> {
+    auth_param: Form<AuthParam>,
+    configuration: State<'_, Configuration>,
+    keys: State<'_, Keys>,
+    authenticator: State<'_, Box<auth::BasicAuthenticator>>,
+) -> Result<Token<PrivateClaim>, crate::Error> {
     if !configuration.refresh_token_enabled() {
-        return Err(::Error::BadRequest(
+        return Err(crate::Error::BadRequest(
             "Refresh token is not enabled".to_string(),
         ));
     }
@@ -115,8 +117,11 @@ fn refresh_token(
 }
 
 /// Route to catch missing Authorization
-#[get("/?<auth_param>", rank = 3)]
-fn bad_request(auth_param: AuthParam, configuration: State<Configuration>) -> Result<(), ::Error> {
+#[get("/?<auth_param..>", rank = 3)]
+fn bad_request(
+    auth_param: Form<AuthParam>,
+    configuration: State<'_, Configuration>,
+) -> Result<(), crate::Error> {
     let _ = auth_param;
     auth::missing_authorization(&configuration.issuer.to_string())
 }
@@ -134,30 +139,30 @@ pub fn routes() -> Vec<Route> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use std::str::FromStr;
+    use std::time::Duration;
 
+    use crate::jwt;
     use hyper;
-    use jwt;
-    use rocket::Rocket;
     use rocket::http::{Header, Status};
     use rocket::local::Client;
+    use rocket::Rocket;
     use serde_json;
 
-    use ByteSequence;
     use super::*;
-    use token::{RefreshTokenConfiguration, Secret};
+    use crate::token::{RefreshTokenConfiguration, Secret};
+    use crate::ByteSequence;
 
     fn ignite() -> Rocket {
         // Ignite rocket
         let allowed_origins = ["https://www.example.com"];
-        let (allowed_origins, _) = ::cors::AllowedOrigins::some(&allowed_origins);
+        let (allowed_origins, _) = crate::cors::AllowedOrigins::some(&allowed_origins);
         let token_configuration = Configuration {
             issuer: FromStr::from_str("https://www.acme.com").unwrap(),
             allowed_origins: allowed_origins,
-            audience: jwt::SingleOrMultiple::Single(
-                not_err!(FromStr::from_str("https://www.example.com")),
-            ),
+            audience: jwt::SingleOrMultiple::Single(not_err!(FromStr::from_str(
+                "https://www.example.com"
+            ))),
             signature_algorithm: Some(jwt::jwa::SignatureAlgorithm::HS512),
             secret: Secret::ByteSequence(ByteSequence::String("secret".to_string())),
             expiry_duration: Duration::from_secs(120),
@@ -168,9 +173,9 @@ mod tests {
                 expiry_duration: Duration::from_secs(86400),
             }),
         };
-        let configuration = ::Configuration {
+        let configuration = crate::Configuration {
             token: token_configuration,
-            basic_authenticator: ::auth::tests::MockAuthenticatorConfiguration {},
+            basic_authenticator: crate::auth::tests::MockAuthenticatorConfiguration {},
         };
 
         let rocket = not_err!(configuration.ignite());
@@ -195,15 +200,16 @@ mod tests {
         let client = not_err!(Client::new(rocket));
 
         // Make headers
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
         let method_header = Header::from(hyper::header::AccessControlRequestMethod(
             hyper::method::Method::Get,
         ));
-        let request_headers = hyper::header::AccessControlRequestHeaders(
-            vec![FromStr::from_str("Authorization").unwrap()],
-        );
+        let request_headers =
+            hyper::header::AccessControlRequestHeaders(vec![
+                FromStr::from_str("Authorization").unwrap()
+            ]);
         let request_headers = Header::from(request_headers);
 
         // Make and dispatch request
@@ -230,9 +236,9 @@ mod tests {
         let client = not_err!(Client::new(rocket));
 
         // Make headers
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
         let auth_header = hyper::header::Authorization(auth::Basic {
             username: "mei".to_owned(),
             password: Some("冻住，不许走!".to_string()),
@@ -294,9 +300,9 @@ mod tests {
         let client = not_err!(Client::new(rocket));
 
         // Make headers
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
         let auth_header = hyper::header::Authorization(auth::Basic {
             username: "Aladin".to_owned(),
             password: Some("let me in".to_string()),
@@ -329,9 +335,9 @@ mod tests {
         let client = not_err!(Client::new(rocket));
 
         // Make headers
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
 
         // Make and dispatch request
         let req = client
@@ -359,9 +365,9 @@ mod tests {
         let client = not_err!(Client::new(rocket));
 
         // Make headers
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
         let auth_header = hyper::header::Authorization(auth::Basic {
             username: "mei".to_owned(),
             password: Some("冻住，不许走!".to_string()),
@@ -396,9 +402,9 @@ mod tests {
 
         // Initial authentication request
         // Make headers
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
         let auth_header = hyper::header::Authorization(auth::Basic {
             username: "mei".to_owned(),
             password: Some("冻住，不许走!".to_string()),
@@ -432,9 +438,9 @@ mod tests {
         let refresh_token = actual_token.refresh_token.unwrap();
 
         // Use refresh token to authenticate
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
         let auth_header = hyper::header::Authorization(auth::Bearer {
             token: refresh_token.to_string().unwrap(),
         });
@@ -494,9 +500,9 @@ mod tests {
         let rocket = ignite();
         let client = not_err!(Client::new(rocket));
 
-        let origin_header = Header::from(not_err!(
-            hyper::header::Origin::from_str("https://www.example.com")
-        ));
+        let origin_header = Header::from(not_err!(hyper::header::Origin::from_str(
+            "https://www.example.com"
+        )));
         let auth_header = hyper::header::Authorization(auth::Bearer {
             token: "foobar".to_string(),
         });

@@ -1,6 +1,6 @@
 [package]
 name = "rowdy-diesel"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["Yong Wen Chua <me@yongwen.xyz>"]
 
 [lib]
@@ -14,22 +14,20 @@ doc = true
 default = []
 
 # Support MySQL
-mysql = ["diesel/mysql", "diesel_codegen/mysql"]
+mysql = ["diesel/mysql"]
 
 # Support Sqlite
-sqlite = ["diesel/sqlite", "diesel_codegen/sqlite"]
+sqlite = ["diesel/sqlite"]
 
 # Support Postgres
-postgres = ["diesel/postgres", "diesel_codegen/postgres"]
+postgres = ["diesel/postgres"]
 
 [dependencies]
-diesel = "0.16"
-diesel_codegen = "0.16"
-log = "0.3"
-r2d2 = "0.7.4"
-r2d2-diesel = "0.16.0"
-ring = "0.11"
-rocket = "0.3.2"
+diesel = { version = "1.4.1", features = ["r2d2"] }
+log = "0.4"
+r2d2 = "0.8"
+ring = "0.13.5"
+rocket = "0.4.0"
 rowdy = { path = "../" }
 serde = "1.0"
 serde_derive = "1.0"

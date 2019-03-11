@@ -1,7 +1,7 @@
 //! Custom serializer and deserializer for `std::time::Duration`. Serializes to seconds,
 //! and deserializes from seconds.
-use std::time::Duration;
 use serde::{Deserialize, Deserializer, Serializer};
+use std::time::Duration;
 
 /// Serialize a `Duration` into a `u64` representing the seconds
 pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
@@ -22,12 +22,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use serde_json;
+    use std::time::Duration;
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     struct TestStruct {
-        #[serde(with = "super")] duration: Duration,
+        #[serde(with = "super")]
+        duration: Duration,
     }
 
     #[test]
