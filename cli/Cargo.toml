@@ -10,7 +10,7 @@ test = true
 doc = false
 
 [dependencies]
-clap = "2.26.2"
+clap = "2.33.1"
 rocket = "0.4.0"
 rowdy = { path = "../", features = ["simple_authenticator", "ldap_authenticator"] }
 rowdy-diesel = { path = "../diesel/", features = ["mysql", "sqlite", "postgres"] }
