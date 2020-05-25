@@ -1064,7 +1064,7 @@ dependencies = [
  "serde_test 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "strfmt 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "version_check 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1685,6 +1685,11 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "version_check"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "winapi"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1917,6 +1922,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum vcpkg 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "def296d3eb3b12371b2c7d0e83bfe1403e4db2d7a0bba324a12b21c4ee13143d"
 "checksum vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "05c78687fb1a80548ae3250346c3db86a80a7cdd77bda190189f2d0a0987c81a"
 "checksum version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
+"checksum version_check 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)" = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "92c1eb33641e276cfa214a0522acad57be5c56b10cb348b3c5117db75f3ac4b0"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"
