@@ -23,7 +23,7 @@ sqlite = ["diesel/sqlite"]
 postgres = ["diesel/postgres"]
 
 [dependencies]
-diesel = { version = "1.4.1", features = ["r2d2"] }
+diesel = { version = "1.4.5", features = ["r2d2"] }
 log = "0.4"
 r2d2 = "0.8"
 ring = "0.13.5"
